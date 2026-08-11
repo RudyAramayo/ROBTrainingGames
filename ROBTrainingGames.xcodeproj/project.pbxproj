@@ -1,0 +1,491 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0EA151C76007B45172EFCFE9 /* RobotFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8EABD4931412AA8A676C80 /* RobotFactory.swift */; };
+		15953347EA4132F63B131F4A /* pickup.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 14F0E4F7ED1B3521087B505C /* pickup.m4a */; };
+		1D7E170D9A3B66DC4DC17F7C /* level-complete.m4a in Resources */ = {isa = PBXBuildFile; fileRef = DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */; };
+		201A3506945F144FBBE58F23 /* RobotFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8EABD4931412AA8A676C80 /* RobotFactory.swift */; };
+		29B0FE86232B80DD18211602 /* rob-training-key-art.png in Resources */ = {isa = PBXBuildFile; fileRef = 765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */; };
+		2C9151B4644B259D0962A455 /* pickup.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 14F0E4F7ED1B3521087B505C /* pickup.m4a */; };
+		374094AD795CF2CAD529E072 /* VisionDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D19BBDDC5D490212B965846 /* VisionDashboard.swift */; };
+		39DA35854B101739582EF190 /* IOSRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF0F5FCFB2ACB31F1C6AD186 /* IOSRootView.swift */; };
+		55B33C4761AB7A8D346EB27C /* rob-training-key-art.png in Resources */ = {isa = PBXBuildFile; fileRef = 765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */; };
+		5A7B452D8C82B7E964553832 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A494856CC93CF9C98076DE8A /* GameSession.swift */; };
+		6CFB7C4FCE1E8C49F724F115 /* ROBTrainingiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */; };
+		755B13E4179BDBE68AE89146 /* ARLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCEF00562EAF419AACD5E344 /* ARLabView.swift */; };
+		7DA72140DFAD6235C27D1DD7 /* SoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */; };
+		801F959142CF82D4438D01F3 /* mission-start.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 43C86D54778FEDD1EDB6D00E /* mission-start.m4a */; };
+		80ACD0D4BE8A79DA1446F819 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */; };
+		8E92EDF0CC8A176364702C1A /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A494856CC93CF9C98076DE8A /* GameSession.swift */; };
+		8F5D5EA3ADB8F70CFA08BA08 /* SoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */; };
+		B0D1FEF0D8A64D0B703D8DE8 /* level-complete.m4a in Resources */ = {isa = PBXBuildFile; fileRef = DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */; };
+		B7203185730E33816035D094 /* laser.m4a in Resources */ = {isa = PBXBuildFile; fileRef = E0A2FF07C60F58B44ADD1698 /* laser.m4a */; };
+		B7C66E4EB88560CD50A43CFD /* mission-start.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 43C86D54778FEDD1EDB6D00E /* mission-start.m4a */; };
+		CB6811B4AEFB9E8FD157EA1D /* ROBTrainingVisionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE0655626B80AE21B885AA7 /* ROBTrainingVisionApp.swift */; };
+		DFCB9518DD1D2EC5D31C7920 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */; };
+		FD7F118B5CF5202E5ED50555 /* laser.m4a in Resources */ = {isa = PBXBuildFile; fileRef = E0A2FF07C60F58B44ADD1698 /* laser.m4a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		14F0E4F7ED1B3521087B505C /* pickup.m4a */ = {isa = PBXFileReference; path = pickup.m4a; sourceTree = "<group>"; };
+		43C86D54778FEDD1EDB6D00E /* mission-start.m4a */ = {isa = PBXFileReference; path = "mission-start.m4a"; sourceTree = "<group>"; };
+		4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		63220C95F6BF85ACADC6A078 /* ROBTrainingVision.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ROBTrainingVision.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "rob-training-key-art.png"; sourceTree = "<group>"; };
+		8D19BBDDC5D490212B965846 /* VisionDashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionDashboard.swift; sourceTree = "<group>"; };
+		A494856CC93CF9C98076DE8A /* GameSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSession.swift; sourceTree = "<group>"; };
+		AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundPlayer.swift; sourceTree = "<group>"; };
+		BE8EABD4931412AA8A676C80 /* RobotFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotFactory.swift; sourceTree = "<group>"; };
+		C02AE4063221AD16DBDA6B2F /* ROBTrainingiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ROBTrainingiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CAE0655626B80AE21B885AA7 /* ROBTrainingVisionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBTrainingVisionApp.swift; sourceTree = "<group>"; };
+		DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */ = {isa = PBXFileReference; path = "level-complete.m4a"; sourceTree = "<group>"; };
+		DCEF00562EAF419AACD5E344 /* ARLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARLabView.swift; sourceTree = "<group>"; };
+		DF0F5FCFB2ACB31F1C6AD186 /* IOSRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSRootView.swift; sourceTree = "<group>"; };
+		E0A2FF07C60F58B44ADD1698 /* laser.m4a */ = {isa = PBXFileReference; path = laser.m4a; sourceTree = "<group>"; };
+		ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBTrainingiOSApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		032F22C9CDE7E3453F3118FE /* Artwork */ = {
+			isa = PBXGroup;
+			children = (
+				765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */,
+			);
+			path = Artwork;
+			sourceTree = "<group>";
+		};
+		32F01E7258E210B584C25E8E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C02AE4063221AD16DBDA6B2F /* ROBTrainingiOS.app */,
+				63220C95F6BF85ACADC6A078 /* ROBTrainingVision.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		6C613CEBBA8D4E47E0FAE94A /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */,
+				032F22C9CDE7E3453F3118FE /* Artwork */,
+				FD1C9C2F0921FEE5D6552908 /* Audio */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		840BAA3052F3C77C4D2DF3DF /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				A494856CC93CF9C98076DE8A /* GameSession.swift */,
+				BE8EABD4931412AA8A676C80 /* RobotFactory.swift */,
+				AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */,
+				6C613CEBBA8D4E47E0FAE94A /* Resources */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		A285A589B1ACF796BD20780F = {
+			isa = PBXGroup;
+			children = (
+				E2871D4B374927D73F2023CB /* iOS */,
+				840BAA3052F3C77C4D2DF3DF /* Shared */,
+				C35E3AB157B10D609CA1C81C /* visionOS */,
+				32F01E7258E210B584C25E8E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C35E3AB157B10D609CA1C81C /* visionOS */ = {
+			isa = PBXGroup;
+			children = (
+				CAE0655626B80AE21B885AA7 /* ROBTrainingVisionApp.swift */,
+				8D19BBDDC5D490212B965846 /* VisionDashboard.swift */,
+			);
+			path = visionOS;
+			sourceTree = "<group>";
+		};
+		E2871D4B374927D73F2023CB /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				DCEF00562EAF419AACD5E344 /* ARLabView.swift */,
+				DF0F5FCFB2ACB31F1C6AD186 /* IOSRootView.swift */,
+				ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */,
+			);
+			path = iOS;
+			sourceTree = "<group>";
+		};
+		FD1C9C2F0921FEE5D6552908 /* Audio */ = {
+			isa = PBXGroup;
+			children = (
+				E0A2FF07C60F58B44ADD1698 /* laser.m4a */,
+				DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */,
+				43C86D54778FEDD1EDB6D00E /* mission-start.m4a */,
+				14F0E4F7ED1B3521087B505C /* pickup.m4a */,
+			);
+			path = Audio;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		83FE2B24F912A97CCB20D19F /* ROBTrainingiOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FD9EA600D0707E1439DE708F /* Build configuration list for PBXNativeTarget "ROBTrainingiOS" */;
+			buildPhases = (
+				C23A66CF241C961ECC2B6A6B /* Sources */,
+				43CB6AF5824FE6832F34685D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ROBTrainingiOS;
+			packageProductDependencies = (
+			);
+			productName = ROBTrainingiOS;
+			productReference = C02AE4063221AD16DBDA6B2F /* ROBTrainingiOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F95C511AA46B6C899321C33A /* ROBTrainingVision */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 87854A2638A439F2AE5D5492 /* Build configuration list for PBXNativeTarget "ROBTrainingVision" */;
+			buildPhases = (
+				17A96675544B714D335BB7C6 /* Sources */,
+				028A3D5DD411036E3682E0F8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ROBTrainingVision;
+			packageProductDependencies = (
+			);
+			productName = ROBTrainingVision;
+			productReference = 63220C95F6BF85ACADC6A078 /* ROBTrainingVision.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		4BB9D135B31621FE80D91201 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					83FE2B24F912A97CCB20D19F = {
+						ProvisioningStyle = Automatic;
+					};
+					F95C511AA46B6C899321C33A = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 2E8B2608943FCA472E521815 /* Build configuration list for PBXProject "ROBTrainingGames" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = A285A589B1ACF796BD20780F;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 32F01E7258E210B584C25E8E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				83FE2B24F912A97CCB20D19F /* ROBTrainingiOS */,
+				F95C511AA46B6C899321C33A /* ROBTrainingVision */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		028A3D5DD411036E3682E0F8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				80ACD0D4BE8A79DA1446F819 /* PrivacyInfo.xcprivacy in Resources */,
+				B7203185730E33816035D094 /* laser.m4a in Resources */,
+				1D7E170D9A3B66DC4DC17F7C /* level-complete.m4a in Resources */,
+				801F959142CF82D4438D01F3 /* mission-start.m4a in Resources */,
+				2C9151B4644B259D0962A455 /* pickup.m4a in Resources */,
+				29B0FE86232B80DD18211602 /* rob-training-key-art.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		43CB6AF5824FE6832F34685D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DFCB9518DD1D2EC5D31C7920 /* PrivacyInfo.xcprivacy in Resources */,
+				FD7F118B5CF5202E5ED50555 /* laser.m4a in Resources */,
+				B0D1FEF0D8A64D0B703D8DE8 /* level-complete.m4a in Resources */,
+				B7C66E4EB88560CD50A43CFD /* mission-start.m4a in Resources */,
+				15953347EA4132F63B131F4A /* pickup.m4a in Resources */,
+				55B33C4761AB7A8D346EB27C /* rob-training-key-art.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		17A96675544B714D335BB7C6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5A7B452D8C82B7E964553832 /* GameSession.swift in Sources */,
+				CB6811B4AEFB9E8FD157EA1D /* ROBTrainingVisionApp.swift in Sources */,
+				0EA151C76007B45172EFCFE9 /* RobotFactory.swift in Sources */,
+				8F5D5EA3ADB8F70CFA08BA08 /* SoundPlayer.swift in Sources */,
+				374094AD795CF2CAD529E072 /* VisionDashboard.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C23A66CF241C961ECC2B6A6B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				755B13E4179BDBE68AE89146 /* ARLabView.swift in Sources */,
+				8E92EDF0CC8A176364702C1A /* GameSession.swift in Sources */,
+				39DA35854B101739582EF190 /* IOSRootView.swift in Sources */,
+				6CFB7C4FCE1E8C49F724F115 /* ROBTrainingiOSApp.swift in Sources */,
+				201A3506945F144FBBE58F23 /* RobotFactory.swift in Sources */,
+				7DA72140DFAD6235C27D1DD7 /* SoundPlayer.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1A97A2147FFC1A90A1AE1CB0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitusrobotics.ROBTraining.vision;
+				PRODUCT_NAME = "ROB Training Vision";
+				SDKROOT = xros;
+				TARGETED_DEVICE_FAMILY = 7;
+			};
+			name = Debug;
+		};
+		2D4266265CAB3C31CDCE17E3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+				XROS_DEPLOYMENT_TARGET = 2.0;
+			};
+			name = Debug;
+		};
+		42C7155E5AEAB53955928F4A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+				XROS_DEPLOYMENT_TARGET = 2.0;
+			};
+			name = Release;
+		};
+		52A47DE1F8AA4A6A87636C1E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "ROB Training";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Place ROB in your room and explore robotics components in augmented reality.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitusrobotics.ROBTraining;
+				PRODUCT_NAME = "ROB Training";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		63A6FBADD704F219E839C162 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "ROB Training";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Place ROB in your room and explore robotics components in augmented reality.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitusrobotics.ROBTraining;
+				PRODUCT_NAME = "ROB Training";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1EF5D78EAC002F238520285 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitusrobotics.ROBTraining.vision;
+				PRODUCT_NAME = "ROB Training Vision";
+				SDKROOT = xros;
+				TARGETED_DEVICE_FAMILY = 7;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2E8B2608943FCA472E521815 /* Build configuration list for PBXProject "ROBTrainingGames" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2D4266265CAB3C31CDCE17E3 /* Debug */,
+				42C7155E5AEAB53955928F4A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		87854A2638A439F2AE5D5492 /* Build configuration list for PBXNativeTarget "ROBTrainingVision" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A97A2147FFC1A90A1AE1CB0 /* Debug */,
+				A1EF5D78EAC002F238520285 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FD9EA600D0707E1439DE708F /* Build configuration list for PBXNativeTarget "ROBTrainingiOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				63A6FBADD704F219E839C162 /* Debug */,
+				52A47DE1F8AA4A6A87636C1E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 4BB9D135B31621FE80D91201 /* Project object */;
+}

@@ -1,0 +1,35 @@
+name: ROBTrainingGames
+options:
+  bundleIdPrefix: com.orbitusrobotics
+  deploymentTarget:
+    iOS: "18.0"
+    visionOS: "2.0"
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    CODE_SIGN_STYLE: Automatic
+targets:
+  ROBTrainingiOS:
+    type: application
+    platform: iOS
+    sources: [Shared, iOS]
+    resources: [Shared/Resources]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.orbitusrobotics.ROBTraining
+        PRODUCT_NAME: ROB Training
+        INFOPLIST_KEY_CFBundleDisplayName: ROB Training
+        INFOPLIST_KEY_NSCameraUsageDescription: Place ROB in your room and explore robotics components in augmented reality.
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+  ROBTrainingVision:
+    type: application
+    platform: visionOS
+    sources: [Shared, visionOS]
+    resources: [Shared/Resources]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.orbitusrobotics.ROBTraining.vision
+        PRODUCT_NAME: ROB Training Vision
+        GENERATE_INFOPLIST_FILE: YES
+
