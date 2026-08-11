@@ -20,6 +20,8 @@ targets:
         PRODUCT_NAME: ROB Training
         INFOPLIST_KEY_CFBundleDisplayName: ROB Training
         INFOPLIST_KEY_NSCameraUsageDescription: Place ROB in your room and explore robotics components in augmented reality.
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Talk with ROB during simulated robotics missions.
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: ROB listens to your questions and converts them to text for an on-device conversation.
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1,2"
   ROBTrainingVision:
@@ -32,4 +34,5 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.orbitusrobotics.ROBTraining.vision
         PRODUCT_NAME: ROB Training Vision
         GENERATE_INFOPLIST_FILE: YES
-
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Talk with ROB during simulated spatial robotics missions.
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: ROB listens to your questions and converts them to text for an on-device conversation.

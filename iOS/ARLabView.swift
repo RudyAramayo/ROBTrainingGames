@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ARLabView: View {
     @Bindable var session: GameSession
+    @Bindable var voice: RobotVoice
     @State private var componentMode = false
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -14,6 +15,7 @@ struct ARLabView: View {
                 Toggle("Component Explorer", isOn: $componentMode).padding().background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
                 if componentMode { ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(session.components) { item in Button(item.name) { session.selectedComponent = item }.buttonStyle(.borderedProminent).tint(.cyan) } }.padding(.horizontal) }; if let item = session.selectedComponent { Text(item.summary).font(.footnote).padding().background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14)) } }
                 HStack { Button("Start") { session.begin() }; Button("Collect nearby cell") { session.collectCell() }; Button("Disable target") { session.disableEnemy() }; if session.collectedCells == session.level.cellCount && session.remainingEnemies == 0 && session.levelIndex < 2 { Button("Next level") { session.nextLevel() }.buttonStyle(.borderedProminent) } }.buttonStyle(.bordered)
+                RobotVoicePanel(voice: voice, game: session, compact: true)
             }.padding()
         }
     }

@@ -16,9 +16,12 @@
 		374094AD795CF2CAD529E072 /* VisionDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D19BBDDC5D490212B965846 /* VisionDashboard.swift */; };
 		39DA35854B101739582EF190 /* IOSRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF0F5FCFB2ACB31F1C6AD186 /* IOSRootView.swift */; };
 		55B33C4761AB7A8D346EB27C /* rob-training-key-art.png in Resources */ = {isa = PBXBuildFile; fileRef = 765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */; };
+		59C21018AE39553475ADF2C0 /* RobotVoicePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */; };
 		5A7B452D8C82B7E964553832 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A494856CC93CF9C98076DE8A /* GameSession.swift */; };
 		6CFB7C4FCE1E8C49F724F115 /* ROBTrainingiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */; };
 		755B13E4179BDBE68AE89146 /* ARLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCEF00562EAF419AACD5E344 /* ARLabView.swift */; };
+		75A34823F815FF6431752B25 /* RobotVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDE8CFB55658390DC53F88E /* RobotVoice.swift */; };
+		78CD15D09919EB828233E62E /* RobotVoicePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */; };
 		7DA72140DFAD6235C27D1DD7 /* SoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */; };
 		801F959142CF82D4438D01F3 /* mission-start.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 43C86D54778FEDD1EDB6D00E /* mission-start.m4a */; };
 		80ACD0D4BE8A79DA1446F819 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */; };
@@ -29,6 +32,7 @@
 		B7C66E4EB88560CD50A43CFD /* mission-start.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 43C86D54778FEDD1EDB6D00E /* mission-start.m4a */; };
 		CB6811B4AEFB9E8FD157EA1D /* ROBTrainingVisionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE0655626B80AE21B885AA7 /* ROBTrainingVisionApp.swift */; };
 		DFCB9518DD1D2EC5D31C7920 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */; };
+		E1D33E988ED8F791EF94FE5F /* RobotVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDE8CFB55658390DC53F88E /* RobotVoice.swift */; };
 		FD7F118B5CF5202E5ED50555 /* laser.m4a in Resources */ = {isa = PBXBuildFile; fileRef = E0A2FF07C60F58B44ADD1698 /* laser.m4a */; };
 /* End PBXBuildFile section */
 
@@ -44,8 +48,10 @@
 		BE8EABD4931412AA8A676C80 /* RobotFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotFactory.swift; sourceTree = "<group>"; };
 		C02AE4063221AD16DBDA6B2F /* ROBTrainingiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ROBTrainingiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAE0655626B80AE21B885AA7 /* ROBTrainingVisionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBTrainingVisionApp.swift; sourceTree = "<group>"; };
+		D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotVoicePanel.swift; sourceTree = "<group>"; };
 		DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */ = {isa = PBXFileReference; path = "level-complete.m4a"; sourceTree = "<group>"; };
 		DCEF00562EAF419AACD5E344 /* ARLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARLabView.swift; sourceTree = "<group>"; };
+		DDDE8CFB55658390DC53F88E /* RobotVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotVoice.swift; sourceTree = "<group>"; };
 		DF0F5FCFB2ACB31F1C6AD186 /* IOSRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSRootView.swift; sourceTree = "<group>"; };
 		E0A2FF07C60F58B44ADD1698 /* laser.m4a */ = {isa = PBXFileReference; path = laser.m4a; sourceTree = "<group>"; };
 		ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBTrainingiOSApp.swift; sourceTree = "<group>"; };
@@ -84,6 +90,8 @@
 			children = (
 				A494856CC93CF9C98076DE8A /* GameSession.swift */,
 				BE8EABD4931412AA8A676C80 /* RobotFactory.swift */,
+				DDDE8CFB55658390DC53F88E /* RobotVoice.swift */,
+				D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */,
 				AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */,
 				6C613CEBBA8D4E47E0FAE94A /* Resources */,
 			);
@@ -243,6 +251,8 @@
 				5A7B452D8C82B7E964553832 /* GameSession.swift in Sources */,
 				CB6811B4AEFB9E8FD157EA1D /* ROBTrainingVisionApp.swift in Sources */,
 				0EA151C76007B45172EFCFE9 /* RobotFactory.swift in Sources */,
+				75A34823F815FF6431752B25 /* RobotVoice.swift in Sources */,
+				59C21018AE39553475ADF2C0 /* RobotVoicePanel.swift in Sources */,
 				8F5D5EA3ADB8F70CFA08BA08 /* SoundPlayer.swift in Sources */,
 				374094AD795CF2CAD529E072 /* VisionDashboard.swift in Sources */,
 			);
@@ -257,6 +267,8 @@
 				39DA35854B101739582EF190 /* IOSRootView.swift in Sources */,
 				6CFB7C4FCE1E8C49F724F115 /* ROBTrainingiOSApp.swift in Sources */,
 				201A3506945F144FBBE58F23 /* RobotFactory.swift in Sources */,
+				E1D33E988ED8F791EF94FE5F /* RobotVoice.swift in Sources */,
+				78CD15D09919EB828233E62E /* RobotVoicePanel.swift in Sources */,
 				7DA72140DFAD6235C27D1DD7 /* SoundPlayer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -269,6 +281,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk with ROB during simulated spatial robotics missions.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "ROB listens to your questions and converts them to text for an on-device conversation.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -409,6 +423,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "ROB Training";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Place ROB in your room and explore robotics components in augmented reality.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk with ROB during simulated robotics missions.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "ROB listens to your questions and converts them to text for an on-device conversation.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -428,6 +444,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "ROB Training";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Place ROB in your room and explore robotics components in augmented reality.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk with ROB during simulated robotics missions.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "ROB listens to your questions and converts them to text for an on-device conversation.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -444,6 +462,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk with ROB during simulated spatial robotics missions.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "ROB listens to your questions and converts them to text for an on-device conversation.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

@@ -46,13 +46,16 @@ final class GameSession {
     var selectedComponent: ROBComponent?
     var message = "ROB systems ready."
     var isRunning = false
+    var lastSituation = "ROB systems ready."
+    var situationCount = 0
     var level: ROBLevel { levels[levelIndex] }
 
-    func begin() { isRunning = true; message = "Level \(level.id): \(level.name)"; SoundPlayer.shared.play("mission-start") }
+    private func report(_ situation: String) { lastSituation = situation; situationCount += 1 }
+    func begin() { isRunning = true; message = "Level \(level.id): \(level.name)"; report("The pilot started \(level.name), with \(remainingEnemies) training enemies blocking the route."); SoundPlayer.shared.play("mission-start") }
     func tick(_ delta: TimeInterval) { guard isRunning else { return }; elapsed += delta; let linear = Float((leftTread + rightTread) * 0.5) * Float(delta) * 0.7; robotHeading += Float(leftTread - rightTread) * Float(delta) * 0.85; robotPosition.x -= sin(robotHeading) * linear; robotPosition.z -= cos(robotHeading) * linear; robotPosition.x = min(2.4, max(-2.4, robotPosition.x)); robotPosition.z = min(2.6, max(-2.6, robotPosition.z)) }
-    func fire() { guard isRunning, remainingEnemies > 0 else { return }; score += 50; message = "Training laser fired."; SoundPlayer.shared.play("laser") }
-    func collectCell() { guard collectedCells < level.cellCount else { return }; collectedCells += 1; score += 150; message = "Energy cell \(collectedCells) of \(level.cellCount)."; SoundPlayer.shared.play("pickup") }
-    func disableEnemy() { guard remainingEnemies > 0 else { return }; remainingEnemies -= 1; score += 300; message = "Training obstacle disabled."; SoundPlayer.shared.play("laser") }
-    func nextLevel() { guard levelIndex < levels.count - 1 else { return }; score += max(0, level.timeBonus - Int(elapsed) * 10); levelIndex += 1; elapsed = 0; collectedCells = 0; remainingEnemies = level.enemyCount; robotPosition = SIMD3<Float>(0, 0, 1.8); robotHeading = .pi; message = level.lesson; SoundPlayer.shared.play("level-complete") }
+    func fire() { guard isRunning, remainingEnemies > 0 else { return }; score += 50; message = "Training laser fired."; report("ROB fired at a stubborn training enemy, but it is still causing trouble."); SoundPlayer.shared.play("laser") }
+    func collectCell() { guard collectedCells < level.cellCount else { return }; collectedCells += 1; score += 150; message = "Energy cell \(collectedCells) of \(level.cellCount)."; report("ROB collected energy cell \(collectedCells) of \(level.cellCount)."); SoundPlayer.shared.play("pickup") }
+    func disableEnemy() { guard remainingEnemies > 0 else { return }; remainingEnemies -= 1; score += 300; message = "Training obstacle disabled."; report("ROB disabled a training enemy. \(remainingEnemies) remain, presumably reconsidering their career choices."); SoundPlayer.shared.play("laser") }
+    func nextLevel() { guard levelIndex < levels.count - 1 else { return }; score += max(0, level.timeBonus - Int(elapsed) * 10); levelIndex += 1; elapsed = 0; collectedCells = 0; remainingEnemies = level.enemyCount; robotPosition = SIMD3<Float>(0, 0, 1.8); robotHeading = .pi; message = level.lesson; report("ROB advanced to \(level.name). Difficulty increased and the obstacles are feeling overconfident."); SoundPlayer.shared.play("level-complete") }
     func reset() { levelIndex = 0; score = 0; elapsed = 0; collectedCells = 0; remainingEnemies = levels[0].enemyCount; robotPosition = SIMD3<Float>(0, 0, 1.8); robotHeading = .pi; isRunning = false; message = "ROB systems ready." }
 }

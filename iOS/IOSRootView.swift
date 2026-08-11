@@ -3,10 +3,11 @@ import SwiftUI
 
 struct IOSRootView: View {
     @Bindable var session: GameSession
+    @Bindable var voice: RobotVoice
     var body: some View {
         TabView {
-            MissionView(session: session).tabItem { Label("Missions", systemImage: "gamecontroller.fill") }
-            ARLabView(session: session).tabItem { Label("AR Lab", systemImage: "arkit") }
+            MissionView(session: session, voice: voice).tabItem { Label("Missions", systemImage: "gamecontroller.fill") }
+            ARLabView(session: session, voice: voice).tabItem { Label("AR Lab", systemImage: "arkit") }
             ComponentExplorer(session: session).tabItem { Label("ROB", systemImage: "cpu") }
         }.tint(.cyan)
     }
@@ -14,6 +15,7 @@ struct IOSRootView: View {
 
 struct MissionView: View {
     @Bindable var session: GameSession
+    @Bindable var voice: RobotVoice
     @State private var timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
     @AppStorage("robLocalHighScore") private var highScore = 0
     var body: some View {
@@ -25,6 +27,7 @@ struct MissionView: View {
                     HStack { Label("Level \(session.level.id)/3", systemImage: "flag.checkered"); Spacer(); Text("Score \(session.score)").monospacedDigit(); Text("Best \(highScore)").foregroundStyle(.cyan).monospacedDigit() }.font(.headline).padding(10).background(.ultraThinMaterial, in: Capsule()).padding(.horizontal)
                     Spacer()
                     Text(session.message).font(.subheadline.bold()).padding(.horizontal, 14).padding(.vertical, 8).background(.black.opacity(0.65), in: Capsule())
+                    RobotVoicePanel(voice: voice, game: session, compact: true).padding(.horizontal)
                     HStack(alignment: .bottom) {
                         TreadControl(title: "LEFT", value: $session.leftTread)
                         Spacer()

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct VisionDashboard: View {
     @Bindable var session: GameSession
+    @Bindable var voice: RobotVoice
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
     @State private var immersive = false
@@ -15,6 +16,7 @@ struct VisionDashboard: View {
                 Text("ROB Spatial Workshop").font(.largeTitle.bold()); Text("Place ROB at full scale, move it through your room, complete missions, and reveal the systems inside.").multilineTextAlignment(.center).foregroundStyle(.secondary)
                 HStack { Label("Level \(session.level.id)/3", systemImage: "flag.checkered"); Label("Score \(session.score)", systemImage: "star.fill"); Label("Targets \(session.remainingEnemies)", systemImage: "scope") }.monospacedDigit()
                 Button(immersive ? "Leave Spatial Workshop" : "Enter Spatial Workshop", systemImage: immersive ? "rectangle.portrait.and.arrow.right" : "vision.pro") { Task { if immersive { await dismissImmersiveSpace(); immersive = false } else { immersive = await openImmersiveSpace(id: "ROBWorkshop") == .opened } } }.buttonStyle(.borderedProminent)
+                RobotVoicePanel(voice: voice, game: session).frame(maxWidth: 620)
                 if let component = session.selectedComponent { VStack(alignment: .leading) { Text(component.name).font(.title2.bold()); Text(component.summary).foregroundStyle(.secondary) }.padding().glassBackgroundEffect() }
             }.padding(28)
         }
@@ -23,6 +25,7 @@ struct VisionDashboard: View {
 
 struct ImmersiveROBWorkshop: View {
     @Bindable var session: GameSession
+    @Bindable var voice: RobotVoice
     @State private var robot = RobotFactory.makeROB(componentMode: true)
     @State private var scale: Float = 0.75
     var body: some View {
@@ -40,6 +43,7 @@ struct ImmersiveROBWorkshop: View {
                     HStack { Button("Collect cell") { session.collectCell() }; Button("Disable target") { session.disableEnemy() }; if session.collectedCells == session.level.cellCount && session.remainingEnemies == 0 && session.levelIndex < 2 { Button("Next level") { session.nextLevel() } } }
                     Menu("Inspect a component") { ForEach(session.components) { component in Button(component.name) { session.selectedComponent = component } } }
                     if let component = session.selectedComponent { Text(component.summary).font(.caption).frame(width: 420) }
+                    RobotVoicePanel(voice: voice, game: session, compact: true).frame(width: 440)
                 }.padding().glassBackgroundEffect()
             }
         }
