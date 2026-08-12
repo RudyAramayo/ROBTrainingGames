@@ -6,6 +6,7 @@ A shared educational game for iPhone, iPad, and Apple Vision Pro that matches th
 
 - **Shared campaign:** ten matching missions with coordinated arrow driving, keys and locked doors, collectibles, horizontal saber attacks, enemy-contact damage, level restart, scoring, and increasingly difficult route-planning challenges.
 - **Matching keyboard controls:** use arrow keys or `WASD` to drive, `Space` for a sword-style saber slash, and `Q` to fire the training laser on the website, iPad/iPhone with a hardware keyboard, and Vision Pro with a connected keyboard.
+- **Generative soundtrack:** an original procedural techno engine synthesizes its kick, hats, bass sequence, and level-reactive tempo locally at runtime. It does not download music or reuse a copyrighted recording.
 - **iOS game:** the shared campaign rendered with RealityKit controls and local high scores.
 - **iOS AR Lab:** places a manipulable ROB in the camera view and exposes an educational component explorer.
 - **visionOS:** a windowed mission console plus an immersive campaign where ROB can be driven, fight training robots, solve key-and-door objectives, and be inspected in the room.

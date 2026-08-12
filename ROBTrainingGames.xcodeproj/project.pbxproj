@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0EA151C76007B45172EFCFE9 /* RobotFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8EABD4931412AA8A676C80 /* RobotFactory.swift */; };
+		124AFA151BFFCED32FC5B941 /* TechnoMusicEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F74BC0EEE41DF8682BB1619 /* TechnoMusicEngine.swift */; };
 		15953347EA4132F63B131F4A /* pickup.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 14F0E4F7ED1B3521087B505C /* pickup.m4a */; };
 		189BE478545486B5BF88CAC8 /* GameKeyboardControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 077737605315118EDA10229C /* GameKeyboardControls.swift */; };
 		1D7E170D9A3B66DC4DC17F7C /* level-complete.m4a in Resources */ = {isa = PBXBuildFile; fileRef = DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */; };
@@ -33,6 +34,7 @@
 		B7C66E4EB88560CD50A43CFD /* mission-start.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 43C86D54778FEDD1EDB6D00E /* mission-start.m4a */; };
 		C13CD56E9E707AF99448C80E /* GameKeyboardControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 077737605315118EDA10229C /* GameKeyboardControls.swift */; };
 		CB6811B4AEFB9E8FD157EA1D /* ROBTrainingVisionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE0655626B80AE21B885AA7 /* ROBTrainingVisionApp.swift */; };
+		DA309E8D3CFA1E7A097DD2AE /* TechnoMusicEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F74BC0EEE41DF8682BB1619 /* TechnoMusicEngine.swift */; };
 		DFCB9518DD1D2EC5D31C7920 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */; };
 		E1D33E988ED8F791EF94FE5F /* RobotVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDE8CFB55658390DC53F88E /* RobotVoice.swift */; };
 		FD7F118B5CF5202E5ED50555 /* laser.m4a in Resources */ = {isa = PBXBuildFile; fileRef = E0A2FF07C60F58B44ADD1698 /* laser.m4a */; };
@@ -41,11 +43,13 @@
 /* Begin PBXFileReference section */
 		077737605315118EDA10229C /* GameKeyboardControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameKeyboardControls.swift; sourceTree = "<group>"; };
 		14F0E4F7ED1B3521087B505C /* pickup.m4a */ = {isa = PBXFileReference; path = pickup.m4a; sourceTree = "<group>"; };
+		3F74BC0EEE41DF8682BB1619 /* TechnoMusicEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TechnoMusicEngine.swift; sourceTree = "<group>"; };
 		43C86D54778FEDD1EDB6D00E /* mission-start.m4a */ = {isa = PBXFileReference; path = "mission-start.m4a"; sourceTree = "<group>"; };
 		4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		63220C95F6BF85ACADC6A078 /* ROBTrainingVision.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ROBTrainingVision.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "rob-training-key-art.png"; sourceTree = "<group>"; };
 		8D19BBDDC5D490212B965846 /* VisionDashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionDashboard.swift; sourceTree = "<group>"; };
+		96C1B68B72E191DB240B3A84 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A494856CC93CF9C98076DE8A /* GameSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSession.swift; sourceTree = "<group>"; };
 		AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundPlayer.swift; sourceTree = "<group>"; };
 		BE8EABD4931412AA8A676C80 /* RobotFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotFactory.swift; sourceTree = "<group>"; };
@@ -97,6 +101,7 @@
 				DDDE8CFB55658390DC53F88E /* RobotVoice.swift */,
 				D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */,
 				AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */,
+				3F74BC0EEE41DF8682BB1619 /* TechnoMusicEngine.swift */,
 				6C613CEBBA8D4E47E0FAE94A /* Resources */,
 			);
 			path = Shared;
@@ -115,6 +120,7 @@
 		C35E3AB157B10D609CA1C81C /* visionOS */ = {
 			isa = PBXGroup;
 			children = (
+				96C1B68B72E191DB240B3A84 /* Info.plist */,
 				CAE0655626B80AE21B885AA7 /* ROBTrainingVisionApp.swift */,
 				8D19BBDDC5D490212B965846 /* VisionDashboard.swift */,
 			);
@@ -259,6 +265,7 @@
 				75A34823F815FF6431752B25 /* RobotVoice.swift in Sources */,
 				59C21018AE39553475ADF2C0 /* RobotVoicePanel.swift in Sources */,
 				8F5D5EA3ADB8F70CFA08BA08 /* SoundPlayer.swift in Sources */,
+				DA309E8D3CFA1E7A097DD2AE /* TechnoMusicEngine.swift in Sources */,
 				374094AD795CF2CAD529E072 /* VisionDashboard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -276,6 +283,7 @@
 				E1D33E988ED8F791EF94FE5F /* RobotVoice.swift in Sources */,
 				78CD15D09919EB828233E62E /* RobotVoicePanel.swift in Sources */,
 				7DA72140DFAD6235C27D1DD7 /* SoundPlayer.swift in Sources */,
+				124AFA151BFFCED32FC5B941 /* TechnoMusicEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -286,9 +294,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk with ROB during simulated spatial robotics missions.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "ROB listens to your questions and converts them to text for an on-device conversation.";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = visionOS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -467,9 +474,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk with ROB during simulated spatial robotics missions.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "ROB listens to your questions and converts them to text for an on-device conversation.";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = visionOS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

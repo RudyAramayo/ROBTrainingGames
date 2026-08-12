@@ -34,7 +34,7 @@ struct MissionView: View {
             }
             .navigationTitle(session.level.name).navigationBarTitleDisplayMode(.inline)
             .robGameKeyboardControls(session: session)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(session.isRunning ? "Reset" : "Start") { session.isRunning ? session.reset() : session.begin() } }; ToolbarItem(placement: .topBarLeading) { if session.canFinish { Button(session.levelIndex == session.levels.count - 1 ? "Finish" : "Next Level") { session.nextLevel() } } } }
+            .toolbar { ToolbarItemGroup(placement: .topBarTrailing) { Button { session.toggleMusic() } label: { Label(session.musicEnabled ? "Techno on" : "Music off", systemImage: session.musicEnabled ? "music.note" : "speaker.slash") }; Button(session.isRunning ? "Reset" : "Start") { session.isRunning ? session.reset() : session.begin() } }; ToolbarItem(placement: .topBarLeading) { if session.canFinish { Button(session.levelIndex == session.levels.count - 1 ? "Finish" : "Next Level") { session.nextLevel() } } } }
             .onReceive(timer) { _ in session.tick(1.0 / 30.0); highScore = max(highScore, session.score) }
         }
     }

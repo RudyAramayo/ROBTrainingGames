@@ -61,6 +61,7 @@ final class GameSession {
     var selectedComponent: ROBComponent?
     var message = "ROB systems ready."
     var isRunning = false
+    var musicEnabled = true
     var lastSituation = "ROB systems ready."
     var situationCount = 0
     var level: ROBLevel { levels[levelIndex] }
@@ -73,7 +74,8 @@ final class GameSession {
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
         robotPosition = SIMD3<Float>(0, 0, 1.8); robotHeading = .pi
     }
-    func begin() { configureLevel(); isRunning = true; message = "Level \(level.id): \(level.challenge)"; report("The pilot started \(level.name). \(level.challenge)"); SoundPlayer.shared.play("mission-start") }
+    func begin() { configureLevel(); isRunning = true; if musicEnabled { TechnoMusicEngine.shared.start(level: levelIndex) }; message = "Level \(level.id): \(level.challenge)"; report("The pilot started \(level.name). \(level.challenge)"); SoundPlayer.shared.play("mission-start") }
+    func toggleMusic() { musicEnabled.toggle(); if musicEnabled && isRunning { TechnoMusicEngine.shared.start(level: levelIndex) } else { TechnoMusicEngine.shared.stop() } }
     func setDrive(forward: Double, steering: Double) { forwardDemand = forward; steeringDemand = steering }
     func stopDrive() { setDrive(forward: 0, steering: 0) }
     func tick(_ delta: TimeInterval) {
@@ -96,6 +98,6 @@ final class GameSession {
     func collectKey() { guard isRunning, level.requiresKey, !hasKey else { return }; hasKey = true; score += 250; message = "Key secured. Bring it to the locked door."; report(message); SoundPlayer.shared.play("pickup") }
     func openDoor() { guard isRunning, level.requiresKey, !doorOpen else { return }; guard hasKey else { message = "The door is locked. Find the key first."; return }; doorOpen = true; score += 300; message = "Key accepted. Door open."; report(message); SoundPlayer.shared.play("pickup") }
     func enemyContact() { guard isRunning else { return }; score = max(0, score - 200); configureLevel(); isRunning = true; message = "Enemy contact damaged ROB. Restarting level \(level.id)."; report(message) }
-    func nextLevel() { guard canFinish else { message = "Finish every objective before leaving the level."; return }; score += max(0, level.timeBonus - Int(elapsed) * 10); if levelIndex < levels.count - 1 { levelIndex += 1; configureLevel(); isRunning = true; message = level.challenge; report("ROB advanced to \(level.name). \(level.challenge)") } else { isRunning = false; message = "Ten-level campaign complete!" }; SoundPlayer.shared.play("level-complete") }
-    func reset() { levelIndex = 0; score = 0; configureLevel(); isRunning = false; message = "ROB systems ready." }
+    func nextLevel() { guard canFinish else { message = "Finish every objective before leaving the level."; return }; score += max(0, level.timeBonus - Int(elapsed) * 10); if levelIndex < levels.count - 1 { levelIndex += 1; TechnoMusicEngine.shared.setLevel(levelIndex); configureLevel(); isRunning = true; message = level.challenge; report("ROB advanced to \(level.name). \(level.challenge)") } else { isRunning = false; TechnoMusicEngine.shared.stop(); message = "Ten-level campaign complete!" }; SoundPlayer.shared.play("level-complete") }
+    func reset() { levelIndex = 0; score = 0; configureLevel(); isRunning = false; TechnoMusicEngine.shared.stop(); message = "ROB systems ready." }
 }

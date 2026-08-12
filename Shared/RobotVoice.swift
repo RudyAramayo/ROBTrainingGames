@@ -43,19 +43,44 @@ final class RobotVoice {
     @ObservationIgnored
     private var responderStorage: Any?
 
+    /// Speech and microphone authorization callbacks arrive on private framework
+    /// queues. Build that callback chain outside MainActor isolation, then make an
+    /// explicit hop before touching observable UI state.
+    private nonisolated static func requestVoicePermissions(
+        completion: @escaping @MainActor @Sendable (SFSpeechRecognizerAuthorizationStatus, Bool) -> Void
+    ) {
+        SFSpeechRecognizer.requestAuthorization { speechStatus in
+            AVAudioApplication.requestRecordPermission { microphoneAllowed in
+                Task { @MainActor in
+                    completion(speechStatus, microphoneAllowed)
+                }
+            }
+        }
+    }
+
+    /// SFSpeechRecognizer also invokes recognition handlers on an unspecified
+    /// queue, so keep its callback nonisolated and deliver results to the UI actor.
+    private nonisolated static func beginRecognition(
+        recognizer: SFSpeechRecognizer,
+        request: SFSpeechAudioBufferRecognitionRequest,
+        completion: @escaping @MainActor @Sendable (SFSpeechRecognitionResult?, Error?) -> Void
+    ) -> SFSpeechRecognitionTask {
+        recognizer.recognitionTask(with: request) { result, error in
+            Task { @MainActor in
+                completion(result, error)
+            }
+        }
+    }
+
     func toggleListening(game: GameSession) {
         if isListening { finishListening(game: game) } else { requestPermissionAndListen(game: game) }
     }
 
     private func requestPermissionAndListen(game: GameSession) {
-        SFSpeechRecognizer.requestAuthorization { [weak self] speechStatus in
-            AVAudioApplication.requestRecordPermission { microphoneAllowed in
-                Task { @MainActor in
-                    guard let self else { return }
-                    guard speechStatus == .authorized, microphoneAllowed else { self.answer = RobotVoiceError.permissionDenied.localizedDescription; return }
-                    self.startListening(game: game)
-                }
-            }
+        Self.requestVoicePermissions { [weak self] speechStatus, microphoneAllowed in
+            guard let self else { return }
+            guard speechStatus == .authorized, microphoneAllowed else { self.answer = RobotVoiceError.permissionDenied.localizedDescription; return }
+            self.startListening(game: game)
         }
     }
 
@@ -66,7 +91,16 @@ final class RobotVoice {
         do {
             let session = AVAudioSession.sharedInstance(); try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.defaultToSpeaker, .duckOthers]); try session.setActive(true, options: .notifyOthersOnDeactivation)
             let input = audioEngine.inputNode; let format = input.outputFormat(forBus: 0); input.removeTap(onBus: 0); input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in request.append(buffer) }; audioEngine.prepare(); try audioEngine.start(); isListening = true; status = "Listening…"
-            recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in Task { @MainActor in guard let self else { return }; if let result { self.transcript = result.bestTranscription.formattedString; if result.isFinal { self.finishListening(game: game) } } else if error != nil { self.stopAudio(); self.answer = "My audio receptors tripped over a metaphorical cable. Please try again." } } }
+            recognitionTask = Self.beginRecognition(recognizer: recognizer, request: request) { [weak self] result, error in
+                guard let self else { return }
+                if let result {
+                    self.transcript = result.bestTranscription.formattedString
+                    if result.isFinal { self.finishListening(game: game) }
+                } else if error != nil {
+                    self.stopAudio()
+                    self.answer = "My audio receptors tripped over a metaphorical cable. Please try again."
+                }
+            }
         } catch { stopAudio(); answer = "I could not start the microphone. Even droids occasionally lose an argument with audio routing." }
     }
 
