@@ -14,10 +14,11 @@ struct ARLabView: View {
                 Text(componentMode ? "Tap a ROB part, then use the guide below." : "Drag to move · pinch to resize · twist to rotate").font(.callout.bold()).padding(10).background(.ultraThinMaterial, in: Capsule())
                 Toggle("Component Explorer", isOn: $componentMode).padding().background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
                 if componentMode { ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(session.components) { item in Button(item.name) { session.selectedComponent = item }.buttonStyle(.borderedProminent).tint(.cyan) } }.padding(.horizontal) }; if let item = session.selectedComponent { Text(item.summary).font(.footnote).padding().background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14)) } }
-                HStack { Button("Start") { session.begin() }; Button("Key") { session.collectKey() }; Button("Door") { session.openDoor() }; Button("Cell") { session.collectCell() }; Button("Saber") { session.saberAttack() }; if session.canFinish { Button("Next") { session.nextLevel() }.buttonStyle(.borderedProminent) } }.buttonStyle(.bordered)
+                HStack { Button("Start") { session.begin() }; Button("Key") { session.collectKey() }; Button("Door") { session.openDoor() }; Button("Cell") { session.collectCell() }; Button("Laser") { session.fireLaser() }; Button("Slash") { session.saberAttack() }; if session.canFinish { Button("Next") { session.nextLevel() }.buttonStyle(.borderedProminent) } }.buttonStyle(.bordered)
                 RobotVoicePanel(voice: voice, game: session, compact: true)
             }.padding()
         }
+        .robGameKeyboardControls(session: session)
     }
 }
 

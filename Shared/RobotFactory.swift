@@ -37,10 +37,23 @@ import UIKit
             }
             cylinder("\(prefix) Lightsaber", radius: 0.025, height: 0.78, position: [side * 0.75, 0.29, -0.48], color: side < 0 ? .systemGreen : .systemCyan, faceForward: true)
         }
+        cylinder("Training Laser", radius: 0.018, height: 0.45, position: [0, 0.82, -0.8], color: .systemRed, faceForward: true)
         part("Sensor Mast", [0.1, 0.48, 0.1], [0, 1.2, 0], .gray)
         let head = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: .black, isMetallic: true)]); head.name = "Camera Head"; head.position = [0, 1.52, 0]; head.scale.z = 0.82; root.addChild(head)
         cylinder("Head Camera", radius: 0.055, height: 0.045, position: [0, 1.52, -0.2], color: .systemGreen, faceForward: true)
         root.components.set(InputTargetComponent()); root.generateCollisionShapes(recursive: true); return root
+    }
+
+    static func applyWeapons(to robot: Entity, session: GameSession) {
+        let swing = Float(sin(session.saberAnimation * .pi))
+        for name in ["Left Lightsaber", "Right Lightsaber"] {
+            guard let saber = robot.findEntity(named: name) else { continue }
+            let side: Float = name.hasPrefix("Left") ? -1 : 1
+            saber.orientation = simd_quatf(angle: .pi / 2, axis: [1, 0, 0]) * simd_quatf(angle: side * swing * 1.25, axis: [0, 1, 0])
+        }
+        if let laser = robot.findEntity(named: "Training Laser") {
+            if let distance = session.laserDistance { laser.isEnabled = true; laser.position = [0, 0.82, -distance] } else { laser.isEnabled = false }
+        }
     }
 
     static func makeTrainingRoom(level: Int) -> Entity {

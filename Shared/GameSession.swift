@@ -56,6 +56,8 @@ final class GameSession {
     var robotHeading: Float = .pi
     var hasKey = false
     var doorOpen = true
+    var saberAnimation = 0.0
+    var laserDistance: Float?
     var selectedComponent: ROBComponent?
     var message = "ROB systems ready."
     var isRunning = false
@@ -67,7 +69,7 @@ final class GameSession {
     private func report(_ situation: String) { lastSituation = situation; situationCount += 1 }
     private func configureLevel() {
         elapsed = 0; collectedCells = 0; remainingEnemies = level.enemyCount
-        hasKey = false; doorOpen = !level.requiresKey
+        hasKey = false; doorOpen = !level.requiresKey; saberAnimation = 0; laserDistance = nil
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
         robotPosition = SIMD3<Float>(0, 0, 1.8); robotHeading = .pi
     }
@@ -85,8 +87,11 @@ final class GameSession {
         robotHeading += Float(leftTread - rightTread) * Float(delta) * 1.05
         robotPosition.x -= sin(robotHeading) * linear; robotPosition.z -= cos(robotHeading) * linear
         robotPosition.x = min(2.55, max(-2.55, robotPosition.x)); robotPosition.z = min(2.7, max(-2.7, robotPosition.z))
+        if saberAnimation > 0 { saberAnimation = max(0, saberAnimation - delta * 2.8) }
+        if let distance = laserDistance { let next = distance + Float(delta) * 4.5; laserDistance = next > 6 ? nil : next }
     }
-    func saberAttack() { guard isRunning, remainingEnemies > 0 else { return }; remainingEnemies -= 1; score += 350; message = "Horizontal saber sweep disabled a training robot. \(remainingEnemies) remain."; report(message); SoundPlayer.shared.play("laser") }
+    func fireLaser() { guard isRunning, laserDistance == nil else { return }; laserDistance = 0.7; message = "Training laser fired."; report(message); SoundPlayer.shared.play("laser") }
+    func saberAttack() { guard isRunning else { return }; saberAnimation = 1; if remainingEnemies > 0 { remainingEnemies -= 1; score += 350; message = "Sword-style saber slash disabled a training robot. \(remainingEnemies) remain." } else { message = "ROB completed a guarded saber slash." }; report(message); SoundPlayer.shared.play("laser") }
     func collectCell() { guard isRunning, collectedCells < level.cellCount else { return }; collectedCells += 1; score += 150; message = "Energy cell \(collectedCells) of \(level.cellCount)."; report(message); SoundPlayer.shared.play("pickup") }
     func collectKey() { guard isRunning, level.requiresKey, !hasKey else { return }; hasKey = true; score += 250; message = "Key secured. Bring it to the locked door."; report(message); SoundPlayer.shared.play("pickup") }
     func openDoor() { guard isRunning, level.requiresKey, !doorOpen else { return }; guard hasKey else { message = "The door is locked. Find the key first."; return }; doorOpen = true; score += 300; message = "Key accepted. Door open."; report(message); SoundPlayer.shared.play("pickup") }

@@ -21,17 +21,19 @@ struct MissionView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                RealityView { content in content.add(RobotFactory.makeTrainingRoom(level: session.levelIndex)); let rob = RobotFactory.makeROB(); rob.position = session.robotPosition; content.add(rob) } update: { content in if let rob = content.entities.first(where: { $0.name == "ROB" }) { rob.position = session.robotPosition; rob.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0]) } }
+                RealityView { content in content.add(RobotFactory.makeTrainingRoom(level: session.levelIndex)); let rob = RobotFactory.makeROB(); rob.position = session.robotPosition; content.add(rob) } update: { content in if let rob = content.entities.first(where: { $0.name == "ROB" }) { rob.position = session.robotPosition; rob.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0]); RobotFactory.applyWeapons(to: rob, session: session) } }
                     .ignoresSafeArea().background(.black)
                 VStack(spacing: 10) {
                     HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Spacer(); Label(session.hasKey ? "Key" : "No key", systemImage: session.hasKey ? "key.fill" : "key"); Text("Score \(session.score)").monospacedDigit(); Text("Best \(highScore)").foregroundStyle(.cyan).monospacedDigit() }.font(.headline).padding(10).background(.ultraThinMaterial, in: Capsule()).padding(.horizontal)
                     Spacer()
                     Text(session.message).font(.subheadline.bold()).padding(.horizontal, 14).padding(.vertical, 8).background(.black.opacity(0.65), in: Capsule())
+                    Text("Move: WASD or arrows · Slash: Space · Laser: Q").font(.caption2.bold()).foregroundStyle(.cyan).padding(.horizontal, 12).padding(.vertical, 6).background(.black.opacity(0.65), in: Capsule())
                     RobotVoicePanel(voice: voice, game: session, compact: true).padding(.horizontal)
-                    HStack(alignment: .bottom) { DrivePad(session: session); Spacer(); VStack { Button { session.saberAttack() } label: { Label("Saber attack", systemImage: "lightsaber").frame(minWidth: 110, minHeight: 52) }.buttonStyle(.borderedProminent).tint(.pink); HStack { Button("Get key") { session.collectKey() }; Button("Open door") { session.openDoor() } }; HStack { Button("Cell") { session.collectCell() }; Button("Enemy hit") { session.enemyContact() }.tint(.red) } }.buttonStyle(.bordered) }.padding()
+                    HStack(alignment: .bottom) { DrivePad(session: session); Spacer(); VStack { HStack { Button { session.fireLaser() } label: { Label("Laser", systemImage: "scope") }; Button { session.saberAttack() } label: { Label("Saber slash", systemImage: "lightsaber") } }.buttonStyle(.borderedProminent).tint(.pink); HStack { Button("Get key") { session.collectKey() }; Button("Open door") { session.openDoor() } }; HStack { Button("Cell") { session.collectCell() }; Button("Enemy hit") { session.enemyContact() }.tint(.red) } }.buttonStyle(.bordered) }.padding()
                 }
             }
             .navigationTitle(session.level.name).navigationBarTitleDisplayMode(.inline)
+            .robGameKeyboardControls(session: session)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(session.isRunning ? "Reset" : "Start") { session.isRunning ? session.reset() : session.begin() } }; ToolbarItem(placement: .topBarLeading) { if session.canFinish { Button(session.levelIndex == session.levels.count - 1 ? "Finish" : "Next Level") { session.nextLevel() } } } }
             .onReceive(timer) { _ in session.tick(1.0 / 30.0); highScore = max(highScore, session.score) }
         }
