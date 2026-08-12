@@ -24,30 +24,23 @@ struct MissionView: View {
                 RealityView { content in content.add(RobotFactory.makeTrainingRoom(level: session.levelIndex)); let rob = RobotFactory.makeROB(); rob.position = session.robotPosition; content.add(rob) } update: { content in if let rob = content.entities.first(where: { $0.name == "ROB" }) { rob.position = session.robotPosition; rob.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0]) } }
                     .ignoresSafeArea().background(.black)
                 VStack(spacing: 10) {
-                    HStack { Label("Level \(session.level.id)/3", systemImage: "flag.checkered"); Spacer(); Text("Score \(session.score)").monospacedDigit(); Text("Best \(highScore)").foregroundStyle(.cyan).monospacedDigit() }.font(.headline).padding(10).background(.ultraThinMaterial, in: Capsule()).padding(.horizontal)
+                    HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Spacer(); Label(session.hasKey ? "Key" : "No key", systemImage: session.hasKey ? "key.fill" : "key"); Text("Score \(session.score)").monospacedDigit(); Text("Best \(highScore)").foregroundStyle(.cyan).monospacedDigit() }.font(.headline).padding(10).background(.ultraThinMaterial, in: Capsule()).padding(.horizontal)
                     Spacer()
                     Text(session.message).font(.subheadline.bold()).padding(.horizontal, 14).padding(.vertical, 8).background(.black.opacity(0.65), in: Capsule())
                     RobotVoicePanel(voice: voice, game: session, compact: true).padding(.horizontal)
-                    HStack(alignment: .bottom) {
-                        TreadControl(title: "LEFT", value: $session.leftTread)
-                        Spacer()
-                        VStack { Button { session.fire() } label: { Image(systemName: "laser.burst").font(.title).frame(width: 64, height: 64) }.buttonStyle(.borderedProminent).tint(.pink); Button("Cell") { session.collectCell() }.buttonStyle(.bordered); Button("Target") { session.disableEnemy() }.buttonStyle(.bordered) }
-                        Spacer()
-                        TreadControl(title: "RIGHT", value: $session.rightTread)
-                    }.padding()
+                    HStack(alignment: .bottom) { DrivePad(session: session); Spacer(); VStack { Button { session.saberAttack() } label: { Label("Saber attack", systemImage: "lightsaber").frame(minWidth: 110, minHeight: 52) }.buttonStyle(.borderedProminent).tint(.pink); HStack { Button("Get key") { session.collectKey() }; Button("Open door") { session.openDoor() } }; HStack { Button("Cell") { session.collectCell() }; Button("Enemy hit") { session.enemyContact() }.tint(.red) } }.buttonStyle(.bordered) }.padding()
                 }
             }
             .navigationTitle(session.level.name).navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(session.isRunning ? "Reset" : "Start") { session.isRunning ? session.reset() : session.begin() } }; ToolbarItem(placement: .topBarLeading) { if session.collectedCells == session.level.cellCount && session.remainingEnemies == 0 && session.levelIndex < 2 { Button("Next Level") { session.nextLevel() } } } }
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(session.isRunning ? "Reset" : "Start") { session.isRunning ? session.reset() : session.begin() } }; ToolbarItem(placement: .topBarLeading) { if session.canFinish { Button(session.levelIndex == session.levels.count - 1 ? "Finish" : "Next Level") { session.nextLevel() } } } }
             .onReceive(timer) { _ in session.tick(1.0 / 30.0); highScore = max(highScore, session.score) }
         }
     }
 }
 
-struct TreadControl: View {
-    let title: String
-    @Binding var value: Double
-    var body: some View { VStack { Text("▲").font(.caption); Slider(value: $value, in: -1...1).rotationEffect(.degrees(-90)).frame(width: 120, height: 44).frame(width: 64, height: 130); Text(title).font(.caption2.bold()).foregroundStyle(.cyan); Text(value, format: .number.precision(.fractionLength(2))).font(.caption.monospacedDigit()) }.padding(8).background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 18)) }
+struct DrivePad: View {
+    @Bindable var session: GameSession
+    var body: some View { VStack(spacing: 6) { Button("↑") { session.setDrive(forward: 1, steering: 0) }; HStack { Button("←") { session.setDrive(forward: 0, steering: 1) }; Button("■") { session.stopDrive() }; Button("→") { session.setDrive(forward: 0, steering: -1) } }; Button("↓") { session.setDrive(forward: -1, steering: 0) }; Text("Treads \(session.leftTread, format: .number.precision(.fractionLength(1))) · \(session.rightTread, format: .number.precision(.fractionLength(1)))").font(.caption.monospacedDigit()) }.buttonStyle(.borderedProminent).tint(.cyan).padding(10).background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 18)) }
 }
 
 struct ComponentExplorer: View {

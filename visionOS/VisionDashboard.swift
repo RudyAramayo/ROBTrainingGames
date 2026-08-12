@@ -14,7 +14,7 @@ struct VisionDashboard: View {
             VStack(spacing: 18) {
                 Image("rob-training-key-art").resizable().scaledToFit().frame(maxHeight: 310).clipShape(RoundedRectangle(cornerRadius: 24))
                 Text("ROB Spatial Workshop").font(.largeTitle.bold()); Text("Place ROB at full scale, move it through your room, complete missions, and reveal the systems inside.").multilineTextAlignment(.center).foregroundStyle(.secondary)
-                HStack { Label("Level \(session.level.id)/3", systemImage: "flag.checkered"); Label("Score \(session.score)", systemImage: "star.fill"); Label("Targets \(session.remainingEnemies)", systemImage: "scope") }.monospacedDigit()
+                HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Label("Score \(session.score)", systemImage: "star.fill"); Label("Targets \(session.remainingEnemies)", systemImage: "scope"); Label(session.hasKey ? "Key secured" : "Find key", systemImage: session.hasKey ? "key.fill" : "key") }.monospacedDigit()
                 Button(immersive ? "Leave Spatial Workshop" : "Enter Spatial Workshop", systemImage: immersive ? "rectangle.portrait.and.arrow.right" : "vision.pro") { Task { if immersive { await dismissImmersiveSpace(); immersive = false } else { immersive = await openImmersiveSpace(id: "ROBWorkshop") == .opened } } }.buttonStyle(.borderedProminent)
                 RobotVoicePanel(voice: voice, game: session).frame(maxWidth: 620)
                 if let component = session.selectedComponent { VStack(alignment: .leading) { Text(component.name).font(.title2.bold()); Text(component.summary).foregroundStyle(.secondary) }.padding().glassBackgroundEffect() }
@@ -36,11 +36,12 @@ struct ImmersiveROBWorkshop: View {
             Attachment(id: "controls") {
                 VStack(spacing: 12) {
                     Text("ROB Spatial Controls").font(.headline)
-                    HStack { Button("◀︎ Turn") { robot.orientation *= simd_quatf(angle: .pi / 8, axis: [0, 1, 0]) }; Button("Forward") { robot.position.z -= 0.2 }; Button("Turn ▶︎") { robot.orientation *= simd_quatf(angle: -.pi / 8, axis: [0, 1, 0]) } }
-                    HStack { Button("Left") { robot.position.x -= 0.2 }; Button("Back") { robot.position.z += 0.2 }; Button("Right") { robot.position.x += 0.2 } }
+                    HStack { Button("←") { robot.orientation *= simd_quatf(angle: .pi / 8, axis: [0, 1, 0]); session.setDrive(forward: 0, steering: 1) }; Button("↑") { robot.position.z -= 0.2; session.setDrive(forward: 1, steering: 0) }; Button("→") { robot.orientation *= simd_quatf(angle: -.pi / 8, axis: [0, 1, 0]); session.setDrive(forward: 0, steering: -1) } }
+                    HStack { Button("↓") { robot.position.z += 0.2; session.setDrive(forward: -1, steering: 0) }; Button("Stop") { session.stopDrive() } }
                     Slider(value: Binding(get: { Double(scale) }, set: { scale = Float($0) }), in: 0.3...1.3) { Text("Scale") }.frame(width: 320)
-                    Button("Fire training laser") { session.fire() }.tint(.pink)
-                    HStack { Button("Collect cell") { session.collectCell() }; Button("Disable target") { session.disableEnemy() }; if session.collectedCells == session.level.cellCount && session.remainingEnemies == 0 && session.levelIndex < 2 { Button("Next level") { session.nextLevel() } } }
+                    Button("Horizontal saber attack") { session.saberAttack() }.tint(.pink)
+                    HStack { Button("Get key") { session.collectKey() }; Button("Open door") { session.openDoor() }; Button("Collect cell") { session.collectCell() } }
+                    HStack { Button("Simulate enemy hit") { session.enemyContact() }.tint(.red); if session.canFinish { Button(session.levelIndex == session.levels.count - 1 ? "Finish campaign" : "Next level") { session.nextLevel() } } }
                     Menu("Inspect a component") { ForEach(session.components) { component in Button(component.name) { session.selectedComponent = component } } }
                     if let component = session.selectedComponent { Text(component.summary).font(.caption).frame(width: 420) }
                     RobotVoicePanel(voice: voice, game: session, compact: true).frame(width: 440)
