@@ -32,19 +32,19 @@ struct ImmersiveROBWorkshop: View {
     @State private var scale: Float = 0.75
     var body: some View {
         RealityView { content, attachments in
-            robot.position = [0, 0, -2]; robot.scale = .init(repeating: scale); content.add(robot); let room = RobotFactory.makeTrainingRoom(level: session.levelIndex); room.position = [0, -0.02, -2]; content.add(room)
+            robot.position = [0, 0, -2]; robot.scale = .init(repeating: scale); content.add(robot); let room = RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle); room.position = [0, -0.02, -2]; content.add(room)
             if let controls = attachments.entity(for: "controls") { controls.position = [0, 1.9, -1.4]; content.add(controls) }
-        } update: { _, _ in robot.scale = .init(repeating: scale); RobotFactory.applyWeapons(to: robot, session: session) } attachments: {
+        } update: { content, _ in robot.scale = .init(repeating: scale); robot.position = session.robotPosition + SIMD3<Float>(0, 0, -2); robot.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0]); RobotFactory.applyWeapons(to: robot, session: session); let roomName = "Training Room-\(session.levelIndex)"; if let room = content.entities.first(where: { $0.name == roomName }) { RobotFactory.applyPuzzleState(to: room, session: session) } else { content.entities.filter { $0.name.hasPrefix("Training Room-") }.forEach { $0.removeFromParent() }; let room = RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle); room.position = [0, -0.02, -2]; content.add(room) } } attachments: {
             Attachment(id: "controls") {
                 VStack(spacing: 12) {
                     Text("ROB Spatial Controls").font(.headline)
                     Text("WASD / arrows · Space slash · Q laser").font(.caption.monospaced()).foregroundStyle(.cyan)
-                    HStack { Button("←") { robot.orientation *= simd_quatf(angle: .pi / 8, axis: [0, 1, 0]); session.setDrive(forward: 0, steering: 1) }; Button("↑") { robot.position.z -= 0.2; session.setDrive(forward: 1, steering: 0) }; Button("→") { robot.orientation *= simd_quatf(angle: -.pi / 8, axis: [0, 1, 0]); session.setDrive(forward: 0, steering: -1) } }
-                    HStack { Button("↓") { robot.position.z += 0.2; session.setDrive(forward: -1, steering: 0) }; Button("Stop") { session.stopDrive() } }
+                    HStack { Button("←") { session.moveStep(steering: 1) }; Button("↑") { session.moveStep(forward: 1) }; Button("→") { session.moveStep(steering: -1) } }
+                    HStack { Button("↓") { session.moveStep(forward: -1) }; Button("Stop") { session.stopDrive() } }
                     Slider(value: Binding(get: { Double(scale) }, set: { scale = Float($0) }), in: 0.3...1.3) { Text("Scale") }.frame(width: 320)
                     HStack { Button("Fire training laser") { session.fireLaser() }; Button("Sword-style saber slash") { session.saberAttack() } }.tint(.pink)
                     Button(session.musicEnabled ? "♫ Generated techno" : "Music off") { session.toggleMusic() }
-                    HStack { Button("Get key") { session.collectKey() }; Button("Open door") { session.openDoor() }; Button("Collect cell") { session.collectCell() } }
+                    Text("Navigate ROB onto keys, doors, and cells; locked partitions block every bypass.").font(.caption).frame(width: 420)
                     HStack { Button("Simulate enemy hit") { session.enemyContact() }.tint(.red); if session.canFinish { Button(session.levelIndex == session.levels.count - 1 ? "Finish campaign" : "Next level") { session.nextLevel() } } }
                     Menu("Inspect a component") { ForEach(session.components) { component in Button(component.name) { session.selectedComponent = component } } }
                     if let component = session.selectedComponent { Text(component.summary).font(.caption).frame(width: 420) }
@@ -52,7 +52,6 @@ struct ImmersiveROBWorkshop: View {
                 }.padding().glassBackgroundEffect()
             }
         }
-        .gesture(DragGesture().targetedToAnyEntity().onChanged { value in let delta = value.gestureValue.translation; robot.position.x += Float(delta.width) * 0.0005; robot.position.y -= Float(delta.height) * 0.0005 })
         .robGameKeyboardControls(session: session)
     }
 }

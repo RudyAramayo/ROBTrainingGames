@@ -21,6 +21,19 @@ struct ROBComponent: Identifiable, Sendable {
     let color: UInt32
 }
 
+struct PuzzleBarrier: Sendable {
+    let center: SIMD2<Float>
+    let size: SIMD2<Float>
+}
+
+struct PuzzleGeometry: Sendable {
+    let key: SIMD2<Float>?
+    let door: PuzzleBarrier?
+    let barriers: [PuzzleBarrier]
+    let cells: [SIMD2<Float>]
+    let dock: SIMD2<Float>
+}
+
 @MainActor @Observable
 final class GameSession {
     let levels = [
@@ -56,6 +69,7 @@ final class GameSession {
     var robotHeading: Float = .pi
     var hasKey = false
     var doorOpen = true
+    var collectedCellIndices: Set<Int> = []
     var saberAnimation = 0.0
     var laserDistance: Float?
     var selectedComponent: ROBComponent?
@@ -66,11 +80,47 @@ final class GameSession {
     var situationCount = 0
     var level: ROBLevel { levels[levelIndex] }
     var canFinish: Bool { collectedCells == level.cellCount && remainingEnemies == 0 && (!level.requiresKey || doorOpen) }
+    var puzzle: PuzzleGeometry { Self.puzzleGeometry(for: level) }
+
+    private static func puzzleGeometry(for level: ROBLevel) -> PuzzleGeometry {
+        let count = level.cellCount
+        let cells = (0..<count).map { index in
+            let columns: [Float] = [-2.05, -1.05, 0, 1.05, 2.05]
+            return SIMD2<Float>(columns[index % columns.count], index.isMultiple(of: 2) ? -2.15 : -1.15)
+        }
+        guard level.requiresKey else {
+            let zigzag = (0..<max(1, level.id / 3)).map { index in
+                PuzzleBarrier(center: [index.isMultiple(of: 2) ? -0.8 : 0.8, 0.25 - Float(index) * 0.65], size: [2.8, 0.18])
+            }
+            return PuzzleGeometry(key: nil, door: nil, barriers: zigzag, cells: cells, dock: [2.05, -2.35])
+        }
+        let horizontal = level.id != 2 && level.id != 6 && level.id != 8
+        if horizontal {
+            let door = PuzzleBarrier(center: [level.id == 9 ? -1.25 : 0, 0.15], size: [0.9, 0.2])
+            let left = door.center.x - door.size.x / 2
+            let right = door.center.x + door.size.x / 2
+            let walls = [
+                PuzzleBarrier(center: [(-2.75 + left) / 2, door.center.y], size: [left + 2.75, 0.2]),
+                PuzzleBarrier(center: [(right + 2.75) / 2, door.center.y], size: [2.75 - right, 0.2]),
+                PuzzleBarrier(center: [level.id.isMultiple(of: 2) ? -1.15 : 1.15, -1.0], size: [0.18, 1.55]),
+            ]
+            return PuzzleGeometry(key: [level.id == 9 ? 2.1 : -2.1, 2.15], door: door, barriers: walls, cells: cells, dock: [2.05, -2.35])
+        }
+        let door = PuzzleBarrier(center: [0.35, -0.35], size: [0.2, 0.9])
+        let near = door.center.y - door.size.y / 2
+        let far = door.center.y + door.size.y / 2
+        let walls = [
+            PuzzleBarrier(center: [door.center.x, (-2.75 + near) / 2], size: [0.2, near + 2.75]),
+            PuzzleBarrier(center: [door.center.x, (far + 2.75) / 2], size: [0.2, 2.75 - far]),
+            PuzzleBarrier(center: [-1.1, -1.0], size: [1.5, 0.18]),
+        ]
+        return PuzzleGeometry(key: [-2.1, 2.15], door: door, barriers: walls, cells: cells.map { SIMD2<Float>($0.x > 0 ? $0.x : abs($0.x) + 0.35, $0.y) }, dock: [2.1, -2.3])
+    }
 
     private func report(_ situation: String) { lastSituation = situation; situationCount += 1 }
     private func configureLevel() {
         elapsed = 0; collectedCells = 0; remainingEnemies = level.enemyCount
-        hasKey = false; doorOpen = !level.requiresKey; saberAnimation = 0; laserDistance = nil
+        hasKey = false; doorOpen = !level.requiresKey; collectedCellIndices = []; saberAnimation = 0; laserDistance = nil
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
         robotPosition = SIMD3<Float>(0, 0, 1.8); robotHeading = .pi
     }
@@ -78,6 +128,12 @@ final class GameSession {
     func toggleMusic() { musicEnabled.toggle(); if musicEnabled && isRunning { TechnoMusicEngine.shared.start(level: levelIndex) } else { TechnoMusicEngine.shared.stop() } }
     func setDrive(forward: Double, steering: Double) { forwardDemand = forward; steeringDemand = steering }
     func stopDrive() { setDrive(forward: 0, steering: 0) }
+    func moveStep(forward: Double = 0, steering: Double = 0) {
+        guard isRunning else { begin(); return }
+        setDrive(forward: forward, steering: steering)
+        tick(0.24)
+        stopDrive()
+    }
     func tick(_ delta: TimeInterval) {
         guard isRunning else { return }
         elapsed += delta
@@ -87,10 +143,28 @@ final class GameSession {
         leftTread += (targetLeft - leftTread) * smoothing; rightTread += (targetRight - rightTread) * smoothing
         let linear = Float((leftTread + rightTread) * 0.5) * Float(delta) * 0.85
         robotHeading += Float(leftTread - rightTread) * Float(delta) * 1.05
+        let oldPosition = robotPosition
         robotPosition.x -= sin(robotHeading) * linear; robotPosition.z -= cos(robotHeading) * linear
         robotPosition.x = min(2.55, max(-2.55, robotPosition.x)); robotPosition.z = min(2.7, max(-2.7, robotPosition.z))
+        let blockers = puzzle.barriers + ((!doorOpen && puzzle.door != nil) ? [puzzle.door!] : [])
+        if blockers.contains(where: { Self.intersects(robotPosition, barrier: $0) }) {
+            robotPosition = oldPosition
+            message = hasKey ? "Align with the doorway to unlock it." : "Route blocked. The key is on this side of the partition."
+        }
+        resolveSpatialObjectives()
         if saberAnimation > 0 { saberAnimation = max(0, saberAnimation - delta * 2.8) }
         if let distance = laserDistance { let next = distance + Float(delta) * 4.5; laserDistance = next > 6 ? nil : next }
+    }
+    private static func intersects(_ position: SIMD3<Float>, barrier: PuzzleBarrier) -> Bool {
+        abs(position.x - barrier.center.x) < barrier.size.x / 2 + 0.32 && abs(position.z - barrier.center.y) < barrier.size.y / 2 + 0.32
+    }
+    private func resolveSpatialObjectives() {
+        let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
+        if let key = puzzle.key, !hasKey, simd_distance(point, key) < 0.48 { collectKey() }
+        if let door = puzzle.door, !doorOpen, simd_distance(point, door.center) < 0.72 { openDoor() }
+        for (index, cell) in puzzle.cells.enumerated() where !collectedCellIndices.contains(index) && simd_distance(point, cell) < 0.45 {
+            collectedCellIndices.insert(index); collectCell()
+        }
     }
     func fireLaser() { guard isRunning, laserDistance == nil else { return }; laserDistance = 0.7; message = "Training laser fired."; report(message); SoundPlayer.shared.play("laser") }
     func saberAttack() { guard isRunning else { return }; saberAnimation = 1; if remainingEnemies > 0 { remainingEnemies -= 1; score += 350; message = "Sword-style saber slash disabled a training robot. \(remainingEnemies) remain." } else { message = "ROB completed a guarded saber slash." }; report(message); SoundPlayer.shared.play("laser") }

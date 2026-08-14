@@ -56,12 +56,21 @@ import UIKit
         }
     }
 
-    static func makeTrainingRoom(level: Int) -> Entity {
-        let room = Entity(); room.name = "Training Room"
+    static func makeTrainingRoom(level: Int, puzzle: PuzzleGeometry) -> Entity {
+        let room = Entity(); room.name = "Training Room-\(level)"
         let color: UIColor = level == 1 ? .systemIndigo : UIColor(white: 0.16, alpha: 1)
         let floor = ModelEntity(mesh: .generatePlane(width: 6, depth: 6), materials: [SimpleMaterial(color: color, isMetallic: false)]); room.addChild(floor)
-        let layouts: [[SIMD3<Float>]] = [[[-1.4, 0.3, 0], [1.2, 0.3, -0.8]], [[-1.8, 0.3, -0.5], [0, 0.3, 0.4], [1.7, 0.3, -1.2]], [[-2, 0.3, 0], [-0.8, 0.3, -1], [0.8, 0.3, 0.8], [2, 0.3, -0.5]]]
-        for (index, position) in layouts[level % layouts.count].enumerated() { let block = ModelEntity(mesh: .generateBox(size: [0.48, 0.6 + Float(index % 2) * 0.3, 0.68], cornerRadius: 0.08), materials: [SimpleMaterial(color: UIColor(white: 0.28, alpha: 1), isMetallic: true)]); block.position = position; room.addChild(block) }
+        for barrier in puzzle.barriers { let block = ModelEntity(mesh: .generateBox(size: [barrier.size.x, 0.75, barrier.size.y], cornerRadius: 0.03), materials: [SimpleMaterial(color: UIColor(white: 0.28, alpha: 1), isMetallic: true)]); block.position = [barrier.center.x, 0.375, barrier.center.y]; room.addChild(block) }
+        if let door = puzzle.door { let entity = ModelEntity(mesh: .generateBox(size: [door.size.x, 0.9, door.size.y], cornerRadius: 0.025), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); entity.name = "Puzzle Door"; entity.position = [door.center.x, 0.45, door.center.y]; room.addChild(entity) }
+        if let key = puzzle.key { let entity = ModelEntity(mesh: .generateBox(size: [0.28, 0.08, 0.12], cornerRadius: 0.04), materials: [SimpleMaterial(color: .systemCyan, isMetallic: true)]); entity.name = "Puzzle Key"; entity.position = [key.x, 0.2, key.y]; room.addChild(entity) }
+        for (index, cell) in puzzle.cells.enumerated() { let entity = ModelEntity(mesh: .generateCylinder(height: 0.28, radius: 0.11), materials: [SimpleMaterial(color: .systemYellow, isMetallic: true)]); entity.name = "Puzzle Cell \(index)"; entity.position = [cell.x, 0.2, cell.y]; room.addChild(entity) }
+        let dock = ModelEntity(mesh: .generateBox(size: [0.7, 0.025, 0.7], cornerRadius: 0.08), materials: [SimpleMaterial(color: .systemGreen, isMetallic: false)]); dock.name = "Puzzle Dock"; dock.position = [puzzle.dock.x, 0.02, puzzle.dock.y]; room.addChild(dock)
         return room
+    }
+
+    static func applyPuzzleState(to room: Entity, session: GameSession) {
+        room.findEntity(named: "Puzzle Key")?.isEnabled = !session.hasKey
+        room.findEntity(named: "Puzzle Door")?.isEnabled = !session.doorOpen
+        for index in session.puzzle.cells.indices { room.findEntity(named: "Puzzle Cell \(index)")?.isEnabled = !session.collectedCellIndices.contains(index) }
     }
 }
