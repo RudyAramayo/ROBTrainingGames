@@ -131,9 +131,22 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNotNil(robot.findEntity(named: "Right Shoulder Gatling"))
         XCTAssertNotNil(robot.findEntity(named: "Gatling Lock Indicator"))
         XCTAssertNotNil(robot.findEntity(named: "Shoulder Laser Beam"))
+        XCTAssertNotNil(robot.findEntity(named: "Left Tri-Wheel Tread"))
+        XCTAssertNotNil(robot.findEntity(named: "Right Tri-Wheel Tread"))
+        for side in ["Left", "Right"] { for index in 1...3 { XCTAssertNotNil(robot.findEntity(named: "\(side) Tri-Wheel \(index)")) } }
 
         game.begin()
         RobotFactory.applyWeapons(to: robot, session: game)
         XCTAssertTrue(robot.findEntity(named: "Gatling Lock Indicator")?.isEnabled == true)
+    }
+
+    func testTriWheelsAnimateWithIndependentTreadDemand() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        game.setDrive(forward: 0.36, steering: 0.5)
+        game.tick(0.25)
+
+        XCTAssertNotEqual(game.leftWheelAngle, 0)
+        XCTAssertEqual(game.rightWheelAngle, 0, accuracy: 0.0001)
     }
 }

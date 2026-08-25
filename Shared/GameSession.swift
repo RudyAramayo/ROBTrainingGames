@@ -88,7 +88,7 @@ final class GameSession {
         ROBLevel(id: 15, name: "Final Citadel", lesson: "Integrate mobility, target lock, timing, and tool choice.", cellCount: 8, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 5, timeBonus: 4_800, requiresKey: true, challenge: "Clear the eight-robot citadel wave and complete the expanded campaign."),
     ]
     let components = [
-        ROBComponent(id: "base", name: "Tracked Base", summary: "A drive mixer converts forward and steering commands into coordinated left and right tread speeds.", color: 0x263746),
+        ROBComponent(id: "base", name: "Tri-Wheel Tracked Base", summary: "Three-wheel triangular tread pods expose the road wheels while a drive mixer preserves independent left and right tread speeds.", color: 0x263746),
         ROBComponent(id: "power", name: "Power System", summary: "Batteries, protection, disconnects, and motor electronics form ROB’s energy path.", color: 0xF1B93A),
         ROBComponent(id: "cerebro", name: "Cerebro", summary: "The Mac-based control layer coordinates operator intent, cameras, networking, and diagnostics.", color: 0x36DFFF),
         ROBComponent(id: "sensors", name: "Sensors", summary: "Cameras, lidar, inertial sensing, and infrared observations help ROB describe its environment.", color: 0x55DD88),
@@ -108,6 +108,8 @@ final class GameSession {
     var rightTread = 0.0
     var robotPosition = SIMD3<Float>(0, 0, 1.8)
     var robotHeading: Float = 0
+    var leftWheelAngle: Float = 0
+    var rightWheelAngle: Float = 0
     var hasKey = false
     var doorOpen = true
     var collectedCellIndices: Set<Int> = []
@@ -205,7 +207,7 @@ final class GameSession {
         hasKey = false; doorOpen = !level.requiresKey; collectedCellIndices = []; saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
         laserDistance = nil; laserCharge = 0; laserShotCharge = 0; isChargingLaser = false; lockedEnemyID = nil
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
-        robotPosition = SIMD3<Float>(0, 0, puzzle.arenaHalfExtent - 0.8); robotHeading = 0
+        robotPosition = SIMD3<Float>(0, 0, puzzle.arenaHalfExtent - 0.8); robotHeading = 0; leftWheelAngle = 0; rightWheelAngle = 0
         enemyBolts = []; nextBoltID = 0; enemies = configuredEnemies()
         updateLaserLock()
     }
@@ -227,6 +229,7 @@ final class GameSession {
         let smoothing = min(1, delta * 8)
         leftTread += (targetLeft - leftTread) * smoothing; rightTread += (targetRight - rightTread) * smoothing
         let linear = Float((leftTread + rightTread) * 0.5) * Float(delta) * 0.85
+        leftWheelAngle -= Float(leftTread) * Float(delta) * 4.8; rightWheelAngle -= Float(rightTread) * Float(delta) * 4.8
         robotHeading += Float(leftTread - rightTread) * Float(delta) * 1.05
         let oldPosition = robotPosition
         robotPosition.x -= sin(robotHeading) * linear; robotPosition.z -= cos(robotHeading) * linear

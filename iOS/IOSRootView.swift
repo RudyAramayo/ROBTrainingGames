@@ -26,8 +26,10 @@ struct MissionView: View {
                     content.add(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle))
                     let rob = RobotFactory.makeROB(); rob.position = session.robotPosition; content.add(rob)
                     content.add(RobotFactory.makeCombatLayer(session: session))
+                    let camera = PerspectiveCamera(); camera.name = "Mission Camera"; camera.look(at: session.robotPosition + SIMD3<Float>(0, 0.65, -1.1), from: session.robotPosition + SIMD3<Float>(3.4, 5.2, 5.4), relativeTo: nil); content.add(camera)
                 } update: { content in
                     if let rob = content.entities.first(where: { $0.name == "ROB" }) { rob.position = session.robotPosition; rob.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0]); RobotFactory.applyWeapons(to: rob, session: session) }
+                    if let camera = content.entities.first(where: { $0.name == "Mission Camera" }) { camera.look(at: session.robotPosition + SIMD3<Float>(0, 0.65, -1.1), from: session.robotPosition + SIMD3<Float>(3.4, 5.2, 5.4), relativeTo: nil) }
                     let roomName = "Training Room-\(session.levelIndex)"
                     if let room = content.entities.first(where: { $0.name == roomName }) { RobotFactory.applyPuzzleState(to: room, session: session) }
                     else { content.entities.filter { $0.name.hasPrefix("Training Room-") }.forEach { $0.removeFromParent() }; content.add(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle)) }

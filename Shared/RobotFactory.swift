@@ -4,7 +4,7 @@ import UIKit
 @MainActor enum RobotFactory {
     static func makeROB(componentMode: Bool = false) -> Entity {
         let root = Entity(); root.name = "ROB"
-        func part(_ name: String, _ size: SIMD3<Float>, _ position: SIMD3<Float>, _ color: UIColor, parent: Entity? = nil) { let entity = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.015), materials: [SimpleMaterial(color: color, isMetallic: true)]); entity.name = name; entity.position = position; (parent ?? root).addChild(entity) }
+        @discardableResult func part(_ name: String, _ size: SIMD3<Float>, _ position: SIMD3<Float>, _ color: UIColor, parent: Entity? = nil) -> ModelEntity { let entity = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.015), materials: [SimpleMaterial(color: color, isMetallic: true)]); entity.name = name; entity.position = position; (parent ?? root).addChild(entity); return entity }
         func cylinder(_ name: String, radius: Float, height: Float, position: SIMD3<Float>, color: UIColor, faceForward: Bool = false, sideways: Bool = false, parent: Entity? = nil) {
             let entity = ModelEntity(mesh: .generateCylinder(height: height, radius: radius), materials: [SimpleMaterial(color: color, isMetallic: true)])
             entity.name = name; entity.position = position
@@ -12,9 +12,23 @@ import UIKit
             if sideways { entity.orientation = simd_quatf(angle: .pi / 2, axis: [0, 0, 1]) }
             (parent ?? root).addChild(entity)
         }
-        part("Base", [0.72, 0.22, 0.82], [0, 0.2, 0], .black)
-        part("Left Tread", [0.2, 0.34, 1.02], [-0.47, 0.22, 0], UIColor(white: 0.04, alpha: 1)); part("Right Tread", [0.2, 0.34, 1.02], [0.47, 0.22, 0], UIColor(white: 0.04, alpha: 1))
-        for x: Float in [-0.47, 0.47] { for z: Float in [-0.32, 0, 0.32] { cylinder("Tread Wheel", radius: 0.12, height: 0.21, position: [x, 0.22, z], color: .darkGray, sideways: true) } }
+        part("Tri-Wheel Chassis", [0.72, 0.2, 0.68], [0, 0.48, 0], .black)
+        for side: Float in [-1, 1] {
+            let prefix = side < 0 ? "Left" : "Right"
+            let tread = Entity(); tread.name = "\(prefix) Tri-Wheel Tread"; tread.position = [side * 0.47, 0, 0]; root.addChild(tread)
+            part("\(prefix) Lower Tread Belt", [0.22, 0.075, 0.82], [0, 0.085, 0], UIColor(white: 0.025, alpha: 1), parent: tread)
+            for end: Float in [-1, 1] {
+                let belt = part("\(prefix) Sloped Tread Belt", [0.22, 0.075, 0.43], [0, 0.28, end * 0.18], UIColor(white: 0.025, alpha: 1), parent: tread)
+                belt.orientation = simd_quatf(angle: end * 0.51, axis: [1, 0, 0])
+            }
+            let wheelLayout: [(z: Float, y: Float, radius: Float)] = [(-0.36, 0.18, 0.14), (0, 0.38, 0.16), (0.36, 0.18, 0.14)]
+            for (index, wheelSpec) in wheelLayout.enumerated() {
+                let wheel = Entity(); wheel.name = "\(prefix) Tri-Wheel \(index + 1)"; wheel.position = [0, wheelSpec.y, wheelSpec.z]; tread.addChild(wheel)
+                cylinder("\(prefix) Tri-Wheel Tire", radius: wheelSpec.radius, height: 0.225, position: .zero, color: UIColor(white: 0.025, alpha: 1), sideways: true, parent: wheel)
+                cylinder("\(prefix) Tri-Wheel Rim", radius: wheelSpec.radius * 0.67, height: 0.235, position: .zero, color: .darkGray, sideways: true, parent: wheel)
+                cylinder("\(prefix) Tri-Wheel Hub", radius: wheelSpec.radius * 0.25, height: 0.245, position: .zero, color: .systemOrange, sideways: true, parent: wheel)
+            }
+        }
 
         let torso = Entity(); torso.name = "Torso Assembly"; root.addChild(torso)
         part("Cerebro Torso", [0.68, 0.64, 0.54], [0, 0.72, 0], UIColor(red: 0.08, green: 0.12, blue: 0.16, alpha: 1), parent: torso)
@@ -100,6 +114,9 @@ import UIKit
     }
 
     static func applyWeapons(to robot: Entity, session: GameSession) {
+        for (prefix, angle) in [("Left", session.leftWheelAngle), ("Right", session.rightWheelAngle)] {
+            for index in 1...3 { robot.findEntity(named: "\(prefix) Tri-Wheel \(index)")?.orientation = simd_quatf(angle: angle, axis: [1, 0, 0]) }
+        }
         let progress = Float(1 - session.saberAnimation), arc = sin(progress * .pi)
         let torso = robot.findEntity(named: "Torso Assembly")
         var torsoYaw: Float = 0
