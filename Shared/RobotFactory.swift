@@ -100,7 +100,8 @@ import UIKit
             guard let entity = layer.findEntity(named: "Training Enemy \(enemy.id)") else { continue }
             entity.isEnabled = enemy.isActive
             entity.position = enemy.position + SIMD3<Float>(0, enemy.kind == .spider ? Float(sin(session.elapsed * 10 + Double(enemy.id))) * 0.025 : Float(sin(session.elapsed * 2.4 + Double(enemy.id))) * 0.015, 0)
-            entity.orientation = simd_quatf(angle: enemy.heading, axis: [0, 1, 0])
+            let modelHeading = enemy.heading + (enemy.kind == .fax ? Float.pi : 0)
+            entity.orientation = simd_quatf(angle: modelHeading, axis: [0, 1, 0])
         }
         let boltNames = Set(session.enemyBolts.map { "Enemy Bolt \($0.id)" })
         for child in Array(layer.children) where child.name.hasPrefix("Enemy Bolt ") && !boltNames.contains(child.name) { child.removeFromParent() }
