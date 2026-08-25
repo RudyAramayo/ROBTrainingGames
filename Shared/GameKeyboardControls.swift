@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GameKeyboardControls: ViewModifier {
     @Bindable var session: GameSession
+    @Environment(\.scenePhase) private var scenePhase
     @State private var heldKeys: Set<KeyEquivalent> = []
 
     func body(content: Content) -> some View {
@@ -24,7 +25,8 @@ struct GameKeyboardControls: ViewModifier {
                 updateDrive()
                 return .handled
             }
-            .onDisappear { if heldKeys.contains("q") { session.releaseLaserCharge() } }
+            .onChange(of: scenePhase) { _, phase in if phase != .active { cancelInput() } }
+            .onDisappear(perform: cancelInput)
     }
 
     private func updateDrive() {
@@ -35,9 +37,58 @@ struct GameKeyboardControls: ViewModifier {
         session.setDrive(forward: forward, steering: steering)
     }
 
+    private func cancelInput() {
+        if heldKeys.contains("q") { session.releaseLaserCharge() }
+        heldKeys = []
+        session.stopDrive()
+    }
+
     private static let supportedKeys: Set<KeyEquivalent> = [
         "w", "a", "s", "d", "q", .upArrow, .downArrow, .leftArrow, .rightArrow, .space,
     ]
+}
+
+struct DriveHoldButton: View {
+    @Bindable var session: GameSession
+    let title: String
+    var forward = 0.0
+    var steering = 0.0
+    @State private var pressing = false
+
+    var body: some View {
+        Text(title)
+            .font(.body.bold())
+            .frame(minWidth: 42, minHeight: 40)
+            .padding(.horizontal, 4)
+            .foregroundStyle(.white)
+            .background(pressing ? Color.cyan : Color.cyan.opacity(0.82), in: RoundedRectangle(cornerRadius: 10))
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !pressing else { return }
+                        pressing = true
+                        session.setDrive(forward: forward, steering: steering)
+                    }
+                    .onEnded { _ in stop() }
+            )
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityValue(pressing ? "Driving" : "Stopped")
+            .accessibilityAction { session.moveStep(forward: forward, steering: steering) }
+            .onDisappear(perform: stop)
+    }
+
+    private var accessibilityLabel: String {
+        if forward > 0 { return "Drive forward" }
+        if forward < 0 { return "Drive in reverse" }
+        return steering > 0 ? "Turn left" : "Turn right"
+    }
+
+    private func stop() {
+        session.stopDrive()
+        pressing = false
+    }
 }
 
 extension View {

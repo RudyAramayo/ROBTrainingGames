@@ -214,7 +214,7 @@ final class GameSession {
     func begin() { enemyAttackCount = 0; configureLevel(); isRunning = true; if audioEnabled && musicEnabled { TechnoMusicEngine.shared.start(level: levelIndex) }; message = "Level \(level.id): \(level.challenge)"; report("The pilot started \(level.name). \(level.challenge)"); play("mission-start") }
     func toggleMusic() { musicEnabled.toggle(); guard audioEnabled else { return }; if musicEnabled && isRunning { TechnoMusicEngine.shared.start(level: levelIndex) } else { TechnoMusicEngine.shared.stop() } }
     func setDrive(forward: Double, steering: Double) { forwardDemand = forward; steeringDemand = steering }
-    func stopDrive() { setDrive(forward: 0, steering: 0) }
+    func stopDrive() { setDrive(forward: 0, steering: 0); leftTread = 0; rightTread = 0 }
     func moveStep(forward: Double = 0, steering: Double = 0) {
         guard isRunning else { begin(); return }
         setDrive(forward: forward, steering: steering)

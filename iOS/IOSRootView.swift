@@ -63,9 +63,9 @@ struct DrivePad: View {
     var body: some View {
         Group {
             if compact {
-                HStack(spacing: 4) { Button("←") { session.setDrive(forward: 0, steering: 1) }; Button("↑") { session.setDrive(forward: 1, steering: 0) }; Button("■") { session.stopDrive() }; Button("↓") { session.setDrive(forward: -1, steering: 0) }; Button("→") { session.setDrive(forward: 0, steering: -1) } }
+                HStack(spacing: 4) { DriveHoldButton(session: session, title: "←", steering: 1); DriveHoldButton(session: session, title: "↑", forward: 1); Button("■") { session.stopDrive() }; DriveHoldButton(session: session, title: "↓", forward: -1); DriveHoldButton(session: session, title: "→", steering: -1) }
             } else {
-                VStack(spacing: 6) { Button("↑") { session.setDrive(forward: 1, steering: 0) }; HStack { Button("←") { session.setDrive(forward: 0, steering: 1) }; Button("■") { session.stopDrive() }; Button("→") { session.setDrive(forward: 0, steering: -1) } }; Button("↓") { session.setDrive(forward: -1, steering: 0) }; Text("Treads \(session.leftTread, format: .number.precision(.fractionLength(1))) · \(session.rightTread, format: .number.precision(.fractionLength(1)))").font(.caption.monospacedDigit()) }
+                VStack(spacing: 6) { DriveHoldButton(session: session, title: "↑", forward: 1); HStack { DriveHoldButton(session: session, title: "←", steering: 1); Button("■") { session.stopDrive() }; DriveHoldButton(session: session, title: "→", steering: -1) }; DriveHoldButton(session: session, title: "↓", forward: -1); Text("Treads \(session.leftTread, format: .number.precision(.fractionLength(1))) · \(session.rightTread, format: .number.precision(.fractionLength(1)))").font(.caption.monospacedDigit()) }
             }
         }.buttonStyle(.borderedProminent).tint(.cyan).padding(compact ? 6 : 10).background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 18))
     }

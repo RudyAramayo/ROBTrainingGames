@@ -42,8 +42,8 @@ struct ImmersiveROBWorkshop: View {
                 VStack(spacing: 12) {
                     Text("ROB Spatial Controls").font(.headline)
                     Text("WASD / arrows · Space combo · hold Q to charge").font(.caption.monospaced()).foregroundStyle(.cyan)
-                    HStack { Button("←") { session.moveStep(steering: 1) }; Button("↑") { session.moveStep(forward: 1) }; Button("→") { session.moveStep(steering: -1) } }
-                    HStack { Button("↓") { session.moveStep(forward: -1) }; Button("Stop") { session.stopDrive() } }
+                    HStack { DriveHoldButton(session: session, title: "←", steering: 1); DriveHoldButton(session: session, title: "↑", forward: 1); DriveHoldButton(session: session, title: "→", steering: -1) }
+                    HStack { DriveHoldButton(session: session, title: "↓", forward: -1); Button("Stop") { session.stopDrive() } }
                     Slider(value: Binding(get: { Double(scale) }, set: { scale = Float($0) }), in: 0.3...1.3) { Text("Scale") }.frame(width: 320)
                     HStack { LaserChargeButton(session: session, title: "Shoulder laser"); Button("Dual-saber combo") { session.saberAttack() }.buttonStyle(.borderedProminent).tint(.pink) }
                     Text(session.laserLockDescription).font(.caption.bold().monospaced()).foregroundStyle(session.lockedEnemy == nil ? .orange : .red)

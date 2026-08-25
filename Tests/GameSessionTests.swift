@@ -44,6 +44,25 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.steeringDemand, 0)
     }
 
+    func testStopDriveImmediatelyClearsAStuckTurn() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        game.setDrive(forward: 0, steering: 1)
+        game.tick(0.25)
+        XCTAssertNotEqual(game.leftTread, 0)
+        XCTAssertNotEqual(game.rightTread, 0)
+
+        game.stopDrive()
+        let stoppedHeading = game.robotHeading
+        game.tick(0.25)
+
+        XCTAssertEqual(game.forwardDemand, 0)
+        XCTAssertEqual(game.steeringDemand, 0)
+        XCTAssertEqual(game.leftTread, 0)
+        XCTAssertEqual(game.rightTread, 0)
+        XCTAssertEqual(game.robotHeading, stoppedHeading, accuracy: 0.0001)
+    }
+
     func testFaxRobotFiresTrackedProjectile() {
         let game = GameSession(audioEnabled: false)
         game.begin()
