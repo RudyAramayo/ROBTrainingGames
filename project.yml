@@ -8,6 +8,15 @@ settings:
   base:
     SWIFT_VERSION: 6.0
     CODE_SIGN_STYLE: Automatic
+schemes:
+  ROBTrainingiOS:
+    build:
+      targets:
+        ROBTrainingiOS: all
+        ROBTrainingTests: [test]
+    test:
+      targets:
+        - ROBTrainingTests
 targets:
   ROBTrainingiOS:
     type: application
@@ -35,3 +44,15 @@ targets:
         PRODUCT_NAME: ROB Training Vision
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: visionOS/Info.plist
+  ROBTrainingTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: ROBTrainingiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.orbitusrobotics.ROBTrainingTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/ROB Training.app/ROB Training"
+        BUNDLE_LOADER: "$(TEST_HOST)"

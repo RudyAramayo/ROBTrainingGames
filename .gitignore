@@ -1,0 +1,4 @@
+# Xcode per-user workspace state and breakpoints
+xcuserdata/
+*.xcuserstate
+*.xcbkptlist

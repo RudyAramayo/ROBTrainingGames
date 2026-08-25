@@ -44,6 +44,51 @@ import UIKit
         root.components.set(InputTargetComponent()); root.generateCollisionShapes(recursive: true); return root
     }
 
+    static func combatLayerName(level: Int) -> String { "Combat Layer-\(level)" }
+
+    static func makeCombatLayer(session: GameSession) -> Entity {
+        let root = Entity(); root.name = combatLayerName(level: session.levelIndex)
+        for enemy in session.enemies { root.addChild(makeEnemy(enemy)) }
+        applyCombatState(to: root, session: session)
+        return root
+    }
+
+    private static func makeEnemy(_ enemy: TrainingEnemy) -> Entity {
+        let root = Entity(); root.name = "Training Enemy \(enemy.id)"
+        func box(_ size: SIMD3<Float>, _ position: SIMD3<Float>, _ color: UIColor) { let part = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.02), materials: [SimpleMaterial(color: color, isMetallic: true)]); part.position = position; root.addChild(part) }
+        func cylinder(radius: Float, height: Float, position: SIMD3<Float>, color: UIColor) { let part = ModelEntity(mesh: .generateCylinder(height: height, radius: radius), materials: [SimpleMaterial(color: color, isMetallic: true)]); part.position = position; root.addChild(part) }
+        if enemy.kind == .spider {
+            box([0.62, 0.2, 0.5], [0, 0.3, 0], .darkGray)
+            let skull = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: UIColor(red: 0.88, green: 0.84, blue: 0.7, alpha: 1), isMetallic: false)]); skull.position = [0, 0.5, -0.18]; skull.scale.z = 1.25; root.addChild(skull)
+            for side: Float in [-1, 1] { for row: Float in [-1, 1] { box([0.46, 0.07, 0.09], [side * 0.43, 0.24, row * 0.2], .gray); box([0.08, 0.32, 0.1], [side * 0.68, 0.12, row * 0.2], UIColor(white: 0.82, alpha: 1)) } }
+        } else {
+            cylinder(radius: 0.38, height: 0.64, position: [0, 0.34, 0], color: .lightGray)
+            cylinder(radius: 0.27, height: 0.24, position: [0, 0.78, 0], color: .darkGray)
+            let dome = ModelEntity(mesh: .generateSphere(radius: 0.28), materials: [SimpleMaterial(color: .lightGray, isMetallic: true)]); dome.position = [0, 0.94, 0]; dome.scale.y = 0.55; root.addChild(dome)
+            let eye = ModelEntity(mesh: .generateBox(size: [0.08, 0.08, 0.48], cornerRadius: 0.02), materials: [SimpleMaterial(color: .systemCyan, isMetallic: true)]); eye.position = [0, 0.96, -0.37]; root.addChild(eye)
+            for y: Float in [0.18, 0.38, 0.58] { for x: Float in [-0.22, 0, 0.22] { let light = ModelEntity(mesh: .generateSphere(radius: 0.055), materials: [SimpleMaterial(color: .systemBlue, isMetallic: true)]); light.position = [x, y, -0.31]; root.addChild(light) } }
+        }
+        return root
+    }
+
+    static func applyCombatState(to layer: Entity, session: GameSession) {
+        for enemy in session.enemies {
+            guard let entity = layer.findEntity(named: "Training Enemy \(enemy.id)") else { continue }
+            entity.isEnabled = enemy.isActive
+            entity.position = enemy.position + SIMD3<Float>(0, enemy.kind == .spider ? Float(sin(session.elapsed * 10 + Double(enemy.id))) * 0.025 : Float(sin(session.elapsed * 2.4 + Double(enemy.id))) * 0.015, 0)
+            entity.orientation = simd_quatf(angle: enemy.heading, axis: [0, 1, 0])
+        }
+        let boltNames = Set(session.enemyBolts.map { "Enemy Bolt \($0.id)" })
+        for child in Array(layer.children) where child.name.hasPrefix("Enemy Bolt ") && !boltNames.contains(child.name) { child.removeFromParent() }
+        for bolt in session.enemyBolts {
+            let name = "Enemy Bolt \(bolt.id)"
+            let entity: Entity
+            if let existing = layer.findEntity(named: name) { entity = existing }
+            else { let created = ModelEntity(mesh: .generateSphere(radius: 0.055), materials: [SimpleMaterial(color: .systemCyan, isMetallic: true)]); created.name = name; layer.addChild(created); entity = created }
+            entity.position = bolt.position
+        }
+    }
+
     static func applyWeapons(to robot: Entity, session: GameSession) {
         let swing = Float(sin(session.saberAnimation * .pi))
         for name in ["Left Lightsaber", "Right Lightsaber"] {

@@ -11,6 +11,11 @@ enum RobotVoiceError: LocalizedError {
     }
 }
 
+private struct ROBRecognitionDelivery: @unchecked Sendable {
+    let result: SFSpeechRecognitionResult?
+    let error: Error?
+}
+
 @available(iOS 26.0, visionOS 26.0, *)
 @MainActor private final class ROBFoundationResponder {
     let session = LanguageModelSession(instructions: """
@@ -66,8 +71,9 @@ final class RobotVoice {
         completion: @escaping @MainActor @Sendable (SFSpeechRecognitionResult?, Error?) -> Void
     ) -> SFSpeechRecognitionTask {
         recognizer.recognitionTask(with: request) { result, error in
+            let delivery = ROBRecognitionDelivery(result: result, error: error)
             Task { @MainActor in
-                completion(result, error)
+                completion(delivery.result, delivery.error)
             }
         }
     }

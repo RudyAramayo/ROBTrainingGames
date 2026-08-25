@@ -20,6 +20,7 @@
 		55B33C4761AB7A8D346EB27C /* rob-training-key-art.png in Resources */ = {isa = PBXBuildFile; fileRef = 765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */; };
 		59C21018AE39553475ADF2C0 /* RobotVoicePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */; };
 		5A7B452D8C82B7E964553832 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A494856CC93CF9C98076DE8A /* GameSession.swift */; };
+		5F24C21F936B161D686DDBFE /* GameSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEBC1A2DCC5F0625E90BCDE7 /* GameSessionTests.swift */; };
 		6CFB7C4FCE1E8C49F724F115 /* ROBTrainingiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */; };
 		755B13E4179BDBE68AE89146 /* ARLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCEF00562EAF419AACD5E344 /* ARLabView.swift */; };
 		75A34823F815FF6431752B25 /* RobotVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDE8CFB55658390DC53F88E /* RobotVoice.swift */; };
@@ -40,9 +41,20 @@
 		FD7F118B5CF5202E5ED50555 /* laser.m4a in Resources */ = {isa = PBXBuildFile; fileRef = E0A2FF07C60F58B44ADD1698 /* laser.m4a */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		C83CECC9257DE2E9B11F6D8C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4BB9D135B31621FE80D91201 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 83FE2B24F912A97CCB20D19F;
+			remoteInfo = ROBTrainingiOS;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		077737605315118EDA10229C /* GameKeyboardControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameKeyboardControls.swift; sourceTree = "<group>"; };
 		14F0E4F7ED1B3521087B505C /* pickup.m4a */ = {isa = PBXFileReference; path = pickup.m4a; sourceTree = "<group>"; };
+		359F05090B7BCCFB1DC7C669 /* ROBTrainingTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ROBTrainingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3F74BC0EEE41DF8682BB1619 /* TechnoMusicEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TechnoMusicEngine.swift; sourceTree = "<group>"; };
 		43C86D54778FEDD1EDB6D00E /* mission-start.m4a */ = {isa = PBXFileReference; path = "mission-start.m4a"; sourceTree = "<group>"; };
 		4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -59,6 +71,7 @@
 		DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */ = {isa = PBXFileReference; path = "level-complete.m4a"; sourceTree = "<group>"; };
 		DCEF00562EAF419AACD5E344 /* ARLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARLabView.swift; sourceTree = "<group>"; };
 		DDDE8CFB55658390DC53F88E /* RobotVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotVoice.swift; sourceTree = "<group>"; };
+		DEBC1A2DCC5F0625E90BCDE7 /* GameSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSessionTests.swift; sourceTree = "<group>"; };
 		DF0F5FCFB2ACB31F1C6AD186 /* IOSRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSRootView.swift; sourceTree = "<group>"; };
 		E0A2FF07C60F58B44ADD1698 /* laser.m4a */ = {isa = PBXFileReference; path = laser.m4a; sourceTree = "<group>"; };
 		ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBTrainingiOSApp.swift; sourceTree = "<group>"; };
@@ -77,6 +90,7 @@
 			isa = PBXGroup;
 			children = (
 				C02AE4063221AD16DBDA6B2F /* ROBTrainingiOS.app */,
+				359F05090B7BCCFB1DC7C669 /* ROBTrainingTests.xctest */,
 				63220C95F6BF85ACADC6A078 /* ROBTrainingVision.app */,
 			);
 			name = Products;
@@ -112,6 +126,7 @@
 			children = (
 				E2871D4B374927D73F2023CB /* iOS */,
 				840BAA3052F3C77C4D2DF3DF /* Shared */,
+				F0042E4A19489759563B5463 /* Tests */,
 				C35E3AB157B10D609CA1C81C /* visionOS */,
 				32F01E7258E210B584C25E8E /* Products */,
 			);
@@ -135,6 +150,14 @@
 				ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */,
 			);
 			path = iOS;
+			sourceTree = "<group>";
+		};
+		F0042E4A19489759563B5463 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				DEBC1A2DCC5F0625E90BCDE7 /* GameSessionTests.swift */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 		FD1C9C2F0921FEE5D6552908 /* Audio */ = {
@@ -169,6 +192,24 @@
 			productReference = C02AE4063221AD16DBDA6B2F /* ROBTrainingiOS.app */;
 			productType = "com.apple.product-type.application";
 		};
+		8D6349F2888BA4ABF421451F /* ROBTrainingTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 82CA29551B1370B30E1444FA /* Build configuration list for PBXNativeTarget "ROBTrainingTests" */;
+			buildPhases = (
+				7B50FEDA44338FE4E01BFE0A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FDEAA919DD47288345C3D340 /* PBXTargetDependency */,
+			);
+			name = ROBTrainingTests;
+			packageProductDependencies = (
+			);
+			productName = ROBTrainingTests;
+			productReference = 359F05090B7BCCFB1DC7C669 /* ROBTrainingTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		F95C511AA46B6C899321C33A /* ROBTrainingVision */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 87854A2638A439F2AE5D5492 /* Build configuration list for PBXNativeTarget "ROBTrainingVision" */;
@@ -199,6 +240,9 @@
 					83FE2B24F912A97CCB20D19F = {
 						ProvisioningStyle = Automatic;
 					};
+					8D6349F2888BA4ABF421451F = {
+						ProvisioningStyle = Automatic;
+					};
 					F95C511AA46B6C899321C33A = {
 						ProvisioningStyle = Automatic;
 					};
@@ -220,6 +264,7 @@
 			targets = (
 				83FE2B24F912A97CCB20D19F /* ROBTrainingiOS */,
 				F95C511AA46B6C899321C33A /* ROBTrainingVision */,
+				8D6349F2888BA4ABF421451F /* ROBTrainingTests */,
 			);
 		};
 /* End PBXProject section */
@@ -270,6 +315,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7B50FEDA44338FE4E01BFE0A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5F24C21F936B161D686DDBFE /* GameSessionTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C23A66CF241C961ECC2B6A6B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -289,7 +342,32 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		FDEAA919DD47288345C3D340 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 83FE2B24F912A97CCB20D19F /* ROBTrainingiOS */;
+			targetProxy = C83CECC9257DE2E9B11F6D8C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		04021D624B943482B3F022F6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitusrobotics.ROBTrainingTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ROB Training.app/ROB Training";
+			};
+			name = Debug;
+		};
 		1A97A2147FFC1A90A1AE1CB0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -487,6 +565,23 @@
 			};
 			name = Release;
 		};
+		F3706DC4EE9710B99BF6AC37 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.orbitusrobotics.ROBTrainingTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ROB Training.app/ROB Training";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -495,6 +590,15 @@
 			buildConfigurations = (
 				2D4266265CAB3C31CDCE17E3 /* Debug */,
 				42C7155E5AEAB53955928F4A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		82CA29551B1370B30E1444FA /* Build configuration list for PBXNativeTarget "ROBTrainingTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				04021D624B943482B3F022F6 /* Debug */,
+				F3706DC4EE9710B99BF6AC37 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

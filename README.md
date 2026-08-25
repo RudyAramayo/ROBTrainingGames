@@ -4,7 +4,8 @@ A shared educational game for iPhone, iPad, and Apple Vision Pro that matches th
 
 ## Experiences
 
-- **Shared campaign:** ten matching missions with coordinated arrow driving, keys and locked doors, collectibles, horizontal saber attacks, enemy-contact damage, level restart, scoring, and increasingly difficult route-planning challenges.
+- **Shared campaign:** ten matching missions with coordinated arrow driving, keys and locked doors, collectibles, aimed saber and laser attacks, enemy-contact damage, level restart, scoring, and increasingly difficult route-planning challenges.
+- **Active combat:** spider bots patrol, chase, skitter, and lunge. Dalek-style fax robots patrol, circle ROB, fire visible projectiles, synthesize fax-modem attack sounds, and call out “Exterminate!” with Apple speech synthesis.
 - **Matching keyboard controls:** use arrow keys or `WASD` to drive, `Space` for a sword-style saber slash, and `Q` to fire the training laser on the website, iPad/iPhone with a hardware keyboard, and Vision Pro with a connected keyboard.
 - **Generative soundtrack:** an original procedural techno engine synthesizes its kick, hats, bass sequence, and level-reactive tempo locally at runtime. It does not download music or reuse a copyrighted recording.
 - **iOS game:** the shared campaign rendered with RealityKit controls and local high scores.
@@ -24,5 +25,7 @@ open ROBTrainingGames.xcodeproj
 ```
 
 Select `ROBTrainingiOS` or `ROBTrainingVision`, choose your signing team, and run on a compatible device. AR camera behavior must be verified on physical hardware. No robot-control connection is included: every mission is simulated.
+
+Run the shared campaign tests on an iOS Simulator with `xcodebuild test -scheme ROBTrainingiOS -destination 'platform=iOS Simulator,name=iPhone 17'`. Build the `ROBTrainingVision` scheme against a visionOS Simulator to verify the shared combat renderer and spatial controls.
 
 Before App Store submission, add production icons/screenshots, signing, privacy review, age rating, support URLs, and device testing. Keep lessons synchronized with `Presentation/ROB-Books/ROBOT_GAME_CURRICULUM.md` as the books evolve.

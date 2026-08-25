@@ -16,20 +16,35 @@ struct IOSRootView: View {
 struct MissionView: View {
     @Bindable var session: GameSession
     @Bindable var voice: RobotVoice
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
     @AppStorage("robLocalHighScore") private var highScore = 0
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                RealityView { content in content.add(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle)); let rob = RobotFactory.makeROB(); rob.position = session.robotPosition; content.add(rob) } update: { content in if let rob = content.entities.first(where: { $0.name == "ROB" }) { rob.position = session.robotPosition; rob.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0]); RobotFactory.applyWeapons(to: rob, session: session) }; let roomName = "Training Room-\(session.levelIndex)"; if let room = content.entities.first(where: { $0.name == roomName }) { RobotFactory.applyPuzzleState(to: room, session: session) } else { content.entities.filter { $0.name.hasPrefix("Training Room-") }.forEach { $0.removeFromParent() }; content.add(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle)) } }
+                RealityView { content in
+                    content.add(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle))
+                    let rob = RobotFactory.makeROB(); rob.position = session.robotPosition; content.add(rob)
+                    content.add(RobotFactory.makeCombatLayer(session: session))
+                } update: { content in
+                    if let rob = content.entities.first(where: { $0.name == "ROB" }) { rob.position = session.robotPosition; rob.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0]); RobotFactory.applyWeapons(to: rob, session: session) }
+                    let roomName = "Training Room-\(session.levelIndex)"
+                    if let room = content.entities.first(where: { $0.name == roomName }) { RobotFactory.applyPuzzleState(to: room, session: session) }
+                    else { content.entities.filter { $0.name.hasPrefix("Training Room-") }.forEach { $0.removeFromParent() }; content.add(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle)) }
+                    let combatName = RobotFactory.combatLayerName(level: session.levelIndex)
+                    if let combat = content.entities.first(where: { $0.name == combatName }) { RobotFactory.applyCombatState(to: combat, session: session) }
+                    else { content.entities.filter { $0.name.hasPrefix("Combat Layer-") }.forEach { $0.removeFromParent() }; content.add(RobotFactory.makeCombatLayer(session: session)) }
+                }
                     .ignoresSafeArea().background(.black)
-                VStack(spacing: 10) {
-                    HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Spacer(); Label(session.hasKey ? "Key" : "No key", systemImage: session.hasKey ? "key.fill" : "key"); Text("Score \(session.score)").monospacedDigit(); Text("Best \(highScore)").foregroundStyle(.cyan).monospacedDigit() }.font(.headline).padding(10).background(.ultraThinMaterial, in: Capsule()).padding(.horizontal)
+                VStack(spacing: verticalSizeClass == .compact ? 4 : 10) {
+                    HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Spacer(); Label(session.hasKey ? "Key" : "No key", systemImage: session.hasKey ? "key.fill" : "key"); Text("Targets \(session.remainingEnemies)").monospacedDigit(); Text("Score \(session.score)").monospacedDigit(); Text("Best \(highScore)").foregroundStyle(.cyan).monospacedDigit() }.font(.headline).padding(10).background(.ultraThinMaterial, in: Capsule()).padding(.horizontal)
                     Spacer()
                     Text(session.message).font(.subheadline.bold()).padding(.horizontal, 14).padding(.vertical, 8).background(.black.opacity(0.65), in: Capsule())
-                    Text("Move: WASD or arrows · Slash: Space · Laser: Q").font(.caption2.bold()).foregroundStyle(.cyan).padding(.horizontal, 12).padding(.vertical, 6).background(.black.opacity(0.65), in: Capsule())
-                    RobotVoicePanel(voice: voice, game: session, compact: true).padding(.horizontal)
-                    HStack(alignment: .bottom) { DrivePad(session: session); Spacer(); VStack { HStack { Button { session.fireLaser() } label: { Label("Laser", systemImage: "scope") }; Button { session.saberAttack() } label: { Label("Saber slash", systemImage: "lightsaber") } }.buttonStyle(.borderedProminent).tint(.pink); Text("Drive onto keys, doors, and cells").font(.caption.bold()).foregroundStyle(.cyan); Button("Enemy hit") { session.enemyContact() }.tint(.red) }.buttonStyle(.bordered) }.padding()
+                    if verticalSizeClass != .compact {
+                        Text("Move: WASD or arrows · Slash: Space · Laser: Q").font(.caption2.bold()).foregroundStyle(.cyan).padding(.horizontal, 12).padding(.vertical, 6).background(.black.opacity(0.65), in: Capsule())
+                        RobotVoicePanel(voice: voice, game: session, compact: true).padding(.horizontal)
+                    }
+                    HStack(alignment: .bottom) { DrivePad(session: session, compact: verticalSizeClass == .compact); Spacer(); VStack { HStack { Button { session.fireLaser() } label: { Label("Laser", systemImage: "scope") }; Button { session.saberAttack() } label: { Label("Saber slash", systemImage: "sparkles") } }.buttonStyle(.borderedProminent).tint(.pink); if verticalSizeClass != .compact { Text("Spiders lunge · Fax robots fire from range").font(.caption.bold()).foregroundStyle(.cyan); Text("Drive onto keys, doors, and cells").font(.caption2) } }.buttonStyle(.bordered) }.padding(verticalSizeClass == .compact ? 6 : 16)
                 }
             }
             .navigationTitle(session.level.name).navigationBarTitleDisplayMode(.inline)
@@ -42,7 +57,16 @@ struct MissionView: View {
 
 struct DrivePad: View {
     @Bindable var session: GameSession
-    var body: some View { VStack(spacing: 6) { Button("↑") { session.setDrive(forward: 1, steering: 0) }; HStack { Button("←") { session.setDrive(forward: 0, steering: 1) }; Button("■") { session.stopDrive() }; Button("→") { session.setDrive(forward: 0, steering: -1) } }; Button("↓") { session.setDrive(forward: -1, steering: 0) }; Text("Treads \(session.leftTread, format: .number.precision(.fractionLength(1))) · \(session.rightTread, format: .number.precision(.fractionLength(1)))").font(.caption.monospacedDigit()) }.buttonStyle(.borderedProminent).tint(.cyan).padding(10).background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 18)) }
+    var compact = false
+    var body: some View {
+        Group {
+            if compact {
+                HStack(spacing: 4) { Button("←") { session.setDrive(forward: 0, steering: 1) }; Button("↑") { session.setDrive(forward: 1, steering: 0) }; Button("■") { session.stopDrive() }; Button("↓") { session.setDrive(forward: -1, steering: 0) }; Button("→") { session.setDrive(forward: 0, steering: -1) } }
+            } else {
+                VStack(spacing: 6) { Button("↑") { session.setDrive(forward: 1, steering: 0) }; HStack { Button("←") { session.setDrive(forward: 0, steering: 1) }; Button("■") { session.stopDrive() }; Button("→") { session.setDrive(forward: 0, steering: -1) } }; Button("↓") { session.setDrive(forward: -1, steering: 0) }; Text("Treads \(session.leftTread, format: .number.precision(.fractionLength(1))) · \(session.rightTread, format: .number.precision(.fractionLength(1)))").font(.caption.monospacedDigit()) }
+            }
+        }.buttonStyle(.borderedProminent).tint(.cyan).padding(compact ? 6 : 10).background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 18))
+    }
 }
 
 struct ComponentExplorer: View {
