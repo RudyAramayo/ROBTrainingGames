@@ -28,6 +28,13 @@ import AVFoundation
         speech.speak(warning)
     }
 
+    func playLaser(charge: Double) {
+        let clampedCharge = min(1, max(0, charge))
+        if clampedCharge < 0.12 { play("laser"); return }
+        guard let buffer = makeLaserBuffer(clampedCharge) else { return }
+        do { if !engine.isRunning { try engine.start() }; effectNode.scheduleBuffer(buffer, at: nil, options: .interrupts); effectNode.play() } catch { }
+    }
+
     private func playProceduralEffect(_ kind: TrainingEnemyKind) {
         guard let buffer = makeBuffer(kind) else { return }
         do { if !engine.isRunning { try engine.start() }; effectNode.scheduleBuffer(buffer, at: nil, options: .interrupts); effectNode.play() } catch { }
@@ -53,6 +60,24 @@ import AVFoundation
                 let edge = min(1, time * 45) * min(1, (duration - time) * 28)
                 samples[frame] = Float((carrier * 0.72 + white * 0.28) * edge * 0.3)
             }
+        }
+        return buffer
+    }
+
+    private func makeLaserBuffer(_ charge: Double) -> AVAudioPCMBuffer? {
+        let duration = 0.16 + charge * 0.34
+        let frames = AVAudioFrameCount(format.sampleRate * duration)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames), let samples = buffer.floatChannelData?[0] else { return nil }
+        buffer.frameLength = frames
+        var noise: UInt64 = 0x4741544C494E4752
+        for frame in 0..<Int(frames) {
+            let time = Double(frame) / format.sampleRate
+            noise = noise &* 2_862_933_555_777_941_757 &+ 3_037_000_493
+            let white = Double(Int64(bitPattern: noise)) / Double(Int64.max)
+            let pitch = 310 - charge * 190, fall = exp(-time * (5.5 - charge * 2.4))
+            let carrier = sin(2 * .pi * pitch * time) + sin(2 * .pi * pitch * 0.49 * time) * (0.45 + charge * 0.25)
+            let crack = white * exp(-time * 32) * 0.38
+            samples[frame] = Float((carrier * 0.27 + crack) * fall * (0.72 + charge * 0.28))
         }
         return buffer
     }

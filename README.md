@@ -4,9 +4,9 @@ A shared educational game for iPhone, iPad, and Apple Vision Pro that matches th
 
 ## Experiences
 
-- **Shared campaign:** ten matching missions with coordinated arrow driving, keys and locked doors, collectibles, aimed saber and laser attacks, enemy-contact damage, level restart, scoring, and increasingly difficult route-planning challenges.
-- **Active combat:** spider bots patrol, chase, skitter, and lunge. Dalek-style fax robots patrol, circle ROB, fire visible projectiles, synthesize fax-modem attack sounds, and call out “Exterminate!” with Apple speech synthesis.
-- **Matching keyboard controls:** use arrow keys or `WASD` to drive, `Space` for a sword-style saber slash, and `Q` to fire the training laser on the website, iPad/iPhone with a hardware keyboard, and Vision Pro with a connected keyboard.
+- **Shared campaign:** fifteen matching missions in expanded arenas with coordinated arrow driving, keys and locked doors, collectibles, active target lock, enemy-contact damage, level restart, scoring, and increasingly difficult route-planning challenges.
+- **Active combat:** both AMBER arm assemblies alternate wide dual-saber sweeps and trigger a torso spin on the third consecutive attack. A black right-shoulder gatling scans for targets, signals lock in red, and charges larger, deeper laser shots while spider bots and Dalek-style fax robots coordinate increasingly dense counterattacks.
+- **Matching keyboard controls:** use arrow keys or `WASD` to drive, press `Space` repeatedly for the saber combo, and hold `Q` to charge the shoulder laser on the website, iPad/iPhone with a hardware keyboard, and Vision Pro with a connected keyboard.
 - **Generative soundtrack:** an original procedural techno engine synthesizes its kick, hats, bass sequence, and level-reactive tempo locally at runtime. It does not download music or reuse a copyrighted recording.
 - **iOS game:** the shared campaign rendered with RealityKit controls and local high scores.
 - **iOS AR Lab:** places a manipulable ROB in the camera view and exposes an educational component explorer.

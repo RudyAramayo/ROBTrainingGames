@@ -9,8 +9,10 @@ final class GameSessionTests: XCTestCase {
 
         XCTAssertEqual(game.level.cellCount, 3)
         XCTAssertEqual(game.level.enemyShields, 2)
-        XCTAssertEqual(game.enemies.map(\.kind), [.spider, .fax])
-        XCTAssertEqual(game.remainingEnemies, 2)
+        XCTAssertEqual(game.enemies.map(\.kind), [.spider, .fax, .spider])
+        XCTAssertEqual(game.remainingEnemies, 3)
+        XCTAssertEqual(game.levels.count, 15)
+        XCTAssertGreaterThan(game.puzzle.arenaHalfExtent, 5)
     }
 
     func testEnemiesPatrolAndInitiateAttacks() {
@@ -84,6 +86,54 @@ final class GameSessionTests: XCTestCase {
         game.saberAttack()
 
         XCTAssertEqual(game.enemies[spiderIndex].shields, shields - 1)
-        XCTAssertTrue(game.message.contains("hit by saber"))
+        XCTAssertTrue(game.message.contains("dual-saber"))
+    }
+
+    func testThirdSaberPressTriggersSpinAndHitsBehindROB() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        let index = game.enemies.startIndex
+        game.enemies[index].position = game.robotPosition + SIMD3<Float>(0, 0, 1.25)
+        let shields = game.enemies[index].shields
+
+        game.saberAttack()
+        game.saberAttack()
+        XCTAssertEqual(game.enemies[index].shields, shields)
+        game.saberAttack()
+
+        XCTAssertEqual(game.saberStyle, .spin)
+        XCTAssertEqual(game.enemies[index].shields, shields - 1)
+        XCTAssertTrue(game.message.contains("Spin attack"))
+    }
+
+    func testShoulderLaserLocksAndChargedShotDealsMoreDamage() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        guard let targetID = game.lockedEnemyID, let targetIndex = game.enemies.firstIndex(where: { $0.id == targetID }) else { return XCTFail("Shoulder laser did not acquire a target") }
+        let shields = game.enemies[targetIndex].shields
+
+        game.beginLaserCharge()
+        game.tick(1.0)
+        game.releaseLaserCharge()
+
+        XCTAssertFalse(game.isChargingLaser)
+        XCTAssertGreaterThan(game.laserShotCharge, 0.7)
+        XCTAssertLessThanOrEqual(game.enemies[targetIndex].shields, shields - 2)
+        XCTAssertNotNil(game.laserDistance)
+    }
+
+    func testROBGeometryContainsSwingingArmsAndShoulderGatling() {
+        let game = GameSession(audioEnabled: false)
+        let robot = RobotFactory.makeROB()
+
+        XCTAssertNotNil(robot.findEntity(named: "Left Arm Assembly"))
+        XCTAssertNotNil(robot.findEntity(named: "Right Arm Assembly"))
+        XCTAssertNotNil(robot.findEntity(named: "Right Shoulder Gatling"))
+        XCTAssertNotNil(robot.findEntity(named: "Gatling Lock Indicator"))
+        XCTAssertNotNil(robot.findEntity(named: "Shoulder Laser Beam"))
+
+        game.begin()
+        RobotFactory.applyWeapons(to: robot, session: game)
+        XCTAssertTrue(robot.findEntity(named: "Gatling Lock Indicator")?.isEnabled == true)
     }
 }

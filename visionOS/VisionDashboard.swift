@@ -15,7 +15,8 @@ struct VisionDashboard: View {
                 Image("rob-training-key-art").resizable().scaledToFit().frame(maxHeight: 310).clipShape(RoundedRectangle(cornerRadius: 24))
                 Text("ROB Spatial Workshop").font(.largeTitle.bold()); Text("Place ROB at full scale, evade patrolling spider and fax robots, complete missions, and reveal the systems inside.").multilineTextAlignment(.center).foregroundStyle(.secondary)
                 HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Label("Score \(session.score)", systemImage: "star.fill"); Label("Targets \(session.remainingEnemies)", systemImage: "scope"); Label(session.hasKey ? "Key secured" : "Find key", systemImage: session.hasKey ? "key.fill" : "key") }.monospacedDigit()
-                Text("Keyboard: WASD or arrows to move · Space to slash · Q to fire laser").font(.callout.monospaced()).foregroundStyle(.cyan)
+                Text("Keyboard: WASD or arrows to move · Space for saber combo · hold Q to charge laser").font(.callout.monospaced()).foregroundStyle(.cyan)
+                Text(session.laserLockDescription).font(.headline.monospaced()).foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
                 HStack { Button(session.musicEnabled ? "Generated techno on" : "Music off", systemImage: session.musicEnabled ? "music.note" : "speaker.slash") { session.toggleMusic() }; Button(immersive ? "Leave Spatial Workshop" : "Enter Spatial Workshop", systemImage: immersive ? "rectangle.portrait.and.arrow.right" : "vision.pro") { Task { if immersive { await dismissImmersiveSpace(); immersive = false } else { immersive = await openImmersiveSpace(id: "ROBWorkshop") == .opened } } } }.buttonStyle(.borderedProminent)
                 RobotVoicePanel(voice: voice, game: session).frame(maxWidth: 620)
                 if let component = session.selectedComponent { VStack(alignment: .leading) { Text(component.name).font(.title2.bold()); Text(component.summary).foregroundStyle(.secondary) }.padding().glassBackgroundEffect() }
@@ -40,11 +41,12 @@ struct ImmersiveROBWorkshop: View {
             Attachment(id: "controls") {
                 VStack(spacing: 12) {
                     Text("ROB Spatial Controls").font(.headline)
-                    Text("WASD / arrows · Space slash · Q laser").font(.caption.monospaced()).foregroundStyle(.cyan)
+                    Text("WASD / arrows · Space combo · hold Q to charge").font(.caption.monospaced()).foregroundStyle(.cyan)
                     HStack { Button("←") { session.moveStep(steering: 1) }; Button("↑") { session.moveStep(forward: 1) }; Button("→") { session.moveStep(steering: -1) } }
                     HStack { Button("↓") { session.moveStep(forward: -1) }; Button("Stop") { session.stopDrive() } }
                     Slider(value: Binding(get: { Double(scale) }, set: { scale = Float($0) }), in: 0.3...1.3) { Text("Scale") }.frame(width: 320)
-                    HStack { Button("Fire training laser") { session.fireLaser() }; Button("Sword-style saber slash") { session.saberAttack() } }.tint(.pink)
+                    HStack { LaserChargeButton(session: session, title: "Shoulder laser"); Button("Dual-saber combo") { session.saberAttack() }.buttonStyle(.borderedProminent).tint(.pink) }
+                    Text(session.laserLockDescription).font(.caption.bold().monospaced()).foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
                     Button(session.musicEnabled ? "♫ Generated techno" : "Music off") { session.toggleMusic() }
                     Text("\(session.remainingEnemies) targets · spiders lunge · fax robots circle and fire").font(.caption.bold()).foregroundStyle(.cyan)
                     Text("Navigate ROB onto keys, doors, and cells; locked partitions block every bypass.").font(.caption).frame(width: 420)

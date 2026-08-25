@@ -17,6 +17,7 @@
 		2C9151B4644B259D0962A455 /* pickup.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 14F0E4F7ED1B3521087B505C /* pickup.m4a */; };
 		374094AD795CF2CAD529E072 /* VisionDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D19BBDDC5D490212B965846 /* VisionDashboard.swift */; };
 		39DA35854B101739582EF190 /* IOSRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF0F5FCFB2ACB31F1C6AD186 /* IOSRootView.swift */; };
+		506257F4720091349F2D80AB /* LaserChargeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86F46D4F36051CC6C3E326B /* LaserChargeButton.swift */; };
 		55B33C4761AB7A8D346EB27C /* rob-training-key-art.png in Resources */ = {isa = PBXBuildFile; fileRef = 765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */; };
 		59C21018AE39553475ADF2C0 /* RobotVoicePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */; };
 		5A7B452D8C82B7E964553832 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A494856CC93CF9C98076DE8A /* GameSession.swift */; };
@@ -28,6 +29,7 @@
 		7DA72140DFAD6235C27D1DD7 /* SoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */; };
 		801F959142CF82D4438D01F3 /* mission-start.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 43C86D54778FEDD1EDB6D00E /* mission-start.m4a */; };
 		80ACD0D4BE8A79DA1446F819 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */; };
+		81A5669F7DB12E4AC7CEC8EC /* LaserChargeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86F46D4F36051CC6C3E326B /* LaserChargeButton.swift */; };
 		8E92EDF0CC8A176364702C1A /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A494856CC93CF9C98076DE8A /* GameSession.swift */; };
 		8F5D5EA3ADB8F70CFA08BA08 /* SoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */; };
 		B0D1FEF0D8A64D0B703D8DE8 /* level-complete.m4a in Resources */ = {isa = PBXBuildFile; fileRef = DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */; };
@@ -66,6 +68,7 @@
 		AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundPlayer.swift; sourceTree = "<group>"; };
 		BE8EABD4931412AA8A676C80 /* RobotFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotFactory.swift; sourceTree = "<group>"; };
 		C02AE4063221AD16DBDA6B2F /* ROBTrainingiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ROBTrainingiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C86F46D4F36051CC6C3E326B /* LaserChargeButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaserChargeButton.swift; sourceTree = "<group>"; };
 		CAE0655626B80AE21B885AA7 /* ROBTrainingVisionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBTrainingVisionApp.swift; sourceTree = "<group>"; };
 		D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotVoicePanel.swift; sourceTree = "<group>"; };
 		DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */ = {isa = PBXFileReference; path = "level-complete.m4a"; sourceTree = "<group>"; };
@@ -111,6 +114,7 @@
 			children = (
 				077737605315118EDA10229C /* GameKeyboardControls.swift */,
 				A494856CC93CF9C98076DE8A /* GameSession.swift */,
+				C86F46D4F36051CC6C3E326B /* LaserChargeButton.swift */,
 				BE8EABD4931412AA8A676C80 /* RobotFactory.swift */,
 				DDDE8CFB55658390DC53F88E /* RobotVoice.swift */,
 				D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */,
@@ -305,6 +309,7 @@
 			files = (
 				C13CD56E9E707AF99448C80E /* GameKeyboardControls.swift in Sources */,
 				5A7B452D8C82B7E964553832 /* GameSession.swift in Sources */,
+				81A5669F7DB12E4AC7CEC8EC /* LaserChargeButton.swift in Sources */,
 				CB6811B4AEFB9E8FD157EA1D /* ROBTrainingVisionApp.swift in Sources */,
 				0EA151C76007B45172EFCFE9 /* RobotFactory.swift in Sources */,
 				75A34823F815FF6431752B25 /* RobotVoice.swift in Sources */,
@@ -331,6 +336,7 @@
 				189BE478545486B5BF88CAC8 /* GameKeyboardControls.swift in Sources */,
 				8E92EDF0CC8A176364702C1A /* GameSession.swift in Sources */,
 				39DA35854B101739582EF190 /* IOSRootView.swift in Sources */,
+				506257F4720091349F2D80AB /* LaserChargeButton.swift in Sources */,
 				6CFB7C4FCE1E8C49F724F115 /* ROBTrainingiOSApp.swift in Sources */,
 				201A3506945F144FBBE58F23 /* RobotFactory.swift in Sources */,
 				E1D33E988ED8F791EF94FE5F /* RobotVoice.swift in Sources */,

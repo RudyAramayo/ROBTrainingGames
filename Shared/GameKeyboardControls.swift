@@ -14,15 +14,17 @@ struct GameKeyboardControls: ViewModifier {
                     let wasHeld = heldKeys.contains(press.key)
                     heldKeys.insert(press.key)
                     if !wasHeld {
-                        if press.key == "q" { session.fireLaser() }
+                        if press.key == "q" { session.beginLaserCharge() }
                         if press.key == .space { session.saberAttack() }
                     }
                 } else {
                     heldKeys.remove(press.key)
+                    if press.key == "q" { session.releaseLaserCharge() }
                 }
                 updateDrive()
                 return .handled
             }
+            .onDisappear { if heldKeys.contains("q") { session.releaseLaserCharge() } }
     }
 
     private func updateDrive() {

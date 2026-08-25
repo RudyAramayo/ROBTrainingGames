@@ -4,43 +4,53 @@ import UIKit
 @MainActor enum RobotFactory {
     static func makeROB(componentMode: Bool = false) -> Entity {
         let root = Entity(); root.name = "ROB"
-        func part(_ name: String, _ size: SIMD3<Float>, _ position: SIMD3<Float>, _ color: UIColor) { let entity = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.015), materials: [SimpleMaterial(color: color, isMetallic: true)]); entity.name = name; entity.position = position; root.addChild(entity) }
-        func cylinder(_ name: String, radius: Float, height: Float, position: SIMD3<Float>, color: UIColor, faceForward: Bool = false, sideways: Bool = false) {
+        func part(_ name: String, _ size: SIMD3<Float>, _ position: SIMD3<Float>, _ color: UIColor, parent: Entity? = nil) { let entity = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.015), materials: [SimpleMaterial(color: color, isMetallic: true)]); entity.name = name; entity.position = position; (parent ?? root).addChild(entity) }
+        func cylinder(_ name: String, radius: Float, height: Float, position: SIMD3<Float>, color: UIColor, faceForward: Bool = false, sideways: Bool = false, parent: Entity? = nil) {
             let entity = ModelEntity(mesh: .generateCylinder(height: height, radius: radius), materials: [SimpleMaterial(color: color, isMetallic: true)])
             entity.name = name; entity.position = position
             if faceForward { entity.orientation = simd_quatf(angle: .pi / 2, axis: [1, 0, 0]) }
             if sideways { entity.orientation = simd_quatf(angle: .pi / 2, axis: [0, 0, 1]) }
-            root.addChild(entity)
+            (parent ?? root).addChild(entity)
         }
         part("Base", [0.72, 0.22, 0.82], [0, 0.2, 0], .black)
         part("Left Tread", [0.2, 0.34, 1.02], [-0.47, 0.22, 0], UIColor(white: 0.04, alpha: 1)); part("Right Tread", [0.2, 0.34, 1.02], [0.47, 0.22, 0], UIColor(white: 0.04, alpha: 1))
         for x: Float in [-0.47, 0.47] { for z: Float in [-0.32, 0, 0.32] { cylinder("Tread Wheel", radius: 0.12, height: 0.21, position: [x, 0.22, z], color: .darkGray, sideways: true) } }
-        part("Cerebro Torso", [0.68, 0.64, 0.54], [0, 0.72, 0], UIColor(red: 0.08, green: 0.12, blue: 0.16, alpha: 1))
+
+        let torso = Entity(); torso.name = "Torso Assembly"; root.addChild(torso)
+        part("Cerebro Torso", [0.68, 0.64, 0.54], [0, 0.72, 0], UIColor(red: 0.08, green: 0.12, blue: 0.16, alpha: 1), parent: torso)
         for x: Float in [-0.19, 0.19] {
             let color: UIColor = x < 0 ? .systemBlue : .systemCyan
-            cylinder("Torso Light Ring", radius: 0.12, height: 0.025, position: [x, 0.8, -0.285], color: color, faceForward: true)
-            cylinder("Torso Speaker", radius: 0.078, height: 0.032, position: [x, 0.8, -0.305], color: UIColor(white: 0.025, alpha: 1), faceForward: true)
+            cylinder("Torso Light Ring", radius: 0.12, height: 0.025, position: [x, 0.8, -0.285], color: color, faceForward: true, parent: torso)
+            cylinder("Torso Speaker", radius: 0.078, height: 0.032, position: [x, 0.8, -0.305], color: UIColor(white: 0.025, alpha: 1), faceForward: true, parent: torso)
         }
-        part("Depth Camera", [0.2, 0.1, 0.065], [0, 0.59, -0.3], .gray)
-        cylinder("Front Linear Actuator", radius: 0.045, height: 0.72, position: [0, 0.28, -0.62], color: .gray, faceForward: true)
+        part("Depth Camera", [0.2, 0.1, 0.065], [0, 0.59, -0.3], .gray, parent: torso)
+        cylinder("Front Linear Actuator", radius: 0.045, height: 0.72, position: [0, 0.28, -0.62], color: .gray, faceForward: true, parent: torso)
         for side: Float in [-1, 1] {
             let armColor: UIColor = componentMode ? (side < 0 ? .systemGreen : .systemBlue) : .gray
             let prefix = side < 0 ? "Left" : "Right"
-            let jointX = side * 0.51
-            cylinder("\(prefix) Shoulder Joint", radius: 0.095, height: 0.15, position: [jointX, 0.93, 0], color: .darkGray, sideways: true)
-            part("\(prefix) Upper Arm", [0.12, 0.32, 0.13], [side * 0.56, 0.75, 0], armColor)
-            cylinder("\(prefix) Elbow Joint", radius: 0.075, height: 0.13, position: [side * 0.59, 0.57, -0.01], color: .darkGray, sideways: true)
-            part("\(prefix) Forearm", [0.1, 0.28, 0.11], [side * 0.61, 0.41, -0.02], armColor)
-            cylinder("\(prefix) Wrist Joint", radius: 0.06, height: 0.11, position: [side * 0.62, 0.25, -0.03], color: .darkGray, sideways: true)
+            let arm = Entity(); arm.name = "\(prefix) Arm Assembly"; arm.position = [side * 0.51, 0.93, 0]; torso.addChild(arm)
+            cylinder("\(prefix) Shoulder Joint", radius: 0.095, height: 0.15, position: [0, 0, 0], color: .darkGray, sideways: true, parent: arm)
+            part("\(prefix) Upper Arm", [0.12, 0.32, 0.13], [side * 0.05, -0.18, 0], armColor, parent: arm)
+            cylinder("\(prefix) Elbow Joint", radius: 0.075, height: 0.13, position: [side * 0.08, -0.36, -0.01], color: .darkGray, sideways: true, parent: arm)
+            part("\(prefix) Forearm", [0.1, 0.28, 0.11], [side * 0.1, -0.52, -0.02], armColor, parent: arm)
+            cylinder("\(prefix) Wrist Joint", radius: 0.06, height: 0.11, position: [side * 0.11, -0.68, -0.03], color: .darkGray, sideways: true, parent: arm)
             for joint in 0..<4 {
-                cylinder("\(prefix) AMBER Joint \(joint + 4)", radius: 0.035, height: 0.08, position: [side * (0.62 + Float(joint) * 0.035), 0.22, -0.09 - Float(joint) * 0.07], color: joint.isMultiple(of: 2) ? .lightGray : .darkGray, sideways: true)
+                cylinder("\(prefix) AMBER Joint \(joint + 4)", radius: 0.035, height: 0.08, position: [side * (0.12 + Float(joint) * 0.035), -0.71, -0.09 - Float(joint) * 0.07], color: joint.isMultiple(of: 2) ? .lightGray : .darkGray, sideways: true, parent: arm)
             }
-            cylinder("\(prefix) Lightsaber", radius: 0.025, height: 0.78, position: [side * 0.75, 0.29, -0.48], color: side < 0 ? .systemGreen : .systemCyan, faceForward: true)
+            cylinder("\(prefix) Lightsaber", radius: 0.025, height: 0.9, position: [side * 0.24, -0.64, -0.55], color: side < 0 ? .systemGreen : .systemCyan, faceForward: true, parent: arm)
         }
-        cylinder("Training Laser", radius: 0.018, height: 0.45, position: [0, 0.82, -0.8], color: .systemRed, faceForward: true)
-        part("Sensor Mast", [0.1, 0.48, 0.1], [0, 1.2, 0], .gray)
-        let head = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: .black, isMetallic: true)]); head.name = "Camera Head"; head.position = [0, 1.52, 0]; head.scale.z = 0.82; root.addChild(head)
-        cylinder("Head Camera", radius: 0.055, height: 0.045, position: [0, 1.52, -0.2], color: .systemGreen, faceForward: true)
+
+        let gatling = Entity(); gatling.name = "Right Shoulder Gatling"; gatling.position = [0.5, 1.08, -0.05]; torso.addChild(gatling)
+        part("Gatling Housing", [0.24, 0.2, 0.38], [0, 0, -0.08], .black, parent: gatling)
+        let barrelCluster = Entity(); barrelCluster.name = "Gatling Barrel Cluster"; gatling.addChild(barrelCluster)
+        for x: Float in [-0.055, 0.055] { for y: Float in [-0.055, 0.055] { cylinder("Gatling Barrel", radius: 0.018, height: 0.52, position: [x, y, -0.36], color: .black, faceForward: true, parent: barrelCluster) } }
+        let lockLamp = ModelEntity(mesh: .generateSphere(radius: 0.055), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); lockLamp.name = "Gatling Lock Indicator"; lockLamp.position = [0, 0.15, -0.22]; gatling.addChild(lockLamp)
+        let shot = Entity(); shot.name = "Shoulder Laser Shot"; shot.position = [0.5, 1.08, -0.28]; torso.addChild(shot)
+        let beam = ModelEntity(mesh: .generateBox(size: [1, 1, 0.55], cornerRadius: 0.04), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); beam.name = "Shoulder Laser Beam"; beam.isEnabled = false; shot.addChild(beam)
+
+        part("Sensor Mast", [0.1, 0.48, 0.1], [0, 1.2, 0], .gray, parent: torso)
+        let head = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: .black, isMetallic: true)]); head.name = "Camera Head"; head.position = [0, 1.52, 0]; head.scale.z = 0.82; torso.addChild(head)
+        cylinder("Head Camera", radius: 0.055, height: 0.045, position: [0, 1.52, -0.2], color: .systemGreen, faceForward: true, parent: torso)
         root.components.set(InputTargetComponent()); root.generateCollisionShapes(recursive: true); return root
     }
 
@@ -90,21 +100,58 @@ import UIKit
     }
 
     static func applyWeapons(to robot: Entity, session: GameSession) {
-        let swing = Float(sin(session.saberAnimation * .pi))
-        for name in ["Left Lightsaber", "Right Lightsaber"] {
-            guard let saber = robot.findEntity(named: name) else { continue }
-            let side: Float = name.hasPrefix("Left") ? -1 : 1
-            saber.orientation = simd_quatf(angle: .pi / 2, axis: [1, 0, 0]) * simd_quatf(angle: side * swing * 1.25, axis: [0, 1, 0])
+        let progress = Float(1 - session.saberAnimation), arc = sin(progress * .pi)
+        let torso = robot.findEntity(named: "Torso Assembly")
+        var torsoYaw: Float = 0
+        if let style = session.saberStyle, session.saberAnimation > 0 {
+            switch style {
+            case .spin: torsoYaw = progress * 2 * .pi
+            case .leftSweep: torsoYaw = -arc * 0.24
+            case .rightSweep: torsoYaw = arc * 0.24
+            }
         }
-        if let laser = robot.findEntity(named: "Training Laser") {
-            if let distance = session.laserDistance { laser.isEnabled = true; laser.position = [0, 0.82, -distance] } else { laser.isEnabled = false }
+        torso?.orientation = simd_quatf(angle: torsoYaw, axis: [0, 1, 0])
+        for (name, side) in [("Left Arm Assembly", Float(-1)), ("Right Arm Assembly", Float(1))] {
+            guard let arm = robot.findEntity(named: name) else { continue }
+            guard let style = session.saberStyle, session.saberAnimation > 0 else { arm.orientation = simd_quatf(angle: 0, axis: [0, 1, 0]); continue }
+            if style == .spin {
+                arm.orientation = simd_quatf(angle: side * .pi / 2, axis: [0, 0, 1]) * simd_quatf(angle: -0.28, axis: [1, 0, 0])
+            } else {
+                let direction: Float = style == .leftSweep ? -1 : 1
+                let sweep = direction * (-1.3 + progress * 2.6)
+                arm.orientation = simd_quatf(angle: sweep, axis: [0, 1, 0]) * simd_quatf(angle: side * arc * 0.5, axis: [0, 0, 1])
+            }
+        }
+        if let gatling = robot.findEntity(named: "Right Shoulder Gatling") {
+            let relativeHeading = session.laserLockHeading.map { $0 - session.robotHeading - torsoYaw } ?? Float(sin(session.elapsed * 0.85)) * 0.9
+            gatling.orientation = simd_quatf(angle: relativeHeading, axis: [0, 1, 0])
+        }
+        if let lamp = robot.findEntity(named: "Gatling Lock Indicator") {
+            lamp.isEnabled = session.lockedEnemy != nil
+            let pulse = 0.9 + Float(sin(session.elapsed * 9)) * 0.18
+            lamp.scale = .init(repeating: pulse)
+        }
+        robot.findEntity(named: "Gatling Barrel Cluster")?.orientation = simd_quatf(angle: Float(session.elapsed) * 7 + Float(session.laserCharge) * 12, axis: [0, 0, 1])
+        if let shot = robot.findEntity(named: "Shoulder Laser Shot"), let beam = robot.findEntity(named: "Shoulder Laser Beam") {
+            shot.orientation = simd_quatf(angle: session.laserShotHeading - session.robotHeading - torsoYaw, axis: [0, 1, 0])
+            if let distance = session.laserDistance {
+                let charge = Float(session.laserShotCharge), width = 0.035 + charge * 0.13
+                beam.isEnabled = true; beam.position = [0, 0, -distance]; beam.scale = [width, width, 1 + charge * 2.6]
+            } else { beam.isEnabled = false }
         }
     }
 
     static func makeTrainingRoom(level: Int, puzzle: PuzzleGeometry) -> Entity {
         let room = Entity(); room.name = "Training Room-\(level)"
         let color: UIColor = level == 1 ? .systemIndigo : UIColor(white: 0.16, alpha: 1)
-        let floor = ModelEntity(mesh: .generatePlane(width: 6, depth: 6), materials: [SimpleMaterial(color: color, isMetallic: false)]); room.addChild(floor)
+        let size = puzzle.arenaHalfExtent * 2
+        let floor = ModelEntity(mesh: .generatePlane(width: size, depth: size), materials: [SimpleMaterial(color: color, isMetallic: false)]); room.addChild(floor)
+        for (position, wallSize) in [
+            (SIMD3<Float>(0, 0.55, -puzzle.arenaHalfExtent), SIMD3<Float>(size, 1.1, 0.18)),
+            (SIMD3<Float>(0, 0.55, puzzle.arenaHalfExtent), SIMD3<Float>(size, 1.1, 0.18)),
+            (SIMD3<Float>(-puzzle.arenaHalfExtent, 0.55, 0), SIMD3<Float>(0.18, 1.1, size)),
+            (SIMD3<Float>(puzzle.arenaHalfExtent, 0.55, 0), SIMD3<Float>(0.18, 1.1, size)),
+        ] { let wall = ModelEntity(mesh: .generateBox(size: wallSize, cornerRadius: 0.03), materials: [SimpleMaterial(color: UIColor(white: 0.12, alpha: 1), isMetallic: true)]); wall.position = position; room.addChild(wall) }
         for barrier in puzzle.barriers { let block = ModelEntity(mesh: .generateBox(size: [barrier.size.x, 0.75, barrier.size.y], cornerRadius: 0.03), materials: [SimpleMaterial(color: UIColor(white: 0.28, alpha: 1), isMetallic: true)]); block.position = [barrier.center.x, 0.375, barrier.center.y]; room.addChild(block) }
         if let door = puzzle.door { let entity = ModelEntity(mesh: .generateBox(size: [door.size.x, 0.9, door.size.y], cornerRadius: 0.025), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); entity.name = "Puzzle Door"; entity.position = [door.center.x, 0.45, door.center.y]; room.addChild(entity) }
         if let key = puzzle.key { let entity = ModelEntity(mesh: .generateBox(size: [0.28, 0.08, 0.12], cornerRadius: 0.04), materials: [SimpleMaterial(color: .systemCyan, isMetallic: true)]); entity.name = "Puzzle Key"; entity.position = [key.x, 0.2, key.y]; room.addChild(entity) }
