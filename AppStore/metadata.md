@@ -32,13 +32,13 @@
 
 Meet ROB, the Orbitus Robotics training robot, and master fifteen increasingly challenging missions built around driving, sensing, safety, combat timing, and route planning.
 
-Drive ROB's independent tri-wheel treads through expanded training rooms. Collect energy cells, find keys, open locked partitions, evade moving spider and fax sentries, and reach Mission Control. Chain wide dual-arm saber swings into a full spin attack, or wait for the right-shoulder gatling to lock before charging a powerful laser shot.
+Drive ROB's independent tri-wheel treads through expanded training rooms. Collect energy cells, find keys, open locked partitions, evade moving spider and Dalek-style sentries, and reach Mission Control. Chain wide dual-arm saber swings into a full spin attack, or wait for the right-shoulder gatling to lock before charging a powerful laser shot.
 
 ROB Training includes:
 
 • Fifteen progressively harder missions
 • Independent tread controls plus keyboard support
-• Active spider and fax sentries that move and fight back
+• Active spider and Dalek-style sentries that move and fight back
 • Dual-saber combos and a chargeable shoulder laser
 • Original procedural techno music and robot effects
 • A RealityKit AR lab for placing ROB in your room
@@ -62,7 +62,7 @@ Discover the real ROB project, books, videos, and engineering work at https://ww
 
 Bring ROB into your space with a dedicated Apple Vision Pro robotics workshop from Orbitus Robotics.
 
-Enter a full-scale immersive training room, command ROB through fifteen increasingly difficult missions, and inspect the systems that make the robot work. Drive independent tri-wheel treads, collect energy cells, unlock partitions, defend against moving spider and fax sentries, and combine dual-saber attacks with a scanning right-shoulder laser.
+Enter a full-scale immersive training room, command ROB through fifteen increasingly difficult missions, and inspect the systems that make the robot work. Drive independent tri-wheel treads, collect energy cells, unlock partitions, defend against moving spider and Dalek-style sentries, and combine dual-saber attacks with a scanning right-shoulder laser.
 
 ROB Training Vision includes:
 

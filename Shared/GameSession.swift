@@ -20,7 +20,7 @@ enum TrainingEnemyKind: String, Sendable {
     case spider
     case fax
 
-    var displayName: String { self == .spider ? "Spider bot" : "Dalek-style fax robot" }
+    var displayName: String { self == .spider ? "Spider bot" : "Dalek-style sentry robot" }
 }
 
 enum SpiderSoundCue: Sendable {
@@ -307,14 +307,14 @@ final class GameSession {
                 speed = 0.24 + Float(levelIndex) * 0.015
                 if elapsed >= enemy.nextAttack && distance < 7.5 {
                     enemy.nextAttack = elapsed + max(1.85, 3.65 - Double(levelIndex) * 0.09); enemyAttackCount += 1; fireEnemyBolt(from: enemy)
-                    playEnemyAttack(.fax); message = "Dalek-style fax robot: “Exterminate!” Incoming laser — keep moving."; report(message)
+                    playEnemyAttack(.fax); message = "Dalek-style sentry robot: “Exterminate!” Incoming laser — keep moving."; report(message)
                 }
             }
             let facing = robotPosition - enemy.position; enemy.heading = atan2(-facing.x, -facing.z)
             moveEnemy(&enemy, toward: target, speed: speed, delta: delta); enemies[index] = enemy
             if simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(enemy.position.x, enemy.position.z)) < (enemy.kind == .spider ? 0.5 : 0.44) {
                 if enemy.kind == .spider { playSpider(.impact) } else { playEnemyAttack(.fax) }
-                enemyContact(enemy.kind == .spider ? "Spider bot lunge" : "Dalek-style fax collision"); return
+                enemyContact(enemy.kind == .spider ? "Spider bot lunge" : "Dalek-style sentry collision"); return
             }
         }
         var survivingBolts: [TrainingEnemyBolt] = []
@@ -322,7 +322,7 @@ final class GameSession {
         for var bolt in enemyBolts {
             bolt.position += bolt.velocity * Float(delta)
             if simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(bolt.position.x, bolt.position.z)) < 0.32 {
-                playEnemyAttack(.fax); enemyContact("Dalek-style fax laser"); return
+                playEnemyAttack(.fax); enemyContact("Dalek-style sentry laser"); return
             }
             let outside = abs(bolt.position.x) > puzzle.arenaHalfExtent || abs(bolt.position.z) > puzzle.arenaHalfExtent
             if !outside && !blockers.contains(where: { Self.intersects(bolt.position, barrier: $0, radius: 0.04) }) { survivingBolts.append(bolt) }
