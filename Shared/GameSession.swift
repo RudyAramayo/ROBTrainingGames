@@ -138,6 +138,7 @@ final class GameSession {
     var lastSituation = "ROB systems ready."
     var situationCount = 0
     private var nextBoltID = 0
+    private var wasAtDock = false
     private let audioEnabled: Bool
     var level: ROBLevel { levels[levelIndex] }
     var remainingEnemies: Int { enemies.filter(\.isActive).count }
@@ -217,7 +218,7 @@ final class GameSession {
         laserDistance = nil; laserCharge = 0; laserShotCharge = 0; isChargingLaser = false; lockedEnemyID = nil
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
         robotPosition = SIMD3<Float>(0, 0, puzzle.arenaHalfExtent - 0.8); robotHeading = 0; leftWheelAngle = 0; rightWheelAngle = 0
-        enemyBolts = []; nextBoltID = 0; enemies = configuredEnemies()
+        enemyBolts = []; nextBoltID = 0; wasAtDock = false; enemies = configuredEnemies()
         updateLaserLock()
     }
     func begin() { enemyAttackCount = 0; configureLevel(); isRunning = true; if audioEnabled && musicEnabled { TechnoMusicEngine.shared.start(level: levelIndex) }; message = "Level \(level.id): \(level.challenge)"; report("The pilot started \(level.name). \(level.challenge)"); play("mission-start") }
@@ -343,6 +344,25 @@ final class GameSession {
         for (index, cell) in puzzle.cells.enumerated() where !collectedCellIndices.contains(index) && simd_distance(point, cell) < 0.45 {
             collectedCellIndices.insert(index); collectCell()
         }
+        let atDock = simd_distance(point, puzzle.dock) < 0.55
+        if atDock && canFinish {
+            nextLevel()
+            return
+        }
+        if atDock && !wasAtDock {
+            message = "Dock offline — \(dockRequirements)."
+            report(message)
+        }
+        wasAtDock = atDock
+    }
+    private var dockRequirements: String {
+        var requirements: [String] = []
+        if level.requiresKey && !hasKey { requirements.append("find the key") }
+        else if level.requiresKey && !doorOpen { requirements.append("open the door") }
+        let cellsLeft = level.cellCount - collectedCells
+        if cellsLeft > 0 { requirements.append("collect \(cellsLeft) more energy \(cellsLeft == 1 ? "cell" : "cells")") }
+        if remainingEnemies > 0 { requirements.append("disable \(remainingEnemies) more \(remainingEnemies == 1 ? "target" : "targets")") }
+        return requirements.joined(separator: " and ")
     }
     private func updateLaserLock() {
         let maxRange = puzzle.arenaHalfExtent * 1.75

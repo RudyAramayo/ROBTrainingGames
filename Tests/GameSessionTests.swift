@@ -16,6 +16,36 @@ final class GameSessionTests: XCTestCase {
         XCTAssertGreaterThan(game.puzzle.arenaHalfExtent, 5)
     }
 
+    func testLevelOneNeedsNoKeyAndAdvancesWhenObjectivesReachTheDock() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+
+        XCTAssertFalse(game.level.requiresKey)
+        XCTAssertNil(game.puzzle.key)
+        XCTAssertTrue(game.doorOpen)
+
+        game.collectedCells = game.level.cellCount
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        game.robotPosition = [game.puzzle.dock.x, 0, game.puzzle.dock.y]
+        game.tick(1.0 / 30.0)
+
+        XCTAssertEqual(game.level.id, 2)
+        XCTAssertTrue(game.isRunning)
+    }
+
+    func testLevelOneDockExplainsItsActualRemainingObjectives() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        game.robotPosition = [game.puzzle.dock.x, 0, game.puzzle.dock.y]
+
+        game.tick(1.0 / 30.0)
+
+        XCTAssertEqual(game.level.id, 1)
+        XCTAssertTrue(game.message.contains("3 more energy cells"))
+        XCTAssertTrue(game.message.contains("3 more targets"))
+        XCTAssertFalse(game.message.localizedCaseInsensitiveContains("key"))
+    }
+
     func testEnemiesPatrolAndInitiateAttacks() {
         let game = GameSession(audioEnabled: false)
         game.begin()

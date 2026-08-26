@@ -178,7 +178,7 @@ import UIKit
         if let door = puzzle.door { let entity = ModelEntity(mesh: .generateBox(size: [door.size.x, 0.9, door.size.y], cornerRadius: 0.025), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); entity.name = "Puzzle Door"; entity.position = [door.center.x, 0.45, door.center.y]; room.addChild(entity) }
         if let key = puzzle.key { let entity = ModelEntity(mesh: .generateBox(size: [0.28, 0.08, 0.12], cornerRadius: 0.04), materials: [SimpleMaterial(color: .systemCyan, isMetallic: true)]); entity.name = "Puzzle Key"; entity.position = [key.x, 0.2, key.y]; room.addChild(entity) }
         for (index, cell) in puzzle.cells.enumerated() { let entity = ModelEntity(mesh: .generateCylinder(height: 0.28, radius: 0.11), materials: [SimpleMaterial(color: .systemYellow, isMetallic: true)]); entity.name = "Puzzle Cell \(index)"; entity.position = [cell.x, 0.2, cell.y]; room.addChild(entity) }
-        let dock = ModelEntity(mesh: .generateBox(size: [0.7, 0.025, 0.7], cornerRadius: 0.08), materials: [SimpleMaterial(color: .systemGreen, isMetallic: false)]); dock.name = "Puzzle Dock"; dock.position = [puzzle.dock.x, 0.02, puzzle.dock.y]; room.addChild(dock)
+        let dock = ModelEntity(mesh: .generateBox(size: [0.7, 0.025, 0.7], cornerRadius: 0.08), materials: [SimpleMaterial(color: .systemOrange, isMetallic: false)]); dock.name = "Puzzle Dock"; dock.position = [puzzle.dock.x, 0.02, puzzle.dock.y]; room.addChild(dock)
         return room
     }
 
@@ -186,5 +186,8 @@ import UIKit
         room.findEntity(named: "Puzzle Key")?.isEnabled = !session.hasKey
         room.findEntity(named: "Puzzle Door")?.isEnabled = !session.doorOpen
         for index in session.puzzle.cells.indices { room.findEntity(named: "Puzzle Cell \(index)")?.isEnabled = !session.collectedCellIndices.contains(index) }
+        if let dock = room.findEntity(named: "Puzzle Dock") as? ModelEntity {
+            dock.model?.materials = [SimpleMaterial(color: session.canFinish ? .systemGreen : .systemOrange, isMetallic: false)]
+        }
     }
 }

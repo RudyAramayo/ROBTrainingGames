@@ -4,6 +4,7 @@ struct RobotVoicePanel: View {
     @Bindable var voice: RobotVoice
     let game: GameSession
     var compact = false
+    var observesGameEvents = true
     var body: some View {
         Group {
             if compact {
@@ -32,7 +33,7 @@ struct RobotVoicePanel: View {
             }
         }
         .padding(12).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-        .onChange(of: game.situationCount) { _, count in if count > 0 { voice.react(to: game.lastSituation, game: game) } }
+        .onChange(of: game.situationCount) { _, count in if observesGameEvents && count > 0 { voice.react(to: game.lastSituation, game: game) } }
     }
 
     private var compactAnswer: String {

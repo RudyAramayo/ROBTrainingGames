@@ -6,16 +6,18 @@ struct IOSRootView: View {
     @Bindable var voice: RobotVoice
     var body: some View {
         TabView {
-            MissionView(session: session, voice: voice).tabItem { Label("Missions", systemImage: "gamecontroller.fill") }
-            ARLabView(session: session, voice: voice).tabItem { Label("AR Lab", systemImage: "arkit") }
+            MissionView(session: session).tabItem { Label("Missions", systemImage: "gamecontroller.fill") }
+            ARLabView(session: session).tabItem { Label("AR Lab", systemImage: "arkit") }
             ComponentExplorer(session: session).tabItem { Label("ROB", systemImage: "cpu") }
-        }.tint(.cyan)
+            RobotVoiceScreen(voice: voice, session: session).tabItem { Label("Voice", systemImage: "waveform") }
+        }
+        .tint(.cyan)
+        .onChange(of: session.situationCount) { _, count in if count > 0 { voice.react(to: session.lastSituation, game: session) } }
     }
 }
 
 struct MissionView: View {
     @Bindable var session: GameSession
-    @Bindable var voice: RobotVoice
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
@@ -42,18 +44,16 @@ struct MissionView: View {
                     .ignoresSafeArea().background(.black)
                 VStack(spacing: verticalSizeClass == .compact ? 4 : 10) {
                     if compactPhoneLayout {
-                        CompactMissionStats(session: session, highScore: highScore).padding(.horizontal, 8)
+                        CompactMissionStats(session: session).padding(.horizontal, 8)
                     } else {
-                        HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Spacer(); Label(session.hasKey ? "Key" : "No key", systemImage: session.hasKey ? "key.fill" : "key"); Text("Targets \(session.remainingEnemies)").monospacedDigit(); Text("Score \(session.score)").monospacedDigit(); Text("Best \(highScore)").foregroundStyle(.cyan).monospacedDigit() }.font(.headline).padding(10).background(.ultraThinMaterial, in: Capsule()).padding(.horizontal)
+                        HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Spacer(); MissionKeyStatus(session: session); Text("Cells \(session.collectedCells)/\(session.level.cellCount)").monospacedDigit(); Text("Targets \(session.remainingEnemies)").monospacedDigit(); Text("Score \(session.score)").monospacedDigit(); Text("Best \(highScore)").foregroundStyle(.cyan).monospacedDigit() }.font(.headline).padding(10).background(.ultraThinMaterial, in: Capsule()).padding(.horizontal)
                     }
                     Spacer()
                     Text(session.message).font(.subheadline.bold()).lineLimit(compactPhoneLayout ? 1 : 2).padding(.horizontal, 14).padding(.vertical, 8).background(.black.opacity(0.65), in: Capsule())
                     if !compactPhoneLayout && verticalSizeClass != .compact {
                         Text("Move: WASD or arrows · Slash: Space · Laser: Q").font(.caption2.bold()).foregroundStyle(.cyan).padding(.horizontal, 12).padding(.vertical, 6).background(.black.opacity(0.65), in: Capsule())
-                        RobotVoicePanel(voice: voice, game: session, compact: true).padding(.horizontal)
                     }
                     if compactPhoneLayout {
-                        RobotVoicePanel(voice: voice, game: session, compact: true).padding(.horizontal, 8)
                         MobileTankControls(session: session).padding(.horizontal, 8)
                     } else {
                         VStack(spacing: 6) {
@@ -79,7 +79,6 @@ struct MissionView: View {
 
 private struct CompactMissionStats: View {
     @Bindable var session: GameSession
-    let highScore: Int
 
     var body: some View {
         VStack(spacing: 7) {
@@ -96,10 +95,10 @@ private struct CompactMissionStats: View {
             HStack(spacing: 12) {
                 Label("\(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered")
                 Spacer(minLength: 0)
-                Label(session.hasKey ? "Key" : "No key", systemImage: session.hasKey ? "key.fill" : "key")
+                MissionKeyStatus(session: session, compact: true)
+                Label("\(session.collectedCells)/\(session.level.cellCount)", systemImage: "bolt.fill")
                 Label("\(session.remainingEnemies)", systemImage: "scope")
                 Label("\(session.score)", systemImage: "star.fill")
-                Label("\(highScore)", systemImage: "trophy.fill").foregroundStyle(.cyan)
             }
             .font(.caption.bold())
             .monospacedDigit()
@@ -107,6 +106,34 @@ private struct CompactMissionStats: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+}
+
+private struct MissionKeyStatus: View {
+    @Bindable var session: GameSession
+    var compact = false
+
+    var body: some View {
+        if !session.level.requiresKey {
+            Label(compact ? "Key N/A" : "Key not required", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+        } else {
+            Label(session.hasKey ? "Key" : "Find key", systemImage: session.hasKey ? "key.fill" : "key")
+        }
+    }
+}
+
+private struct RobotVoiceScreen: View {
+    @Bindable var voice: RobotVoice
+    @Bindable var session: GameSession
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                RobotVoicePanel(voice: voice, game: session, observesGameEvents: false)
+                    .padding()
+            }
+            .navigationTitle("ROB Voice")
+        }
     }
 }
 
