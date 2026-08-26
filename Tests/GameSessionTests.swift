@@ -1,4 +1,5 @@
 import XCTest
+import ARKit
 import AVFoundation
 import Dispatch
 import RealityKit
@@ -61,6 +62,17 @@ final class GameSessionTests: XCTestCase {
         XCTAssertFalse(RobotVoice.isUsableInputFormat(sampleRate: 0, channelCount: 1))
         XCTAssertFalse(RobotVoice.isUsableInputFormat(sampleRate: 48_000, channelCount: 0))
         XCTAssertTrue(RobotVoice.isUsableInputFormat(sampleRate: 48_000, channelCount: 1))
+    }
+
+    func testARLabEnablesCameraLightingAndFillLights() {
+        let configuration = ROBARView.makeConfiguration()
+        let lightRig = ROBARView.makeFillLightRig()
+
+        XCTAssertEqual(configuration.planeDetection, [.horizontal])
+        XCTAssertTrue(configuration.isLightEstimationEnabled)
+        XCTAssertEqual(configuration.environmentTexturing, .automatic)
+        XCTAssertEqual(lightRig.children.count, 2)
+        XCTAssertTrue(lightRig.children.allSatisfy { $0.components[PointLightComponent.self] != nil })
     }
 
     nonisolated func testVoiceAudioTapRunsOutsideMainActor() {
