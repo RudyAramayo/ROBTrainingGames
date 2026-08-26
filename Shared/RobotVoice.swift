@@ -5,9 +5,14 @@ import Observation
 import Speech
 
 enum RobotVoiceError: LocalizedError {
-    case modelUnavailable, recognizerUnavailable, permissionDenied
+    case modelUnavailable, recognizerUnavailable, permissionDenied, audioInputUnavailable
     var errorDescription: String? {
-        switch self { case .modelUnavailable: "Apple Intelligence is not available on this device."; case .recognizerUnavailable: "Speech recognition is unavailable right now."; case .permissionDenied: "Microphone or speech recognition permission was not granted." }
+        switch self {
+        case .modelUnavailable: "Apple Intelligence is not available on this device."
+        case .recognizerUnavailable: "Speech recognition is unavailable right now."
+        case .permissionDenied: "Microphone or speech recognition permission was not granted."
+        case .audioInputUnavailable: "No usable microphone input is available. Check the device input and try again."
+        }
     }
 }
 
@@ -35,6 +40,7 @@ final class RobotVoice {
     var transcript = ""
     var answer = "Tap Talk to ROB and ask about the mission, robotics, or why the enemies are being so dramatically inconvenient."
     var isListening = false
+    private(set) var isPreparingAudio = false
     var isThinking = false
     var automaticComments = true
     var status = "On-device ROB voice"
@@ -44,6 +50,7 @@ final class RobotVoice {
     private let synthesizer = AVSpeechSynthesizer()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
+    private var inputTapInstalled = false
 
     @ObservationIgnored
     private var responderStorage: Any?
@@ -79,26 +86,55 @@ final class RobotVoice {
     }
 
     func toggleListening(game: GameSession) {
+        guard !isPreparingAudio else { return }
         if isListening { finishListening(game: game) } else { requestPermissionAndListen(game: game) }
     }
 
     private func requestPermissionAndListen(game: GameSession) {
+        isPreparingAudio = true
+        status = "Requesting voice permissions…"
         Self.requestVoicePermissions { [weak self] speechStatus, microphoneAllowed in
             guard let self else { return }
-            guard speechStatus == .authorized, microphoneAllowed else { self.answer = RobotVoiceError.permissionDenied.localizedDescription; return }
+            self.isPreparingAudio = false
+            guard speechStatus == .authorized, microphoneAllowed else {
+                self.status = "ROB voice needs microphone access"
+                self.answer = RobotVoiceError.permissionDenied.localizedDescription
+                return
+            }
             self.startListening(game: game)
         }
     }
 
     private func startListening(game: GameSession) {
-        guard let recognizer, recognizer.isAvailable, recognizer.supportsOnDeviceRecognition else { answer = "On-device speech recognition is unavailable for this language or device."; return }
-        recognitionTask?.cancel(); recognitionTask = nil; transcript = ""
-        let request = SFSpeechAudioBufferRecognitionRequest(); request.shouldReportPartialResults = true; request.taskHint = .dictation; request.requiresOnDeviceRecognition = true; self.request = request
+        guard !isListening else { return }
+        guard let recognizer, recognizer.isAvailable, recognizer.supportsOnDeviceRecognition else {
+            status = "ROB voice unavailable"
+            answer = "On-device speech recognition is unavailable for this language or device."
+            return
+        }
+        tearDownAudio(deactivateSession: false)
+        isPreparingAudio = true
+        transcript = ""
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        request.taskHint = .dictation
+        request.requiresOnDeviceRecognition = true
+        self.request = request
         do {
-            let session = AVAudioSession.sharedInstance(); try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.defaultToSpeaker, .duckOthers]); try session.setActive(true, options: .notifyOthersOnDeactivation)
-            let input = audioEngine.inputNode; let format = input.outputFormat(forBus: 0); input.removeTap(onBus: 0); input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in request.append(buffer) }; audioEngine.prepare(); try audioEngine.start(); isListening = true; status = "Listening…"
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.defaultToSpeaker, .duckOthers])
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            guard session.isInputAvailable else { throw RobotVoiceError.audioInputUnavailable }
+
+            let input = audioEngine.inputNode
+            let format = input.outputFormat(forBus: 0)
+            guard Self.isUsableInputFormat(sampleRate: format.sampleRate, channelCount: format.channelCount) else {
+                throw RobotVoiceError.audioInputUnavailable
+            }
+            input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in request.append(buffer) }
+            inputTapInstalled = true
             recognitionTask = Self.beginRecognition(recognizer: recognizer, request: request) { [weak self] result, error in
-                guard let self else { return }
+                guard let self, self.recognitionTask != nil else { return }
                 if let result {
                     self.transcript = result.bestTranscription.formattedString
                     if result.isFinal { self.finishListening(game: game) }
@@ -107,11 +143,50 @@ final class RobotVoice {
                     self.answer = "My audio receptors tripped over a metaphorical cable. Please try again."
                 }
             }
-        } catch { stopAudio(); answer = "I could not start the microphone. Even droids occasionally lose an argument with audio routing." }
+            audioEngine.prepare()
+            try audioEngine.start()
+            isPreparingAudio = false
+            isListening = true
+            status = "Listening…"
+        } catch {
+            tearDownAudio(deactivateSession: true)
+            isPreparingAudio = false
+            isListening = false
+            status = "ROB voice unavailable"
+            answer = (error as? RobotVoiceError)?.localizedDescription
+                ?? "I could not start the microphone. Check the audio input and try again."
+        }
     }
 
     private func finishListening(game: GameSession) { let question = transcript.trimmingCharacters(in: .whitespacesAndNewlines); stopAudio(); guard !question.isEmpty else { answer = "I heard the majestic sound of no question at all."; speak(answer); return }; Task { await respond(to: question, game: game) } }
-    private func stopAudio() { if audioEngine.isRunning { audioEngine.stop() }; audioEngine.inputNode.removeTap(onBus: 0); request?.endAudio(); recognitionTask?.cancel(); recognitionTask = nil; request = nil; isListening = false; status = "On-device ROB voice"; try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
+    private func stopAudio() {
+        tearDownAudio(deactivateSession: true)
+        isPreparingAudio = false
+        isListening = false
+        status = "On-device ROB voice"
+    }
+
+    private func tearDownAudio(deactivateSession: Bool) {
+        let activeRequest = request
+        let activeTask = recognitionTask
+        request = nil
+        recognitionTask = nil
+        if audioEngine.isRunning { audioEngine.stop() }
+        if inputTapInstalled {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            inputTapInstalled = false
+        }
+        activeRequest?.endAudio()
+        activeTask?.cancel()
+        audioEngine.reset()
+        if deactivateSession {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+    }
+
+    nonisolated static func isUsableInputFormat(sampleRate: Double, channelCount: AVAudioChannelCount) -> Bool {
+        sampleRate.isFinite && sampleRate > 0 && channelCount > 0
+    }
 
     func react(to situation: String, game: GameSession) { guard automaticComments, !isListening, !isThinking else { return }; Task { await respond(to: "Make one brief, funny in-character comment about this game event: \(situation)", game: game) } }
 

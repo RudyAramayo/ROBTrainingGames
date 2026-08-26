@@ -15,18 +15,18 @@ struct RobotVoicePanel: View {
                         Spacer(minLength: 4)
                         Toggle("Automatic ROB comments", isOn: $voice.automaticComments).labelsHidden()
                         Button { voice.toggleListening(game: game) } label: {
-                            Image(systemName: voice.isListening ? "stop.circle.fill" : "mic.fill")
+                            Image(systemName: voice.isListening ? "stop.circle.fill" : voice.isPreparingAudio ? "ellipsis.circle" : "mic.fill")
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(voice.isListening ? .red : .cyan)
-                        .disabled(voice.isThinking)
+                        .disabled(voice.isThinking || voice.isPreparingAudio)
                         .accessibilityLabel(voice.isListening ? "Send to ROB" : "Talk to ROB")
                     }
                     Text(compactAnswer).font(.caption).lineLimit(1)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack { Label(voice.status, systemImage: voice.isListening ? "waveform" : "cpu").font(.caption.bold()); Spacer(); Toggle("Auto", isOn: $voice.automaticComments).labelsHidden(); Button { voice.toggleListening(game: game) } label: { Label(voice.isListening ? "Send" : "Talk to ROB", systemImage: voice.isListening ? "stop.circle.fill" : "mic.fill") }.buttonStyle(.borderedProminent).tint(voice.isListening ? .red : .cyan).disabled(voice.isThinking) }
+                    HStack { Label(voice.status, systemImage: voice.isListening ? "waveform" : "cpu").font(.caption.bold()); Spacer(); Toggle("Auto", isOn: $voice.automaticComments).labelsHidden(); Button { voice.toggleListening(game: game) } label: { Label(voice.isListening ? "Send" : voice.isPreparingAudio ? "Preparing…" : "Talk to ROB", systemImage: voice.isListening ? "stop.circle.fill" : voice.isPreparingAudio ? "ellipsis.circle" : "mic.fill") }.buttonStyle(.borderedProminent).tint(voice.isListening ? .red : .cyan).disabled(voice.isThinking || voice.isPreparingAudio) }
                     if !voice.transcript.isEmpty { Text("You: \(voice.transcript)").font(.caption).foregroundStyle(.secondary).lineLimit(3) }
                     Text(voice.isThinking ? "ROB is assembling a thought without dropping any bolts…" : voice.answer).font(.callout).lineLimit(5)
                 }

@@ -1,4 +1,5 @@
 import XCTest
+import AVFoundation
 import RealityKit
 import simd
 @testable import ROB_Training
@@ -44,6 +45,12 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(game.message.contains("3 more energy cells"))
         XCTAssertTrue(game.message.contains("3 more targets"))
         XCTAssertFalse(game.message.localizedCaseInsensitiveContains("key"))
+    }
+
+    func testVoiceRejectsInvalidMicrophoneFormatsBeforeInstallingATap() {
+        XCTAssertFalse(RobotVoice.isUsableInputFormat(sampleRate: 0, channelCount: 1))
+        XCTAssertFalse(RobotVoice.isUsableInputFormat(sampleRate: 48_000, channelCount: 0))
+        XCTAssertTrue(RobotVoice.isUsableInputFormat(sampleRate: 48_000, channelCount: 1))
     }
 
     func testEnemiesPatrolAndInitiateAttacks() {
