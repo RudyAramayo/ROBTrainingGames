@@ -91,6 +91,22 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNotNil(layer.findEntity(named: "Enemy Bolt \(bolt.id)"))
     }
 
+    func testFaxProtrudingFrontFacesROB() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        game.tick(1.0 / 30.0)
+        guard let fax = game.enemies.first(where: { $0.kind == .fax }) else { return XCTFail("Missing fax robot") }
+        let layer = RobotFactory.makeCombatLayer(session: game)
+        guard let entity = layer.findEntity(named: "Training Enemy \(fax.id)") else { return XCTFail("Missing fax model") }
+
+        var directionToROB = game.robotPosition - fax.position
+        directionToROB.y = 0
+        directionToROB = simd_normalize(directionToROB)
+        let protrudingFront = entity.orientation.act(SIMD3<Float>(0, 0, -1))
+
+        XCTAssertGreaterThan(simd_dot(protrudingFront, directionToROB), 0.999)
+    }
+
     func testWeaponsRequireAimAndRange() {
         let game = GameSession(audioEnabled: false)
         game.begin()
