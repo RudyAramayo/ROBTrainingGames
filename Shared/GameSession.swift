@@ -23,6 +23,13 @@ enum TrainingEnemyKind: String, Sendable {
     var displayName: String { self == .spider ? "Spider bot" : "Dalek-style fax robot" }
 }
 
+enum SpiderSoundCue: Sendable {
+    case skitter
+    case lunge
+    case impact
+    case shutdown
+}
+
 struct TrainingEnemy: Identifiable, Sendable {
     let id: Int
     let kind: TrainingEnemyKind
@@ -32,6 +39,7 @@ struct TrainingEnemy: Identifiable, Sendable {
     var shields: Int
     var isActive = true
     var nextAttack: TimeInterval
+    var nextSkitterSound: TimeInterval = 0
     var lungeRemaining = 0.0
 }
 
@@ -185,6 +193,7 @@ final class GameSession {
     private func report(_ situation: String) { lastSituation = situation; situationCount += 1 }
     private func play(_ name: String) { if audioEnabled { SoundPlayer.shared.play(name) } }
     private func playEnemyAttack(_ kind: TrainingEnemyKind) { if audioEnabled { SoundPlayer.shared.playEnemyAttack(kind) } }
+    private func playSpider(_ cue: SpiderSoundCue) { if audioEnabled { SoundPlayer.shared.playSpider(cue) } }
     private func configuredEnemies() -> [TrainingEnemy] {
         let margin = puzzle.arenaHalfExtent - 0.85
         let candidates: [SIMD3<Float>] = [
@@ -199,7 +208,7 @@ final class GameSession {
         let spawns = available.isEmpty ? candidates : available
         return level.enemyKinds.enumerated().map { index, kind in
             let origin = spawns[index % spawns.count]
-            return TrainingEnemy(id: index, kind: kind, position: origin, origin: origin, shields: level.enemyShields, nextAttack: 1.6 + Double(index) * 0.65)
+            return TrainingEnemy(id: index, kind: kind, position: origin, origin: origin, shields: level.enemyShields, nextAttack: 1.6 + Double(index) * 0.65, nextSkitterSound: 0.8 + Double(index) * 0.38)
         }
     }
     private func configureLevel() {
@@ -224,13 +233,13 @@ final class GameSession {
     func tick(_ delta: TimeInterval) {
         guard isRunning else { return }
         elapsed += delta
-        let targetLeft = max(-1, min(1, forwardDemand + steeringDemand * 0.72))
-        let targetRight = max(-1, min(1, forwardDemand - steeringDemand * 0.72))
+        let targetLeft = max(-1, min(1, forwardDemand - steeringDemand * 0.72))
+        let targetRight = max(-1, min(1, forwardDemand + steeringDemand * 0.72))
         let smoothing = min(1, delta * 8)
         leftTread += (targetLeft - leftTread) * smoothing; rightTread += (targetRight - rightTread) * smoothing
         let linear = Float((leftTread + rightTread) * 0.5) * Float(delta) * 0.85
         leftWheelAngle -= Float(leftTread) * Float(delta) * 4.8; rightWheelAngle -= Float(rightTread) * Float(delta) * 4.8
-        robotHeading += Float(leftTread - rightTread) * Float(delta) * 1.05
+        robotHeading += Float(rightTread - leftTread) * Float(delta) * 1.05
         let oldPosition = robotPosition
         robotPosition.x -= sin(robotHeading) * linear; robotPosition.z -= cos(robotHeading) * linear
         let movementLimit = puzzle.arenaHalfExtent - 0.35
@@ -276,9 +285,13 @@ final class GameSession {
             var speed: Float = enemy.kind == .spider ? 0.16 : 0.12
             if enemy.kind == .spider && distance < 6.4 {
                 target = robotPosition; speed = 0.34 + Float(levelIndex) * 0.018
+                if elapsed >= enemy.nextSkitterSound {
+                    enemy.nextSkitterSound = elapsed + 2.1 + Double(index % 3) * 0.42
+                    playSpider(.skitter)
+                }
                 if elapsed >= enemy.nextAttack && distance < 1.65 {
                     enemy.lungeRemaining = 0.72; enemy.nextAttack = elapsed + max(2.5, 3.5 - Double(levelIndex) * 0.06); enemyAttackCount += 1
-                    playEnemyAttack(.spider); message = "Spider bot skittering into a lunge — evade or slash!"; report(message)
+                    playSpider(.lunge); message = "Spider bot skittering into a lunge — evade or slash!"; report(message)
                 }
                 if enemy.lungeRemaining > 0 { enemy.lungeRemaining = max(0, enemy.lungeRemaining - delta); speed = 0.9 + Float(levelIndex) * 0.02 }
             } else if enemy.kind == .fax {
@@ -294,7 +307,8 @@ final class GameSession {
             let facing = robotPosition - enemy.position; enemy.heading = atan2(-facing.x, -facing.z)
             moveEnemy(&enemy, toward: target, speed: speed, delta: delta); enemies[index] = enemy
             if simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(enemy.position.x, enemy.position.z)) < (enemy.kind == .spider ? 0.5 : 0.44) {
-                playEnemyAttack(enemy.kind); enemyContact(enemy.kind == .spider ? "Spider bot lunge" : "Dalek-style fax collision"); return
+                if enemy.kind == .spider { playSpider(.impact) } else { playEnemyAttack(.fax) }
+                enemyContact(enemy.kind == .spider ? "Spider bot lunge" : "Dalek-style fax collision"); return
             }
         }
         var survivingBolts: [TrainingEnemyBolt] = []
@@ -335,8 +349,10 @@ final class GameSession {
     private func damageEnemy(at index: Int, weapon: String, amount: Int = 1) {
         guard enemies.indices.contains(index), enemies[index].isActive else { return }
         enemies[index].shields -= amount; score += 50 * amount
+        if enemies[index].kind == .spider { playSpider(enemies[index].shields <= 0 ? .shutdown : .impact) }
         if enemies[index].shields <= 0 {
-            let kind = enemies[index].kind; enemies[index].isActive = false; score += 300; playEnemyAttack(kind)
+            let kind = enemies[index].kind; enemies[index].isActive = false; score += 300
+            if kind == .fax { playEnemyAttack(kind) }
             message = "\(kind.displayName) disabled by \(weapon). \(remainingEnemies) targets remain."
         } else {
             message = "\(enemies[index].kind.displayName) hit by \(weapon) — \(enemies[index].shields) shields remain."

@@ -133,7 +133,7 @@ import UIKit
             guard let arm = robot.findEntity(named: name) else { continue }
             guard let style = session.saberStyle, session.saberAnimation > 0 else { arm.orientation = simd_quatf(angle: 0, axis: [0, 1, 0]); continue }
             if style == .spin {
-                arm.orientation = simd_quatf(angle: side * .pi / 2, axis: [0, 0, 1]) * simd_quatf(angle: -0.28, axis: [1, 0, 0])
+                arm.orientation = simd_quatf(angle: side * .pi / 2, axis: [0, 0, 1])
             } else {
                 let direction: Float = style == .leftSweep ? -1 : 1
                 let sweep = direction * (-1.3 + progress * 2.6)

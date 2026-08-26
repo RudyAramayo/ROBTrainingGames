@@ -159,13 +159,31 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(robot.findEntity(named: "Gatling Lock Indicator")?.isEnabled == true)
     }
 
-    func testTriWheelsAnimateWithIndependentTreadDemand() {
+    func testTurnMixUsesTheCorrectTreadAndPreservesLeftSteering() {
         let game = GameSession(audioEnabled: false)
         game.begin()
         game.setDrive(forward: 0.36, steering: 0.5)
         game.tick(0.25)
 
-        XCTAssertNotEqual(game.leftWheelAngle, 0)
-        XCTAssertEqual(game.rightWheelAngle, 0, accuracy: 0.0001)
+        XCTAssertEqual(game.leftWheelAngle, 0, accuracy: 0.0001)
+        XCTAssertNotEqual(game.rightWheelAngle, 0)
+        XCTAssertGreaterThan(game.robotHeading, 0)
+    }
+
+    func testSpinExtendsBothArmsFullyOutward() {
+        let game = GameSession(audioEnabled: false)
+        let robot = RobotFactory.makeROB()
+        game.begin()
+        game.saberAttack(); game.saberAttack(); game.saberAttack()
+
+        RobotFactory.applyWeapons(to: robot, session: game)
+
+        for (name, side) in [("Left Arm Assembly", Float(-1)), ("Right Arm Assembly", Float(1))] {
+            guard let arm = robot.findEntity(named: name) else { return XCTFail("Missing \(name)") }
+            let reach = arm.orientation.act(SIMD3<Float>(0, -1, 0))
+            XCTAssertEqual(reach.x, side, accuracy: 0.001)
+            XCTAssertEqual(reach.y, 0, accuracy: 0.001)
+            XCTAssertEqual(reach.z, 0, accuracy: 0.001)
+        }
     }
 }
