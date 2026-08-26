@@ -1,4 +1,5 @@
 import XCTest
+import RealityKit
 import simd
 @testable import ROB_Training
 
@@ -185,6 +186,16 @@ final class GameSessionTests: XCTestCase {
         game.begin()
         RobotFactory.applyWeapons(to: robot, session: game)
         XCTAssertTrue(robot.findEntity(named: "Gatling Lock Indicator")?.isEnabled == true)
+    }
+
+    func testROBGestureRootHasInputAndCollisionComponents() {
+        let robot = RobotFactory.makeROB()
+        let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
+
+        XCTAssertNotNil(robot.components[InputTargetComponent.self])
+        XCTAssertNotNil(robot.collision)
+        XCTAssertFalse(robot.collision?.shapes.isEmpty ?? true)
+        XCTAssertEqual(view.installGestures([.translation, .rotation, .scale], for: robot).count, 3)
     }
 
     func testTurnMixUsesTheCorrectTreadAndPreservesLeftSteering() {

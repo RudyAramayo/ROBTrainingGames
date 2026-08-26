@@ -2,8 +2,8 @@ import RealityKit
 import UIKit
 
 @MainActor enum RobotFactory {
-    static func makeROB(componentMode: Bool = false) -> Entity {
-        let root = Entity(); root.name = "ROB"
+    static func makeROB(componentMode: Bool = false) -> ModelEntity {
+        let root = ModelEntity(); root.name = "ROB"
         @discardableResult func part(_ name: String, _ size: SIMD3<Float>, _ position: SIMD3<Float>, _ color: UIColor, parent: Entity? = nil) -> ModelEntity { let entity = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.015), materials: [SimpleMaterial(color: color, isMetallic: true)]); entity.name = name; entity.position = position; (parent ?? root).addChild(entity); return entity }
         func cylinder(_ name: String, radius: Float, height: Float, position: SIMD3<Float>, color: UIColor, faceForward: Bool = false, sideways: Bool = false, parent: Entity? = nil) {
             let entity = ModelEntity(mesh: .generateCylinder(height: height, radius: radius), materials: [SimpleMaterial(color: color, isMetallic: true)])
@@ -65,7 +65,12 @@ import UIKit
         part("Sensor Mast", [0.1, 0.48, 0.1], [0, 1.2, 0], .gray, parent: torso)
         let head = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: .black, isMetallic: true)]); head.name = "Camera Head"; head.position = [0, 1.52, 0]; head.scale.z = 0.82; torso.addChild(head)
         cylinder("Head Camera", radius: 0.055, height: 0.045, position: [0, 1.52, -0.2], color: .systemGreen, faceForward: true, parent: torso)
-        root.components.set(InputTargetComponent()); root.generateCollisionShapes(recursive: true); return root
+        root.components.set(InputTargetComponent())
+        root.generateCollisionShapes(recursive: true)
+        root.collision = CollisionComponent(shapes: [
+            .generateBox(size: [1.6, 1.85, 1.6]).offsetBy(translation: [0, 0.86, -0.28]),
+        ])
+        return root
     }
 
     static func combatLayerName(level: Int) -> String { "Combat Layer-\(level)" }

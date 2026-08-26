@@ -30,7 +30,7 @@ struct ROBARView: UIViewRepresentable {
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false); let config = ARWorldTrackingConfiguration(); config.planeDetection = [.horizontal]; view.session.run(config); view.environment.sceneUnderstanding.options.insert(.occlusion)
         let anchor = AnchorEntity(.plane(.horizontal, classification: .any, minimumBounds: [0.25, 0.25])); let rob = RobotFactory.makeROB(componentMode: componentMode); rob.scale = [0.32, 0.32, 0.32]; RobotFactory.applyWeapons(to: rob, session: session); anchor.addChild(rob); view.scene.addAnchor(anchor); context.coordinator.robot = rob
-        view.installGestures([.translation, .rotation, .scale], for: rob as! HasCollision); return view
+        view.installGestures([.translation, .rotation, .scale], for: rob); return view
     }
     func updateUIView(_ view: ARView, context: Context) { if let robot = context.coordinator.robot { RobotFactory.applyWeapons(to: robot, session: session) } }
     final class Coordinator { var robot: Entity? }
