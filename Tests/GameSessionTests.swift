@@ -1,8 +1,18 @@
 import XCTest
 import AVFoundation
+import Dispatch
 import RealityKit
+import Speech
 import simd
 @testable import ROB_Training
+
+private struct SendableAudioTapInvocation: @unchecked Sendable {
+    let tap: AVAudioNodeTapBlock
+    let buffer: AVAudioPCMBuffer
+    let time: AVAudioTime
+
+    func call() { tap(buffer, time) }
+}
 
 @MainActor
 final class GameSessionTests: XCTestCase {
@@ -51,6 +61,27 @@ final class GameSessionTests: XCTestCase {
         XCTAssertFalse(RobotVoice.isUsableInputFormat(sampleRate: 0, channelCount: 1))
         XCTAssertFalse(RobotVoice.isUsableInputFormat(sampleRate: 48_000, channelCount: 0))
         XCTAssertTrue(RobotVoice.isUsableInputFormat(sampleRate: 48_000, channelCount: 1))
+    }
+
+    nonisolated func testVoiceAudioTapRunsOutsideMainActor() {
+        let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 32)!
+        buffer.frameLength = 32
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        let invocation = SendableAudioTapInvocation(
+            tap: RobotVoice.makeRecognitionTap(request: request),
+            buffer: buffer,
+            time: AVAudioTime(sampleTime: 0, atRate: format.sampleRate)
+        )
+        let finished = DispatchSemaphore(value: 0)
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            invocation.call()
+            finished.signal()
+        }
+
+        XCTAssertEqual(finished.wait(timeout: .now() + 1), .success)
+        request.endAudio()
     }
 
     func testEnemiesPatrolAndInitiateAttacks() {

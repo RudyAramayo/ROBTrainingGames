@@ -85,6 +85,15 @@ final class RobotVoice {
         }
     }
 
+    /// AVAudioEngine invokes tap blocks on its real-time service queue. Create
+    /// this block in a nonisolated context so Swift does not attach MainActor's
+    /// executor precondition to it.
+    nonisolated static func makeRecognitionTap(
+        request: SFSpeechAudioBufferRecognitionRequest
+    ) -> AVAudioNodeTapBlock {
+        { buffer, _ in request.append(buffer) }
+    }
+
     func toggleListening(game: GameSession) {
         guard !isPreparingAudio else { return }
         if isListening { finishListening(game: game) } else { requestPermissionAndListen(game: game) }
@@ -131,7 +140,12 @@ final class RobotVoice {
             guard Self.isUsableInputFormat(sampleRate: format.sampleRate, channelCount: format.channelCount) else {
                 throw RobotVoiceError.audioInputUnavailable
             }
-            input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in request.append(buffer) }
+            input.installTap(
+                onBus: 0,
+                bufferSize: 1024,
+                format: format,
+                block: Self.makeRecognitionTap(request: request)
+            )
             inputTapInstalled = true
             recognitionTask = Self.beginRecognition(recognizer: recognizer, request: request) { [weak self] result, error in
                 guard let self, self.recognitionTask != nil else { return }
