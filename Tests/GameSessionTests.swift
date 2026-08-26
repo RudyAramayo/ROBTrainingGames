@@ -63,6 +63,18 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.robotHeading, stoppedHeading, accuracy: 0.0001)
     }
 
+    func testDualJoysticksCommandTheirMatchingTreads() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+
+        game.setTreads(left: 1, right: -0.5)
+        game.tick(0.25)
+
+        XCTAssertGreaterThan(game.leftTread, 0)
+        XCTAssertLessThan(game.rightTread, 0)
+        XCTAssertLessThan(game.robotHeading, 0)
+    }
+
     func testFaxRobotFiresTrackedProjectile() {
         let game = GameSession(audioEnabled: false)
         game.begin()

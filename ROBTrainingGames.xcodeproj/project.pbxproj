@@ -22,6 +22,7 @@
 		59C21018AE39553475ADF2C0 /* RobotVoicePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */; };
 		5A7B452D8C82B7E964553832 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A494856CC93CF9C98076DE8A /* GameSession.swift */; };
 		5F24C21F936B161D686DDBFE /* GameSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEBC1A2DCC5F0625E90BCDE7 /* GameSessionTests.swift */; };
+		64A1347719E0197CDACA6D3E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 98A698093E163C5AD99F842C /* Assets.xcassets */; };
 		6CFB7C4FCE1E8C49F724F115 /* ROBTrainingiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */; };
 		755B13E4179BDBE68AE89146 /* ARLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCEF00562EAF419AACD5E344 /* ARLabView.swift */; };
 		75A34823F815FF6431752B25 /* RobotVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDE8CFB55658390DC53F88E /* RobotVoice.swift */; };
@@ -40,6 +41,7 @@
 		DA309E8D3CFA1E7A097DD2AE /* TechnoMusicEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F74BC0EEE41DF8682BB1619 /* TechnoMusicEngine.swift */; };
 		DFCB9518DD1D2EC5D31C7920 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */; };
 		E1D33E988ED8F791EF94FE5F /* RobotVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDE8CFB55658390DC53F88E /* RobotVoice.swift */; };
+		F8CC61AB94CDC2BD86B1A149 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E77C631610B09DFC69177CB4 /* Assets.xcassets */; };
 		FD7F118B5CF5202E5ED50555 /* laser.m4a in Resources */ = {isa = PBXBuildFile; fileRef = E0A2FF07C60F58B44ADD1698 /* laser.m4a */; };
 /* End PBXBuildFile section */
 
@@ -64,6 +66,7 @@
 		765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "rob-training-key-art.png"; sourceTree = "<group>"; };
 		8D19BBDDC5D490212B965846 /* VisionDashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionDashboard.swift; sourceTree = "<group>"; };
 		96C1B68B72E191DB240B3A84 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		98A698093E163C5AD99F842C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A494856CC93CF9C98076DE8A /* GameSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSession.swift; sourceTree = "<group>"; };
 		AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundPlayer.swift; sourceTree = "<group>"; };
 		BE8EABD4931412AA8A676C80 /* RobotFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotFactory.swift; sourceTree = "<group>"; };
@@ -77,6 +80,7 @@
 		DEBC1A2DCC5F0625E90BCDE7 /* GameSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSessionTests.swift; sourceTree = "<group>"; };
 		DF0F5FCFB2ACB31F1C6AD186 /* IOSRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSRootView.swift; sourceTree = "<group>"; };
 		E0A2FF07C60F58B44ADD1698 /* laser.m4a */ = {isa = PBXFileReference; path = laser.m4a; sourceTree = "<group>"; };
+		E77C631610B09DFC69177CB4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBTrainingiOSApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -139,6 +143,7 @@
 		C35E3AB157B10D609CA1C81C /* visionOS */ = {
 			isa = PBXGroup;
 			children = (
+				98A698093E163C5AD99F842C /* Assets.xcassets */,
 				96C1B68B72E191DB240B3A84 /* Info.plist */,
 				CAE0655626B80AE21B885AA7 /* ROBTrainingVisionApp.swift */,
 				8D19BBDDC5D490212B965846 /* VisionDashboard.swift */,
@@ -150,6 +155,7 @@
 			isa = PBXGroup;
 			children = (
 				DCEF00562EAF419AACD5E344 /* ARLabView.swift */,
+				E77C631610B09DFC69177CB4 /* Assets.xcassets */,
 				DF0F5FCFB2ACB31F1C6AD186 /* IOSRootView.swift */,
 				ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */,
 			);
@@ -242,12 +248,15 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					83FE2B24F912A97CCB20D19F = {
+						DevelopmentTeam = 975CAGD5EW;
 						ProvisioningStyle = Automatic;
 					};
 					8D6349F2888BA4ABF421451F = {
+						DevelopmentTeam = 975CAGD5EW;
 						ProvisioningStyle = Automatic;
 					};
 					F95C511AA46B6C899321C33A = {
+						DevelopmentTeam = 975CAGD5EW;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -278,6 +287,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				64A1347719E0197CDACA6D3E /* Assets.xcassets in Resources */,
 				80ACD0D4BE8A79DA1446F819 /* PrivacyInfo.xcprivacy in Resources */,
 				B7203185730E33816035D094 /* laser.m4a in Resources */,
 				1D7E170D9A3B66DC4DC17F7C /* level-complete.m4a in Resources */,
@@ -291,6 +301,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F8CC61AB94CDC2BD86B1A149 /* Assets.xcassets in Resources */,
 				DFCB9518DD1D2EC5D31C7920 /* PrivacyInfo.xcprivacy in Resources */,
 				FD7F118B5CF5202E5ED50555 /* laser.m4a in Resources */,
 				B0D1FEF0D8A64D0B703D8DE8 /* level-complete.m4a in Resources */,
@@ -426,7 +437,9 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 975CAGD5EW;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -444,6 +457,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -490,7 +504,9 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 975CAGD5EW;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -502,6 +518,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -519,9 +536,14 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "ROB Training";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Place ROB in your room and explore robotics components in augmented reality.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk with ROB during simulated robotics missions.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "ROB listens to your questions and converts them to text for an on-device conversation.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -540,9 +562,14 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "ROB Training";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Place ROB in your room and explore robotics components in augmented reality.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk with ROB during simulated robotics missions.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "ROB listens to your questions and converts them to text for an on-device conversation.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
