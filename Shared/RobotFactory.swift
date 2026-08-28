@@ -2,6 +2,16 @@ import RealityKit
 import UIKit
 
 @MainActor enum RobotFactory {
+    static func finishColor(for finish: ROBFinish) -> UIColor {
+        switch finish {
+        case .graphite: UIColor(red: 0.08, green: 0.12, blue: 0.16, alpha: 1)
+        case .rescueOrange: UIColor(red: 0.92, green: 0.28, blue: 0.055, alpha: 1)
+        case .arcticWhite: UIColor(white: 0.86, alpha: 1)
+        case .cobaltBlue: UIColor(red: 0.05, green: 0.22, blue: 0.62, alpha: 1)
+        case .tacticalGreen: UIColor(red: 0.14, green: 0.31, blue: 0.18, alpha: 1)
+        }
+    }
+
     static func makeROB(componentMode: Bool = false) -> ModelEntity {
         let root = ModelEntity(); root.name = "ROB"
         @discardableResult func part(_ name: String, _ size: SIMD3<Float>, _ position: SIMD3<Float>, _ color: UIColor, parent: Entity? = nil) -> ModelEntity { let entity = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.015), materials: [SimpleMaterial(color: color, isMetallic: true)]); entity.name = name; entity.position = position; (parent ?? root).addChild(entity); return entity }
@@ -54,11 +64,33 @@ import UIKit
             cylinder("\(prefix) Lightsaber", radius: 0.025, height: 0.9, position: [side * 0.24, -0.64, -0.55], color: side < 0 ? .systemGreen : .systemCyan, faceForward: true, parent: arm)
         }
 
+        if let rightArm = root.findEntity(named: "Right Arm Assembly") {
+            let hammer = Entity(); hammer.name = "Power Hammer"; rightArm.addChild(hammer)
+            cylinder("Power Hammer Handle", radius: 0.035, height: 0.72, position: [0.2, -0.64, -0.46], color: .darkGray, faceForward: true, parent: hammer)
+            part("Power Hammer Head", [0.42, 0.2, 0.2], [0.2, -0.64, -0.83], .systemOrange, parent: hammer)
+        }
+
         let gatling = Entity(); gatling.name = "Right Shoulder Gatling"; gatling.position = [0.5, 1.08, -0.05]; torso.addChild(gatling)
         part("Gatling Housing", [0.24, 0.2, 0.38], [0, 0, -0.08], .black, parent: gatling)
         let barrelCluster = Entity(); barrelCluster.name = "Gatling Barrel Cluster"; gatling.addChild(barrelCluster)
         for x: Float in [-0.055, 0.055] { for y: Float in [-0.055, 0.055] { cylinder("Gatling Barrel", radius: 0.018, height: 0.52, position: [x, y, -0.36], color: .black, faceForward: true, parent: barrelCluster) } }
         let lockLamp = ModelEntity(mesh: .generateSphere(radius: 0.055), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); lockLamp.name = "Gatling Lock Indicator"; lockLamp.position = [0, 0.15, -0.22]; gatling.addChild(lockLamp)
+
+        let twinBlasters = Entity(); twinBlasters.name = "Twin Blasters"; twinBlasters.position = [0, 0.98, -0.04]; torso.addChild(twinBlasters)
+        for side: Float in [-1, 1] {
+            part(side < 0 ? "Left Blaster Housing" : "Right Blaster Housing", [0.2, 0.15, 0.28], [side * 0.47, 0, -0.08], .systemBlue, parent: twinBlasters)
+            for x: Float in [-0.035, 0.035] {
+                cylinder("Blaster Barrel", radius: 0.018, height: 0.46, position: [side * 0.47 + x, 0, -0.34], color: .black, faceForward: true, parent: twinBlasters)
+            }
+        }
+
+        let arcCannon = Entity(); arcCannon.name = "Arc Cannon"; arcCannon.position = [0, 1.12, -0.04]; torso.addChild(arcCannon)
+        part("Arc Cannon Housing", [0.34, 0.24, 0.42], [0, 0, -0.1], .systemPurple, parent: arcCannon)
+        for side: Float in [-1, 1] {
+            cylinder("Arc Cannon Conductor", radius: 0.035, height: 0.54, position: [side * 0.105, 0, -0.4], color: .systemCyan, faceForward: true, parent: arcCannon)
+        }
+        let arcCore = ModelEntity(mesh: .generateSphere(radius: 0.08), materials: [UnlitMaterial(color: .systemCyan)]); arcCore.name = "Arc Cannon Core"; arcCore.position = [0, 0.02, -0.34]; arcCannon.addChild(arcCore)
+
         let shot = Entity(); shot.name = "Shoulder Laser Shot"; shot.position = [0.5, 1.08, -0.28]; torso.addChild(shot)
         let beam = ModelEntity(mesh: .generateBox(size: [1, 1, 0.55], cornerRadius: 0.04), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); beam.name = "Shoulder Laser Beam"; beam.isEnabled = false; shot.addChild(beam)
 
@@ -118,7 +150,29 @@ import UIKit
         }
     }
 
-    static func applyWeapons(to robot: Entity, session: GameSession) {
+    static func applyWeapons(to robot: Entity, session: GameSession, componentMode: Bool = false) {
+        let appearanceName = "Applied Appearance \(componentMode ? "components" : session.robotFinish.rawValue)"
+        if robot.children.first(where: { $0.name == appearanceName }) == nil {
+            for marker in Array(robot.children) where marker.name.hasPrefix("Applied Appearance ") { marker.removeFromParent() }
+            let marker = Entity(); marker.name = appearanceName; robot.addChild(marker)
+            let bodyMaterial = SimpleMaterial(color: componentMode ? finishColor(for: .graphite) : finishColor(for: session.robotFinish), isMetallic: true)
+            for name in ["Tri-Wheel Chassis", "Cerebro Torso", "Camera Head"] {
+                (robot.findEntity(named: name) as? ModelEntity)?.model?.materials = [bodyMaterial]
+            }
+            for side in ["Left", "Right"] {
+                let color: UIColor = componentMode ? (side == "Left" ? .systemGreen : .systemBlue) : finishColor(for: session.robotFinish)
+                let material = SimpleMaterial(color: color, isMetallic: true)
+                for name in ["\(side) Upper Arm", "\(side) Forearm"] {
+                    (robot.findEntity(named: name) as? ModelEntity)?.model?.materials = [material]
+                }
+            }
+        }
+        robot.findEntity(named: "Right Shoulder Gatling")?.isEnabled = session.rangedWeapon == .shoulderGatling
+        robot.findEntity(named: "Twin Blasters")?.isEnabled = session.rangedWeapon == .twinBlasters
+        robot.findEntity(named: "Arc Cannon")?.isEnabled = session.rangedWeapon == .arcCannon
+        robot.findEntity(named: "Left Lightsaber")?.isEnabled = session.meleeWeapon == .dualSabers
+        robot.findEntity(named: "Right Lightsaber")?.isEnabled = session.meleeWeapon == .dualSabers
+        robot.findEntity(named: "Power Hammer")?.isEnabled = session.meleeWeapon == .powerHammer
         for (prefix, angle) in [("Left", session.leftWheelAngle), ("Right", session.rightWheelAngle)] {
             for index in 1...3 { robot.findEntity(named: "\(prefix) Tri-Wheel \(index)")?.orientation = simd_quatf(angle: angle, axis: [1, 0, 0]) }
         }
@@ -130,13 +184,18 @@ import UIKit
             case .spin: torsoYaw = progress * 2 * .pi
             case .leftSweep: torsoYaw = -arc * 0.24
             case .rightSweep: torsoYaw = arc * 0.24
+            case .hammerSmash: torsoYaw = 0
             }
         }
         torso?.orientation = simd_quatf(angle: torsoYaw, axis: [0, 1, 0])
         for (name, side) in [("Left Arm Assembly", Float(-1)), ("Right Arm Assembly", Float(1))] {
             guard let arm = robot.findEntity(named: name) else { continue }
             guard let style = session.saberStyle, session.saberAnimation > 0 else { arm.orientation = simd_quatf(angle: 0, axis: [0, 1, 0]); continue }
-            if style == .spin {
+            if style == .hammerSmash {
+                arm.orientation = name.hasPrefix("Right")
+                    ? simd_quatf(angle: -1.25 + progress * 2.35, axis: [1, 0, 0])
+                    : simd_quatf(angle: 0, axis: [0, 1, 0])
+            } else if style == .spin {
                 arm.orientation = simd_quatf(angle: side * .pi / 2, axis: [0, 0, 1])
             } else {
                 let direction: Float = style == .leftSweep ? -1 : 1
@@ -144,9 +203,9 @@ import UIKit
                 arm.orientation = simd_quatf(angle: sweep, axis: [0, 1, 0]) * simd_quatf(angle: side * arc * 0.5, axis: [0, 0, 1])
             }
         }
-        if let gatling = robot.findEntity(named: "Right Shoulder Gatling") {
-            let relativeHeading = session.laserLockHeading.map { $0 - session.robotHeading - torsoYaw } ?? Float(sin(session.elapsed * 0.85)) * 0.9
-            gatling.orientation = simd_quatf(angle: relativeHeading, axis: [0, 1, 0])
+        let relativeHeading = session.laserLockHeading.map { $0 - session.robotHeading - torsoYaw } ?? Float(sin(session.elapsed * 0.85)) * 0.9
+        for name in ["Right Shoulder Gatling", "Twin Blasters", "Arc Cannon"] {
+            robot.findEntity(named: name)?.orientation = simd_quatf(angle: relativeHeading, axis: [0, 1, 0])
         }
         if let lamp = robot.findEntity(named: "Gatling Lock Indicator") {
             lamp.isEnabled = session.lockedEnemy != nil
@@ -158,6 +217,19 @@ import UIKit
             shot.orientation = simd_quatf(angle: session.laserShotHeading - session.robotHeading - torsoYaw, axis: [0, 1, 0])
             if let distance = session.laserDistance {
                 let charge = Float(session.laserShotCharge), width = 0.035 + charge * 0.13
+                if let beam = beam as? ModelEntity {
+                    let appearanceName = "Projectile Appearance \(session.laserShotWeapon.rawValue)"
+                    if beam.children.first(where: { $0.name == appearanceName }) == nil {
+                        for marker in Array(beam.children) where marker.name.hasPrefix("Projectile Appearance ") { marker.removeFromParent() }
+                        let marker = Entity(); marker.name = appearanceName; beam.addChild(marker)
+                        let color: UIColor = switch session.laserShotWeapon {
+                        case .shoulderGatling: .systemRed
+                        case .twinBlasters: .systemBlue
+                        case .arcCannon: .systemCyan
+                        }
+                        beam.model?.materials = [UnlitMaterial(color: color)]
+                    }
+                }
                 beam.isEnabled = true; beam.position = [0, 0, -distance]; beam.scale = [width, width, 1 + charge * 2.6]
             } else { beam.isEnabled = false }
         }

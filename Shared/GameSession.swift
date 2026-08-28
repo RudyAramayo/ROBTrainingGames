@@ -53,6 +53,91 @@ enum SaberAttackStyle: Sendable, Equatable {
     case leftSweep
     case rightSweep
     case spin
+    case hammerSmash
+}
+
+enum ROBFinish: String, CaseIterable, Identifiable, Sendable {
+    case graphite
+    case rescueOrange
+    case arcticWhite
+    case cobaltBlue
+    case tacticalGreen
+
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .graphite: "Graphite"
+        case .rescueOrange: "Rescue Orange"
+        case .arcticWhite: "Arctic White"
+        case .cobaltBlue: "Cobalt Blue"
+        case .tacticalGreen: "Tactical Green"
+        }
+    }
+}
+
+enum ROBRangedWeapon: String, CaseIterable, Identifiable, Sendable {
+    case shoulderGatling
+    case twinBlasters
+    case arcCannon
+
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .shoulderGatling: "Shoulder Gatling"
+        case .twinBlasters: "Twin Blasters"
+        case .arcCannon: "Arc Cannon"
+        }
+    }
+    var shortName: String {
+        switch self {
+        case .shoulderGatling: "Gatling"
+        case .twinBlasters: "Blasters"
+        case .arcCannon: "Arc Cannon"
+        }
+    }
+    var summary: String {
+        switch self {
+        case .shoulderGatling: "Balanced tracking weapon with a chargeable shoulder shot."
+        case .twinBlasters: "Faster paired projectiles for mobile close-range fights."
+        case .arcCannon: "Heavy charged energy that arcs into a nearby second target."
+        }
+    }
+    var requiredCompletedLevel: Int {
+        switch self {
+        case .shoulderGatling: 0
+        case .twinBlasters: 5
+        case .arcCannon: 15
+        }
+    }
+    var projectileSpeed: Float {
+        switch self {
+        case .shoulderGatling: 5.5
+        case .twinBlasters: 8.4
+        case .arcCannon: 4.6
+        }
+    }
+    func damage(charge: Double) -> Int {
+        switch self {
+        case .shoulderGatling: 1 + Int(floor(charge * 2.1))
+        case .twinBlasters: 1 + Int(floor(charge * 1.5))
+        case .arcCannon: 2 + Int(floor(charge * 3.0))
+        }
+    }
+}
+
+enum ROBMeleeWeapon: String, CaseIterable, Identifiable, Sendable {
+    case dualSabers
+    case powerHammer
+
+    var id: String { rawValue }
+    var displayName: String { self == .dualSabers ? "Dual Sabers" : "Power Hammer" }
+    var shortName: String { self == .dualSabers ? "Sabers" : "Hammer" }
+    var summary: String {
+        self == .dualSabers
+            ? "Fast alternating sweeps build into a full-circle spin attack."
+            : "A slower forward smash reaches farther and breaks two shield points."
+    }
+    var requiredCompletedLevel: Int { self == .dualSabers ? 0 : 10 }
 }
 
 struct ROBComponent: Identifiable, Sendable {
@@ -130,6 +215,7 @@ final class GameSession {
     private(set) var isChargingLaser = false
     private(set) var laserShotCharge = 0.0
     private(set) var laserShotHeading: Float = 0
+    private(set) var laserShotWeapon: ROBRangedWeapon = .shoulderGatling
     private var laserShotOrigin = SIMD2<Float>.zero
     private(set) var lockedEnemyID: Int?
     var selectedComponent: ROBComponent?
@@ -138,9 +224,14 @@ final class GameSession {
     var musicEnabled = true
     var lastSituation = "ROB systems ready."
     var situationCount = 0
+    private(set) var highestCompletedLevel = 0
+    private(set) var robotFinish: ROBFinish = .graphite
+    private(set) var rangedWeapon: ROBRangedWeapon = .shoulderGatling
+    private(set) var meleeWeapon: ROBMeleeWeapon = .dualSabers
     private var nextBoltID = 0
     private var wasAtDock = false
     private let audioEnabled: Bool
+    private let progressStore: UserDefaults?
     var level: ROBLevel { levels[levelIndex] }
     var remainingEnemies: Int { enemies.filter(\.isActive).count }
     var lockedEnemy: TrainingEnemy? { enemies.first(where: { $0.id == lockedEnemyID && $0.isActive }) }
@@ -152,9 +243,44 @@ final class GameSession {
     var canFinish: Bool { collectedCells == level.cellCount && remainingEnemies == 0 && (!level.requiresKey || doorOpen) }
     var puzzle: PuzzleGeometry { Self.puzzleGeometry(for: level) }
 
-    init(audioEnabled: Bool = true) {
+    init(audioEnabled: Bool = true, progressStore: UserDefaults? = nil) {
         self.audioEnabled = audioEnabled
+        self.progressStore = progressStore ?? (audioEnabled ? .standard : nil)
+        if let store = self.progressStore {
+            highestCompletedLevel = min(levels.count, max(0, store.integer(forKey: "robHighestCompletedLevel")))
+            robotFinish = ROBFinish(rawValue: store.string(forKey: "robRobotFinish") ?? "") ?? .graphite
+            let savedRanged = ROBRangedWeapon(rawValue: store.string(forKey: "robRangedWeapon") ?? "") ?? .shoulderGatling
+            let savedMelee = ROBMeleeWeapon(rawValue: store.string(forKey: "robMeleeWeapon") ?? "") ?? .dualSabers
+            rangedWeapon = savedRanged.requiredCompletedLevel <= highestCompletedLevel ? savedRanged : .shoulderGatling
+            meleeWeapon = savedMelee.requiredCompletedLevel <= highestCompletedLevel ? savedMelee : .dualSabers
+        }
         configureLevel()
+    }
+
+    func isUnlocked(_ weapon: ROBRangedWeapon) -> Bool { highestCompletedLevel >= weapon.requiredCompletedLevel }
+    func isUnlocked(_ weapon: ROBMeleeWeapon) -> Bool { highestCompletedLevel >= weapon.requiredCompletedLevel }
+    func selectFinish(_ finish: ROBFinish) {
+        robotFinish = finish
+        progressStore?.set(finish.rawValue, forKey: "robRobotFinish")
+        message = "\(finish.displayName) finish equipped."
+    }
+    func selectRangedWeapon(_ weapon: ROBRangedWeapon) {
+        guard isUnlocked(weapon) else {
+            message = "Complete Level \(weapon.requiredCompletedLevel) to unlock \(weapon.displayName)."
+            return
+        }
+        rangedWeapon = weapon
+        progressStore?.set(weapon.rawValue, forKey: "robRangedWeapon")
+        message = "\(weapon.displayName) equipped."
+    }
+    func selectMeleeWeapon(_ weapon: ROBMeleeWeapon) {
+        guard isUnlocked(weapon) else {
+            message = "Complete Level \(weapon.requiredCompletedLevel) to unlock \(weapon.displayName)."
+            return
+        }
+        meleeWeapon = weapon
+        progressStore?.set(weapon.rawValue, forKey: "robMeleeWeapon")
+        message = "\(weapon.displayName) equipped."
     }
 
     private static func puzzleGeometry(for level: ROBLevel) -> PuzzleGeometry {
@@ -217,7 +343,7 @@ final class GameSession {
     private func configureLevel() {
         elapsed = 0; collectedCells = 0
         hasKey = false; doorOpen = !level.requiresKey; collectedCellIndices = []; saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
-        laserDistance = nil; laserCharge = 0; laserShotCharge = 0; laserShotOrigin = .zero; isChargingLaser = false; lockedEnemyID = nil
+        laserDistance = nil; laserCharge = 0; laserShotCharge = 0; laserShotWeapon = rangedWeapon; laserShotOrigin = .zero; isChargingLaser = false; lockedEnemyID = nil
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
         robotPosition = SIMD3<Float>(0, 0, puzzle.arenaHalfExtent - 0.8); robotHeading = 0; leftWheelAngle = 0; rightWheelAngle = 0
         enemyBolts = []; nextBoltID = 0; wasAtDock = false; enemies = configuredEnemies()
@@ -260,7 +386,12 @@ final class GameSession {
         }
         resolveSpatialObjectives()
         if saberAnimation > 0 {
-            saberAnimation = max(0, saberAnimation - delta * (saberStyle == .spin ? 1.25 : 2.25))
+            let animationSpeed = switch saberStyle {
+            case .spin: 1.25
+            case .hammerSmash: 1.55
+            default: 2.25
+            }
+            saberAnimation = max(0, saberAnimation - delta * animationSpeed)
             if saberAnimation == 0 { saberStyle = nil }
         }
         if isChargingLaser { laserCharge = min(1, laserCharge + delta / 1.25) }
@@ -331,7 +462,7 @@ final class GameSession {
     private func updateLaserProjectile(_ delta: TimeInterval) {
         guard let distance = laserDistance else { return }
         let maximumDistance = puzzle.arenaHalfExtent * 2.2
-        let nextDistance = min(maximumDistance, distance + Float(delta) * (5.5 + Float(laserShotCharge) * 3.5))
+        let nextDistance = min(maximumDistance, distance + Float(delta) * (laserShotWeapon.projectileSpeed + Float(laserShotCharge) * 3.5))
         let direction = SIMD2<Float>(-sin(laserShotHeading), -cos(laserShotHeading))
         let start = laserShotOrigin + direction * distance
         let end = laserShotOrigin + direction * nextDistance
@@ -365,15 +496,22 @@ final class GameSession {
             laserDistance = nil
             switch nearestImpact.impact {
             case .barrier:
-                message = "Shoulder laser struck the wall. Reposition for a clear shot."
+                message = "\(laserShotWeapon.displayName) struck the wall. Reposition for a clear shot."
                 report(message)
             case let .enemy(index):
-                let damage = 1 + Int(floor(laserShotCharge * 2.1))
+                let damage = laserShotWeapon.damage(charge: laserShotCharge)
+                let weapon = laserShotWeapon
+                let secondaryTargets = weapon == .arcCannon ? enemies.indices.filter { candidate in
+                    candidate != index && enemies[candidate].isActive && simd_distance(enemies[candidate].position, enemies[index].position) <= 1.45
+                } : []
                 damageEnemy(
                     at: index,
-                    weapon: laserShotCharge > 0.72 ? "charged shoulder laser" : "shoulder laser",
+                    weapon: laserShotCharge > 0.72 ? "charged \(weapon.displayName.lowercased())" : weapon.displayName.lowercased(),
                     amount: damage
                 )
+                if let secondary = secondaryTargets.first {
+                    damageEnemy(at: secondary, weapon: "arc cannon chain", amount: max(1, damage / 2))
+                }
             }
         } else {
             laserDistance = nextDistance >= maximumDistance ? nil : nextDistance
@@ -498,7 +636,7 @@ final class GameSession {
     }
     func beginLaserCharge() {
         guard isRunning, laserDistance == nil, !isChargingLaser else { return }
-        laserCharge = 0; isChargingLaser = true; message = lockedEnemy == nil ? "Shoulder gatling scanning — no target lock yet." : "Shoulder gatling charging on locked target…"
+        laserCharge = 0; isChargingLaser = true; message = lockedEnemy == nil ? "\(rangedWeapon.displayName) scanning — no target lock yet." : "\(rangedWeapon.displayName) charging on locked target…"
     }
     func releaseLaserCharge() {
         guard isChargingLaser else { return }
@@ -509,17 +647,34 @@ final class GameSession {
         guard isRunning, laserDistance == nil else { return }
         updateLaserLock()
         guard let targetID = lockedEnemyID, enemies.contains(where: { $0.id == targetID && $0.isActive }), let heading = laserLockHeading else {
-            message = "Shoulder gatling still scanning. Turn or move closer until the lock indicator turns red."; report(message); return
+            message = "\(rangedWeapon.displayName) is still scanning. Turn or move closer until the lock indicator turns red."; report(message); return
         }
         let clampedCharge = min(1, max(0, charge))
-        laserShotCharge = clampedCharge; laserShotHeading = heading
+        laserShotCharge = clampedCharge; laserShotHeading = heading; laserShotWeapon = rangedWeapon
         laserShotOrigin = [robotPosition.x, robotPosition.z]; laserDistance = 0.55
-        message = "Shoulder laser fired."
+        message = "\(rangedWeapon.displayName) fired."
         report(message)
         if audioEnabled { SoundPlayer.shared.playLaser(charge: clampedCharge) }
     }
     func saberAttack() {
         guard isRunning else { return }
+        if meleeWeapon == .powerHammer {
+            saberComboCount = 0; lastSaberAttackTime = elapsed; saberAnimation = 1; saberStyle = .hammerSmash
+            let forward = SIMD2<Float>(-sin(robotHeading), -cos(robotHeading))
+            let hitIndices = enemies.indices.filter { index in
+                guard enemies[index].isActive else { return false }
+                let offset = SIMD2<Float>(enemies[index].position.x - robotPosition.x, enemies[index].position.z - robotPosition.z)
+                return simd_length(offset) <= 2.05 && simd_dot(offset, forward) > 0.08
+            }
+            if hitIndices.isEmpty {
+                message = "Power hammer smash missed. Face a target within reach."; report(message)
+            } else {
+                for index in hitIndices { damageEnemy(at: index, weapon: "power hammer", amount: 2) }
+                message = "Power hammer smash struck \(hitIndices.count) \(hitIndices.count == 1 ? "target" : "targets")."; report(message)
+            }
+            play("laser")
+            return
+        }
         saberComboCount = elapsed - lastSaberAttackTime <= 1.15 ? saberComboCount + 1 : 1
         lastSaberAttackTime = elapsed; saberAnimation = 1
         let spin = saberComboCount >= 3
@@ -543,6 +698,37 @@ final class GameSession {
     func collectKey() { guard isRunning, level.requiresKey, !hasKey else { return }; hasKey = true; score += 250; message = "Key secured. Bring it to the locked door."; report(message); play("pickup") }
     func openDoor() { guard isRunning, level.requiresKey, !doorOpen else { return }; guard hasKey else { message = "The door is locked. Find the key first."; return }; doorOpen = true; score += 300; message = "Key accepted. Door open."; report(message); play("pickup") }
     func enemyContact(_ attack: String = "Enemy contact") { guard isRunning else { return }; score = max(0, score - 200); configureLevel(); isRunning = true; message = "\(attack) damaged ROB. Restarting level \(level.id)."; report(message) }
-    func nextLevel() { guard canFinish else { message = "Finish every objective before leaving the level."; return }; score += max(0, level.timeBonus - Int(elapsed) * 10); if levelIndex < levels.count - 1 { levelIndex += 1; if audioEnabled { TechnoMusicEngine.shared.setLevel(levelIndex) }; enemyAttackCount = 0; configureLevel(); isRunning = true; message = level.challenge; report("ROB advanced to \(level.name). \(level.challenge)") } else { isRunning = false; if audioEnabled { TechnoMusicEngine.shared.stop() }; message = "Fifteen-level campaign complete!" }; play("level-complete") }
+    func nextLevel() {
+        guard canFinish else { message = "Finish every objective before leaving the level."; return }
+        let completedLevel = level.id
+        score += max(0, level.timeBonus - Int(elapsed) * 10)
+        let earnedNewProgress = completedLevel > highestCompletedLevel
+        highestCompletedLevel = max(highestCompletedLevel, completedLevel)
+        progressStore?.set(highestCompletedLevel, forKey: "robHighestCompletedLevel")
+        let reward: String?
+        if earnedNewProgress {
+            switch completedLevel {
+            case 5: reward = "Twin Blasters unlocked in the ROB workshop!"
+            case 10: reward = "Power Hammer unlocked in the ROB workshop!"
+            case 15: reward = "Arc Cannon unlocked in the ROB workshop!"
+            default: reward = nil
+            }
+        } else {
+            reward = nil
+        }
+        if levelIndex < levels.count - 1 {
+            levelIndex += 1
+            if audioEnabled { TechnoMusicEngine.shared.setLevel(levelIndex) }
+            enemyAttackCount = 0; configureLevel(); isRunning = true
+            message = [reward, level.challenge].compactMap { $0 }.joined(separator: " ")
+            report("ROB advanced to \(level.name). \(message)")
+        } else {
+            isRunning = false
+            if audioEnabled { TechnoMusicEngine.shared.stop() }
+            message = [reward, "Fifteen-level campaign complete!"].compactMap { $0 }.joined(separator: " ")
+            report(message)
+        }
+        play("level-complete")
+    }
     func reset() { levelIndex = 0; score = 0; enemyAttackCount = 0; configureLevel(); isRunning = false; if audioEnabled { TechnoMusicEngine.shared.stop() }; message = "ROB systems ready." }
 }

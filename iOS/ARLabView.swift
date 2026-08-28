@@ -106,8 +106,8 @@ struct ARLabView: View {
                 Button("Key") { session.collectKey() }
                 Button("Door") { session.openDoor() }
                 Button("Cell") { session.collectCell() }
-                LaserChargeButton(session: session, title: "Laser", compact: true)
-                Button("Saber combo") { session.saberAttack() }
+                LaserChargeButton(session: session, title: session.rangedWeapon.shortName, compact: true)
+                Button(session.meleeWeapon.shortName) { session.saberAttack() }
                 if session.canFinish {
                     Button("Next") { session.nextLevel() }.buttonStyle(.borderedProminent)
                 }
@@ -182,7 +182,7 @@ struct ROBARView: UIViewRepresentable {
         let anchor = AnchorEntity(.plane(.horizontal, classification: .any, minimumBounds: [0.25, 0.25]))
         let rob = RobotFactory.makeROB(componentMode: componentMode)
         rob.scale = [0.32, 0.32, 0.32]
-        RobotFactory.applyWeapons(to: rob, session: session)
+        RobotFactory.applyWeapons(to: rob, session: session, componentMode: componentMode)
         anchor.addChild(rob)
         anchor.addChild(Self.makeFillLightRig())
         view.scene.addAnchor(anchor)
@@ -196,7 +196,7 @@ struct ROBARView: UIViewRepresentable {
     func updateUIView(_ view: ARView, context: Context) {
         context.coordinator.setSessionActive(isActive, in: view)
         if let robot = context.coordinator.robot {
-            RobotFactory.applyWeapons(to: robot, session: session)
+            RobotFactory.applyWeapons(to: robot, session: session, componentMode: componentMode)
         }
     }
 

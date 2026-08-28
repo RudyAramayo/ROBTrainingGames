@@ -17,6 +17,13 @@ private struct SendableAudioTapInvocation: @unchecked Sendable {
 
 @MainActor
 final class GameSessionTests: XCTestCase {
+    private func completeCurrentLevel(_ game: GameSession) {
+        game.collectedCells = game.level.cellCount
+        game.doorOpen = true
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        game.nextLevel()
+    }
+
     func testCalibrationMatchesBrowserCampaign() {
         let game = GameSession(audioEnabled: false)
 
@@ -355,5 +362,109 @@ final class GameSessionTests: XCTestCase {
             XCTAssertEqual(reach.y, 0, accuracy: 0.001)
             XCTAssertEqual(reach.z, 0, accuracy: 0.001)
         }
+    }
+
+    func testWeaponsUnlockAfterEveryFiveCompletedLevels() {
+        let game = GameSession(audioEnabled: false)
+
+        for _ in 0..<4 { completeCurrentLevel(game) }
+        XCTAssertEqual(game.highestCompletedLevel, 4)
+        XCTAssertFalse(game.isUnlocked(.twinBlasters))
+        game.selectRangedWeapon(.twinBlasters)
+        XCTAssertEqual(game.rangedWeapon, .shoulderGatling)
+        XCTAssertTrue(game.message.contains("Level 5"))
+
+        completeCurrentLevel(game)
+        XCTAssertEqual(game.highestCompletedLevel, 5)
+        XCTAssertTrue(game.isUnlocked(.twinBlasters))
+        XCTAssertFalse(game.isUnlocked(.powerHammer))
+
+        for _ in 0..<5 { completeCurrentLevel(game) }
+        XCTAssertEqual(game.highestCompletedLevel, 10)
+        XCTAssertTrue(game.isUnlocked(.powerHammer))
+        XCTAssertFalse(game.isUnlocked(.arcCannon))
+
+        for _ in 0..<5 { completeCurrentLevel(game) }
+        XCTAssertEqual(game.highestCompletedLevel, 15)
+        XCTAssertTrue(game.isUnlocked(.arcCannon))
+    }
+
+    func testWorkshopChoicesPersistAndResetKeepsUnlocks() {
+        let suiteName = "ROBTrainingTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let game = GameSession(audioEnabled: false, progressStore: defaults)
+        for _ in 0..<5 { completeCurrentLevel(game) }
+        game.selectFinish(.rescueOrange)
+        game.selectRangedWeapon(.twinBlasters)
+        game.reset()
+
+        XCTAssertEqual(game.highestCompletedLevel, 5)
+        XCTAssertEqual(game.robotFinish, .rescueOrange)
+        XCTAssertEqual(game.rangedWeapon, .twinBlasters)
+
+        let restored = GameSession(audioEnabled: false, progressStore: defaults)
+        XCTAssertEqual(restored.highestCompletedLevel, 5)
+        XCTAssertEqual(restored.robotFinish, .rescueOrange)
+        XCTAssertEqual(restored.rangedWeapon, .twinBlasters)
+    }
+
+    func testSelectedLoadoutChangesVisibleRobotWeapons() {
+        let game = GameSession(audioEnabled: false)
+        let robot = RobotFactory.makeROB()
+        game.selectFinish(.rescueOrange)
+        RobotFactory.applyWeapons(to: robot, session: game)
+
+        XCTAssertNotNil(robot.findEntity(named: "Applied Appearance rescueOrange"))
+        XCTAssertTrue(robot.findEntity(named: "Right Shoulder Gatling")?.isEnabled == true)
+        XCTAssertTrue(robot.findEntity(named: "Twin Blasters")?.isEnabled == false)
+        XCTAssertTrue(robot.findEntity(named: "Left Lightsaber")?.isEnabled == true)
+        XCTAssertTrue(robot.findEntity(named: "Power Hammer")?.isEnabled == false)
+
+        for _ in 0..<10 { completeCurrentLevel(game) }
+        game.selectRangedWeapon(.twinBlasters)
+        game.selectMeleeWeapon(.powerHammer)
+        RobotFactory.applyWeapons(to: robot, session: game)
+
+        XCTAssertTrue(robot.findEntity(named: "Right Shoulder Gatling")?.isEnabled == false)
+        XCTAssertTrue(robot.findEntity(named: "Twin Blasters")?.isEnabled == true)
+        XCTAssertTrue(robot.findEntity(named: "Left Lightsaber")?.isEnabled == false)
+        XCTAssertTrue(robot.findEntity(named: "Power Hammer")?.isEnabled == true)
+    }
+
+    func testArcCannonChainsDamageToANearbyTarget() {
+        let game = GameSession(audioEnabled: false)
+        for _ in 0..<15 { completeCurrentLevel(game) }
+        game.reset()
+        game.selectRangedWeapon(.arcCannon)
+        game.begin()
+        guard game.enemies.count >= 2 else { return XCTFail("Missing training targets") }
+        for index in game.enemies.indices where index > 1 { game.enemies[index].isActive = false }
+        game.enemies[0].position = game.robotPosition + SIMD3<Float>(0, 0, -1.7)
+        game.enemies[1].position = game.robotPosition + SIMD3<Float>(0.65, 0, -1.75)
+        let primaryShields = game.enemies[0].shields
+        let secondaryShields = game.enemies[1].shields
+
+        game.fireLaser()
+        for _ in 0..<60 where game.laserDistance != nil { game.tick(1.0 / 60.0) }
+
+        XCTAssertLessThanOrEqual(game.enemies[0].shields, primaryShields - 2)
+        XCTAssertLessThan(game.enemies[1].shields, secondaryShields)
+    }
+
+    func testPowerHammerHasAHeavyForwardHit() {
+        let game = GameSession(audioEnabled: false)
+        for _ in 0..<10 { completeCurrentLevel(game) }
+        game.selectMeleeWeapon(.powerHammer)
+        guard let targetIndex = game.enemies.indices.first else { return XCTFail("Missing training target") }
+        game.robotHeading = 0
+        game.enemies[targetIndex].position = game.robotPosition + SIMD3<Float>(0, 0, -1.8)
+        let shields = game.enemies[targetIndex].shields
+
+        game.saberAttack()
+
+        XCTAssertEqual(game.saberStyle, .hammerSmash)
+        XCTAssertEqual(game.enemies[targetIndex].shields, shields - 2)
+        XCTAssertTrue(game.message.localizedCaseInsensitiveContains("hammer"))
     }
 }

@@ -147,9 +147,9 @@ private struct MobileTankControls: View {
         HStack(alignment: .bottom, spacing: 8) {
             TreadJoystick(title: "LEFT", demand: updateLeft)
             VStack(spacing: 5) {
-                LaserChargeButton(session: session, title: "Laser", compact: true)
+                LaserChargeButton(session: session, title: session.rangedWeapon.shortName, compact: true)
                 Button { session.saberAttack() } label: {
-                    Label("Saber", systemImage: "sparkles").font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.75)
+                    Label(session.meleeWeapon.shortName, systemImage: session.meleeWeapon == .dualSabers ? "sparkles" : "hammer.fill").font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.75)
                 }
                     .buttonStyle(.borderedProminent)
                     .tint(.pink)
@@ -244,5 +244,226 @@ struct DrivePad: View {
 
 struct ComponentExplorer: View {
     @Bindable var session: GameSession
-    var body: some View { NavigationStack { ScrollView { Image("rob-training-key-art").resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 20)).padding(); ForEach(session.components) { component in Button { session.selectedComponent = component } label: { VStack(alignment: .leading, spacing: 6) { Text(component.name).font(.title3.bold()); Text(component.summary).font(.body).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, alignment: .leading).padding().background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16)) }.buttonStyle(.plain).padding(.horizontal) } }.navigationTitle("Inside ROB") } }
+    private let finishColumns = [GridItem(.adaptive(minimum: 112), spacing: 10)]
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    WorkshopRobotPreview(session: session)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Label("Workshop Progress", systemImage: "wrench.and.screwdriver.fill").font(.headline)
+                            Spacer()
+                            Text("\(session.highestCompletedLevel)/\(session.levels.count) levels").monospacedDigit().foregroundStyle(.cyan)
+                        }
+                        ProgressView(value: Double(session.highestCompletedLevel), total: Double(session.levels.count)).tint(.cyan)
+                        Text(nextUnlockText).font(.caption).foregroundStyle(.secondary)
+                    }
+                    .workshopCard()
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Body Finish", systemImage: "paintpalette.fill").font(.title3.bold())
+                        Text("Changes the chassis, torso, arms, and camera housing everywhere ROB appears.").font(.caption).foregroundStyle(.secondary)
+                        LazyVGrid(columns: finishColumns, spacing: 10) {
+                            ForEach(ROBFinish.allCases) { finish in
+                                Button { session.selectFinish(finish) } label: {
+                                    VStack(spacing: 7) {
+                                        Circle().fill(Color(uiColor: RobotFactory.finishColor(for: finish))).frame(width: 36, height: 36)
+                                            .overlay(Circle().stroke(.white.opacity(0.65), lineWidth: 1))
+                                        Text(finish.displayName).font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.75)
+                                        Image(systemName: session.robotFinish == finish ? "checkmark.circle.fill" : "circle").foregroundStyle(.cyan)
+                                    }
+                                    .frame(maxWidth: .infinity).padding(.vertical, 10)
+                                }
+                                .buttonStyle(.plain)
+                                .background(session.robotFinish == finish ? .cyan.opacity(0.18) : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+                            }
+                        }
+                    }
+                    .workshopCard()
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Ranged Weapons", systemImage: "scope").font(.title3.bold())
+                        ForEach(ROBRangedWeapon.allCases) { weapon in
+                            LoadoutOption(
+                                title: weapon.displayName,
+                                summary: weapon.summary,
+                                systemImage: weapon == .shoulderGatling ? "scope" : weapon == .twinBlasters ? "bolt.horizontal.fill" : "wave.3.right.circle.fill",
+                                selected: session.rangedWeapon == weapon,
+                                unlocked: session.isUnlocked(weapon),
+                                requiredLevel: weapon.requiredCompletedLevel
+                            ) { session.selectRangedWeapon(weapon) }
+                        }
+                    }
+                    .workshopCard()
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Melee Weapons", systemImage: "hammer.fill").font(.title3.bold())
+                        ForEach(ROBMeleeWeapon.allCases) { weapon in
+                            LoadoutOption(
+                                title: weapon.displayName,
+                                summary: weapon.summary,
+                                systemImage: weapon == .dualSabers ? "sparkles" : "hammer.fill",
+                                selected: session.meleeWeapon == weapon,
+                                unlocked: session.isUnlocked(weapon),
+                                requiredLevel: weapon.requiredCompletedLevel
+                            ) { session.selectMeleeWeapon(weapon) }
+                        }
+                    }
+                    .workshopCard()
+
+                    Text(session.message).font(.callout.bold()).foregroundStyle(.cyan).frame(maxWidth: .infinity, alignment: .leading).workshopCard()
+
+                    Label("Inside ROB", systemImage: "cpu").font(.title2.bold())
+                    ForEach(session.components) { component in
+                        Button { session.selectedComponent = component } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(component.name).font(.title3.bold())
+                                Text(component.summary).font(.body).foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading).workshopCard()
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding()
+                .frame(maxWidth: 840)
+                .frame(maxWidth: .infinity)
+            }
+            .navigationTitle("ROB Workshop")
+        }
+    }
+
+    private var nextUnlockText: String {
+        if session.highestCompletedLevel < 5 { return "Next unlock: Twin Blasters after Level 5." }
+        if session.highestCompletedLevel < 10 { return "Next unlock: Power Hammer after Level 10." }
+        if session.highestCompletedLevel < 15 { return "Next unlock: Arc Cannon after Level 15." }
+        return "Every workshop weapon is unlocked."
+    }
+}
+
+private struct WorkshopRobotPreview: View {
+    @Bindable var session: GameSession
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [.indigo.opacity(0.88), .black, .cyan.opacity(0.35)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            robotIllustration
+        }
+        .frame(height: 330)
+        .background(LinearGradient(colors: [.indigo.opacity(0.65), .cyan.opacity(0.22)], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(alignment: .topLeading) {
+            Label("ROB LOADOUT PREVIEW", systemImage: "paintbrush.pointed.fill").font(.caption.bold()).foregroundStyle(.cyan)
+                .padding(.horizontal, 10).padding(.vertical, 7).background(.black.opacity(0.62), in: Capsule()).padding(12)
+        }
+        .overlay(alignment: .bottomLeading) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(session.robotFinish.displayName).font(.headline)
+                Text("\(session.rangedWeapon.displayName) · \(session.meleeWeapon.displayName)").font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(14).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14)).padding(12)
+        }
+    }
+
+    private var finish: Color { Color(uiColor: RobotFactory.finishColor(for: session.robotFinish)) }
+
+    private var robotIllustration: some View {
+        ZStack {
+            Ellipse().fill(.cyan.opacity(0.18)).frame(width: 280, height: 54).offset(y: 105).blur(radius: 8)
+            ForEach([-1.0, 1.0], id: \.self) { side in
+                Capsule().fill(.black).frame(width: 48, height: 128).overlay(Capsule().stroke(.gray, lineWidth: 4)).offset(x: CGFloat(side * 78), y: 52)
+                ForEach([-38.0, 0, 38.0], id: \.self) { wheelY in
+                    Circle().fill(.gray).frame(width: 29, height: 29).overlay(Circle().stroke(.orange, lineWidth: 4)).offset(x: CGFloat(side * 78), y: CGFloat(52 + wheelY))
+                }
+                Capsule().fill(finish).frame(width: 22, height: 108).rotationEffect(.degrees(side * -12)).offset(x: CGFloat(side * 88), y: 5)
+            }
+            RoundedRectangle(cornerRadius: 18).fill(finish.gradient).frame(width: 142, height: 104).overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.55), lineWidth: 2)).offset(y: 24)
+            Rectangle().fill(.gray).frame(width: 18, height: 64).offset(y: -54)
+            Ellipse().fill(finish.gradient).frame(width: 92, height: 65).overlay(Ellipse().stroke(.cyan.opacity(0.85), lineWidth: 3)).offset(y: -94)
+            HStack(spacing: 17) {
+                Circle().fill(.cyan).frame(width: 14, height: 14)
+                Circle().fill(.green).frame(width: 14, height: 14)
+            }.offset(y: -95)
+            HStack(spacing: 26) {
+                Circle().fill(.blue).frame(width: 25, height: 25)
+                Circle().fill(.cyan).frame(width: 25, height: 25)
+            }.offset(y: 10)
+            rangedIllustration
+            meleeIllustration
+        }
+        .frame(width: 320, height: 255)
+        .offset(y: -3)
+        .shadow(color: finish.opacity(0.65), radius: 14)
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder private var rangedIllustration: some View {
+        switch session.rangedWeapon {
+        case .shoulderGatling:
+            ZStack {
+                RoundedRectangle(cornerRadius: 5).fill(.black).frame(width: 48, height: 30)
+                ForEach([-12.0, -4, 4, 12], id: \.self) { y in Rectangle().fill(.red).frame(width: 38, height: 3).offset(x: 32, y: CGFloat(y)) }
+            }.offset(x: 72, y: -34)
+        case .twinBlasters:
+            ForEach([-1.0, 1.0], id: \.self) { side in
+                ZStack {
+                    RoundedRectangle(cornerRadius: 5).fill(.blue).frame(width: 42, height: 25)
+                    Rectangle().fill(.cyan).frame(width: 38, height: 5).offset(y: -18)
+                }.offset(x: CGFloat(side * 76), y: -28)
+            }
+        case .arcCannon:
+            ZStack {
+                Circle().fill(.cyan).frame(width: 35, height: 35).shadow(color: .cyan, radius: 12)
+                RoundedRectangle(cornerRadius: 6).fill(.purple).frame(width: 76, height: 22).offset(y: 18)
+            }.offset(y: -58)
+        }
+    }
+
+    @ViewBuilder private var meleeIllustration: some View {
+        switch session.meleeWeapon {
+        case .dualSabers:
+            Capsule().fill(.green).frame(width: 8, height: 105).rotationEffect(.degrees(-22)).offset(x: -115, y: -4).shadow(color: .green, radius: 8)
+            Capsule().fill(.cyan).frame(width: 8, height: 105).rotationEffect(.degrees(22)).offset(x: 115, y: -4).shadow(color: .cyan, radius: 8)
+        case .powerHammer:
+            ZStack {
+                Capsule().fill(.gray).frame(width: 11, height: 116)
+                RoundedRectangle(cornerRadius: 6).fill(.orange).frame(width: 67, height: 34).offset(y: -56)
+            }.rotationEffect(.degrees(24)).offset(x: 118, y: -7)
+        }
+    }
+}
+
+private struct LoadoutOption: View {
+    let title: String
+    let summary: String
+    let systemImage: String
+    let selected: Bool
+    let unlocked: Bool
+    let requiredLevel: Int
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 13) {
+                Image(systemName: unlocked ? systemImage : "lock.fill").font(.title2).frame(width: 34).foregroundStyle(unlocked ? .cyan : .secondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack { Text(title).font(.headline); if selected { Image(systemName: "checkmark.circle.fill").foregroundStyle(.cyan) } }
+                    Text(unlocked ? summary : "Complete Level \(requiredLevel) to unlock.").font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+                }
+                Spacer()
+            }
+            .padding(12)
+            .background(selected ? .cyan.opacity(0.18) : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private extension View {
+    func workshopCard() -> some View {
+        padding(16).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
 }
