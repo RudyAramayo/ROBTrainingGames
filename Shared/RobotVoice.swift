@@ -42,7 +42,7 @@ final class RobotVoice {
     var isListening = false
     private(set) var isPreparingAudio = false
     var isThinking = false
-    var automaticComments = true
+    var automaticComments = false
     var status = "On-device ROB voice"
 
     private let recognizer = SFSpeechRecognizer(locale: Locale.current)

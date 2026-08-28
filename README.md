@@ -12,7 +12,7 @@ A shared educational game for iPhone, iPad, and Apple Vision Pro that matches th
 - **iOS AR Lab:** places a manipulable ROB in the camera view and exposes an educational component explorer.
 - **visionOS:** a windowed mission console plus an immersive campaign where ROB can be driven, fight training robots, solve key-and-door objectives, and be inspected in the room.
 - **Component Explorer:** Animated triangular tri-wheel treads, power, Cerebro, sensing, arms, and safety. Descriptions are deliberately high-level until the publication documentation is expanded.
-- **ROB Voice:** push-to-talk, live on-device speech recognition, Apple’s on-device Foundation Model, spoken answers, and automatic kid-safe commentary about mission events. A small scripted personality remains available when Apple Intelligence is unsupported, disabled, or not ready.
+- **ROB Voice:** push-to-talk, live on-device speech recognition, Apple’s on-device Foundation Model, spoken answers, and optional kid-safe commentary about mission events. Automatic commentary defaults to off and can be enabled from the Voice controls. A small scripted personality remains available when Apple Intelligence is unsupported, disabled, or not ready.
 
 ROB Voice requires microphone and speech-recognition permission. Foundation Models also requires an Apple Intelligence-capable device with Apple Intelligence enabled and its model downloaded. The simulator does not upload game state to a custom service.
 

@@ -124,6 +124,10 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(RobotVoice.isUsableInputFormat(sampleRate: 48_000, channelCount: 1))
     }
 
+    func testAutomaticVoiceCommentaryDefaultsOff() {
+        XCTAssertFalse(RobotVoice().automaticComments)
+    }
+
     func testARLabEnablesCameraLightingAndFillLights() {
         let configuration = ROBARView.makeConfiguration()
         let lightRig = ROBARView.makeFillLightRig()
