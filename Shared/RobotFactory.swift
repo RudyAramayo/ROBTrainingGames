@@ -48,7 +48,6 @@ import UIKit
             cylinder("Torso Speaker", radius: 0.078, height: 0.032, position: [x, 0.8, -0.305], color: UIColor(white: 0.025, alpha: 1), faceForward: true, parent: torso)
         }
         part("Depth Camera", [0.2, 0.1, 0.065], [0, 0.59, -0.3], .gray, parent: torso)
-        cylinder("Front Linear Actuator", radius: 0.045, height: 0.72, position: [0, 0.28, -0.62], color: .gray, faceForward: true, parent: torso)
         for side: Float in [-1, 1] {
             let armColor: UIColor = componentMode ? (side < 0 ? .systemGreen : .systemBlue) : .gray
             let prefix = side < 0 ? "Left" : "Right"
