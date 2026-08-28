@@ -10,6 +10,7 @@ private enum ROBCameraAccess: Equatable {
 
 struct ARLabView: View {
     @Bindable var session: GameSession
+    let onExit: () -> Void
     @Environment(\.scenePhase) private var scenePhase
     @State private var componentMode = false
     @State private var cameraAccess: ROBCameraAccess = .checking
@@ -44,13 +45,27 @@ struct ARLabView: View {
                 )
             }
         }
+        .overlay(alignment: .topLeading) {
+            Button(action: onExit) {
+                Label("Menu", systemImage: "xmark.circle.fill")
+                    .font(.headline)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding()
+            .accessibilityLabel("Exit AR Lab to menu")
+        }
         .background {
             LinearGradient(colors: [.indigo.opacity(0.8), .black], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
         }
-        .robGameKeyboardControls(session: session)
         .task { await updateCameraAccess(requestIfNeeded: true) }
-        .onAppear { isActive = true }
+        .onAppear {
+            session.pause()
+            isActive = true
+        }
         .onDisappear { isActive = false }
         .onChange(of: scenePhase) { _, phase in
             isActive = phase == .active
@@ -63,20 +78,13 @@ struct ARLabView: View {
     private var controls: some View {
         VStack(spacing: 10) {
             HStack {
-                Label("Level \(session.level.id)", systemImage: "flag.checkered")
+                Label("ROB AR LAB", systemImage: "arkit")
                 Spacer()
-                Text("Score \(session.score)").monospacedDigit()
-                Text("Cells \(session.collectedCells)/\(session.level.cellCount)")
-                Text("Targets \(session.remainingEnemies)")
+                Text(session.robotFinish.displayName)
             }
             .font(.caption.bold())
             .padding(10)
             .background(.ultraThinMaterial, in: Capsule())
-
-            CombatHealthBars(session: session, compact: true)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
 
             Text(componentMode ? "Tap a ROB part, then use the guide below." : "Move the phone to find a surface · drag ROB to reposition")
                 .font(.callout.bold())
@@ -106,22 +114,12 @@ struct ARLabView: View {
                 }
             }
 
-            HStack {
-                Button("Start") { session.begin() }
-                Button("Key") { session.collectKey() }
-                Button("Door") { session.openDoor() }
-                Button("Cell") { session.collectCell() }
-                LaserChargeButton(session: session, title: session.rangedWeapon.shortName, compact: true)
-                Button(session.meleeWeapon.shortName) { session.saberAttack() }
-                if session.canFinish {
-                    Button("Next") { session.nextLevel() }.buttonStyle(.borderedProminent)
-                }
-            }
-            .buttonStyle(.bordered)
-
-            Text(session.laserLockDescription)
+            Label("Mission simulation paused", systemImage: "pause.circle.fill")
                 .font(.caption.bold())
-                .foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
+                .foregroundStyle(.cyan)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial, in: Capsule())
         }
         .padding()
     }

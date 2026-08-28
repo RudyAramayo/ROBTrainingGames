@@ -4,20 +4,225 @@ import SwiftUI
 struct IOSRootView: View {
     @Bindable var session: GameSession
     @Bindable var voice: RobotVoice
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var fullScreenExperience: FullScreenExperience?
+
     var body: some View {
         TabView {
-            MissionView(session: session).tabItem { Label("Missions", systemImage: "gamecontroller.fill") }
-            ARLabView(session: session).tabItem { Label("AR Lab", systemImage: "arkit") }
+            MissionLaunchView(session: session, launch: launchMission)
+                .tabItem { Label("Play", systemImage: "gamecontroller.fill") }
+            ARLabLaunchView(session: session, launch: launchARLab)
+                .tabItem { Label("AR Lab", systemImage: "arkit") }
             ComponentExplorer(session: session).tabItem { Label("ROB", systemImage: "cpu") }
             RobotVoiceScreen(voice: voice, session: session).tabItem { Label("Voice", systemImage: "waveform") }
         }
         .tint(.cyan)
         .onChange(of: session.situationCount) { _, count in if count > 0 { voice.react(to: session.lastSituation, game: session) } }
+        .onChange(of: scenePhase) { _, phase in if phase != .active { session.pause() } }
+        .fullScreenCover(item: $fullScreenExperience) { experience in
+            switch experience {
+            case .mission:
+                MissionView(session: session, onExit: exitMission)
+                    .interactiveDismissDisabled()
+            case .arLab:
+                ARLabView(session: session, onExit: exitARLab)
+                    .interactiveDismissDisabled()
+            }
+        }
+    }
+
+    private func launchMission() {
+        if session.isPaused { session.resume() }
+        else if !session.isRunning { session.begin() }
+        fullScreenExperience = .mission
+    }
+
+    private func exitMission() {
+        session.pause()
+        fullScreenExperience = nil
+    }
+
+    private func launchARLab() {
+        session.pause()
+        fullScreenExperience = .arLab
+    }
+
+    private func exitARLab() {
+        fullScreenExperience = nil
+    }
+}
+
+private enum FullScreenExperience: String, Identifiable {
+    case mission
+    case arLab
+
+    var id: String { rawValue }
+}
+
+private struct MissionLaunchView: View {
+    @Bindable var session: GameSession
+    let launch: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                menuBackground
+                ScrollView {
+                    VStack(spacing: 20) {
+                        ExperienceHero(
+                            title: "ROB Training Missions",
+                            message: "Enter the arena in a dedicated full-screen game. Leaving the arena pauses your current level.",
+                            symbol: "gamecontroller.fill",
+                            colors: [.cyan, .blue]
+                        )
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Label("Level \(session.level.id)", systemImage: "flag.checkered")
+                                Spacer()
+                                Text(session.level.name).foregroundStyle(.cyan)
+                            }
+                            .font(.headline)
+                            Text(session.level.challenge).font(.subheadline).foregroundStyle(.secondary)
+                            CombatHealthBars(session: session, compact: true)
+                            HStack {
+                                Label("\(session.collectedCells)/\(session.level.cellCount) cells", systemImage: "bolt.fill")
+                                Spacer()
+                                Label("\(session.remainingEnemies) targets", systemImage: "scope")
+                                Spacer()
+                                Label("\(session.score)", systemImage: "star.fill")
+                            }
+                            .font(.caption.bold())
+                            .monospacedDigit()
+                        }
+                        .experienceCard()
+
+                        Button(action: launch) {
+                            Label(session.isPaused ? "Resume Full-Screen Mission" : "Start Full-Screen Mission", systemImage: session.isPaused ? "play.fill" : "arrow.up.right.square.fill")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 7)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.cyan)
+                        .controlSize(.large)
+
+                        if session.isPaused {
+                            Button(role: .destructive) { session.reset() } label: {
+                                Label("Abandon Mission and Reset", systemImage: "arrow.counterclockwise")
+                            }
+                        }
+
+                        Text(session.isPaused ? "Mission paused safely. No enemies, timers, or movement advance while you are in the menu or AR Lab." : "Starting opens the game above this menu and hides every tab until you exit.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
+                    .padding(.bottom, 96)
+                    .frame(maxWidth: 720)
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .navigationTitle("Play")
+            .toolbarColorScheme(.dark, for: .navigationBar)
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var menuBackground: some View {
+        LinearGradient(
+            colors: [Color(red: 0.02, green: 0.08, blue: 0.14), Color(red: 0.04, green: 0.2, blue: 0.24), Color(red: 0.06, green: 0.05, blue: 0.16)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+}
+
+private struct ARLabLaunchView: View {
+    @Bindable var session: GameSession
+    let launch: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                LinearGradient(
+                    colors: [Color(red: 0.11, green: 0.05, blue: 0.24), Color(red: 0.03, green: 0.15, blue: 0.22), .black],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 20) {
+                        ExperienceHero(
+                            title: "ROB AR Lab",
+                            message: "Place ROB in your room, inspect its systems, and adjust its loadout without running the training mission.",
+                            symbol: "arkit",
+                            colors: [.purple, .cyan]
+                        )
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label("Separate AR Session", systemImage: "pause.circle.fill").font(.headline)
+                            Text("Opening AR pauses any active mission and stops its movement, attacks, timer, and music. Return to Play when you are ready to resume.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Divider()
+                            Label("\(session.robotFinish.displayName) · \(session.rangedWeapon.displayName) · \(session.meleeWeapon.displayName)", systemImage: "wrench.and.screwdriver.fill")
+                                .font(.caption.bold())
+                                .foregroundStyle(.cyan)
+                        }
+                        .experienceCard()
+
+                        Button(action: launch) {
+                            Label("Enter Full-Screen AR Lab", systemImage: "camera.viewfinder")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 7)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.purple)
+                        .controlSize(.large)
+                    }
+                    .padding()
+                    .padding(.bottom, 96)
+                    .frame(maxWidth: 720)
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .navigationTitle("AR Lab")
+            .toolbarColorScheme(.dark, for: .navigationBar)
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+private struct ExperienceHero: View {
+    let title: String
+    let message: String
+    let symbol: String
+    let colors: [Color]
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: symbol)
+                .font(.system(size: 72, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 150, height: 150)
+                .background(LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 38))
+                .shadow(color: colors.last?.opacity(0.65) ?? .clear, radius: 24)
+            Text(title).font(.largeTitle.bold()).multilineTextAlignment(.center)
+            Text(message).font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
     }
 }
 
 struct MissionView: View {
     @Bindable var session: GameSession
+    let onExit: () -> Void
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
@@ -44,7 +249,7 @@ struct MissionView: View {
                     .ignoresSafeArea().background(.black)
                 VStack(spacing: verticalSizeClass == .compact ? 4 : 10) {
                     if compactPhoneLayout {
-                        CompactMissionStats(session: session).padding(.horizontal, 8)
+                        CompactMissionStats(session: session, onExit: onExit).padding(.horizontal, 8)
                     } else {
                         VStack(spacing: 7) {
                             HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Spacer(); MissionKeyStatus(session: session); Text("Cells \(session.collectedCells)/\(session.level.cellCount)").monospacedDigit(); Text("Targets \(session.remainingEnemies)").monospacedDigit(); Text("Score \(session.score)").monospacedDigit(); Text("Best \(highScore)").foregroundStyle(.cyan).monospacedDigit() }.font(.headline)
@@ -77,24 +282,48 @@ struct MissionView: View {
             .navigationTitle(compactPhoneLayout ? "" : session.level.name).navigationBarTitleDisplayMode(.inline)
             .toolbar(compactPhoneLayout ? .hidden : .visible, for: .navigationBar)
             .robGameKeyboardControls(session: session)
-            .toolbar { ToolbarItemGroup(placement: .topBarTrailing) { Button { session.toggleMusic() } label: { Label(session.musicEnabled ? "Techno on" : "Music off", systemImage: session.musicEnabled ? "music.note" : "speaker.slash") }; Button(session.isRunning ? "Reset" : "Start") { session.isRunning ? session.reset() : session.begin() } }; ToolbarItem(placement: .topBarLeading) { if session.canFinish { Button(session.levelIndex == session.levels.count - 1 ? "Finish" : "Next Level") { session.nextLevel() } } } }
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button { session.toggleMusic() } label: { Label(session.musicEnabled ? "Techno on" : "Music off", systemImage: session.musicEnabled ? "music.note" : "speaker.slash") }
+                    Button(missionActionTitle) { performMissionAction() }
+                }
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    Button(action: onExit) { Label("Menu", systemImage: "xmark.circle.fill") }
+                    if session.canFinish { Button(session.levelIndex == session.levels.count - 1 ? "Finish" : "Next Level") { session.nextLevel() } }
+                }
+            }
             .onReceive(timer) { _ in session.tick(1.0 / 30.0); highScore = max(highScore, session.score) }
         }
+    }
+
+    private var missionActionTitle: String {
+        session.isRunning ? "Reset" : session.isPaused ? "Resume" : "Start"
+    }
+
+    private func performMissionAction() {
+        if session.isRunning { session.reset() }
+        else if session.isPaused { session.resume() }
+        else { session.begin() }
     }
 }
 
 private struct CompactMissionStats: View {
     @Bindable var session: GameSession
+    let onExit: () -> Void
 
     var body: some View {
         VStack(spacing: 7) {
             HStack(spacing: 8) {
+                Button(action: onExit) {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .accessibilityLabel("Exit mission to menu")
                 Text("Level \(session.level.id) · \(session.level.name)").font(.subheadline.bold()).lineLimit(1)
                 Spacer(minLength: 2)
                 Button { session.toggleMusic() } label: {
                     Image(systemName: session.musicEnabled ? "music.note" : "speaker.slash")
                 }
-                Button(session.isRunning ? "Reset" : "Start") { session.isRunning ? session.reset() : session.begin() }
+                Button(missionActionTitle) { performMissionAction() }
                     .buttonStyle(.borderedProminent)
                     .tint(.cyan)
             }
@@ -113,6 +342,16 @@ private struct CompactMissionStats: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var missionActionTitle: String {
+        session.isRunning ? "Reset" : session.isPaused ? "Resume" : "Start"
+    }
+
+    private func performMissionAction() {
+        if session.isRunning { session.reset() }
+        else if session.isPaused { session.resume() }
+        else { session.begin() }
     }
 }
 
@@ -699,5 +938,11 @@ private struct LoadoutOption: View {
 private extension View {
     func workshopCard() -> some View {
         padding(16).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    func experienceCard() -> some View {
+        padding(18)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
+            .overlay(RoundedRectangle(cornerRadius: 22).stroke(.white.opacity(0.12), lineWidth: 1))
     }
 }

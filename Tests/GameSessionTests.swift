@@ -65,6 +65,35 @@ final class GameSessionTests: XCTestCase {
         XCTAssertFalse(game.message.localizedCaseInsensitiveContains("key"))
     }
 
+    func testPauseAndResumePreserveMissionProgress() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        game.collectCell()
+        game.setTreads(left: 1, right: 1)
+        game.tick(0.25)
+        let elapsedBeforePause = game.elapsed
+        let positionBeforePause = game.robotPosition
+
+        XCTAssertTrue(game.pause())
+        XCTAssertFalse(game.isRunning)
+        XCTAssertTrue(game.isPaused)
+        XCTAssertEqual(game.leftTread, 0)
+        XCTAssertEqual(game.rightTread, 0)
+
+        game.tick(5)
+        game.moveStep(forward: 1)
+        XCTAssertEqual(game.elapsed, elapsedBeforePause)
+        XCTAssertEqual(game.robotPosition, positionBeforePause)
+        XCTAssertEqual(game.collectedCells, 1)
+
+        XCTAssertTrue(game.resume())
+        XCTAssertTrue(game.isRunning)
+        XCTAssertFalse(game.isPaused)
+        game.tick(0.25)
+        XCTAssertGreaterThan(game.elapsed, elapsedBeforePause)
+        XCTAssertEqual(game.collectedCells, 1)
+    }
+
     func testLevelTwoHasAVisibleReachableKeyOnTheStartingSide() {
         let game = GameSession(audioEnabled: false)
         game.levelIndex = 1

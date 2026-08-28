@@ -233,6 +233,7 @@ final class GameSession {
     var selectedComponent: ROBComponent?
     var message = "ROB systems ready."
     var isRunning = false
+    private(set) var isPaused = false
     var musicEnabled = true
     var lastSituation = "ROB systems ready."
     var situationCount = 0
@@ -366,7 +367,39 @@ final class GameSession {
         enemyBolts = []; nextBoltID = 0; wasAtDock = false; enemies = configuredEnemies()
         updateLaserLock()
     }
-    func begin() { enemyAttackCount = 0; health = maxHealth; damageInvulnerabilityRemaining = 0; configureLevel(); isRunning = true; if audioEnabled && musicEnabled { TechnoMusicEngine.shared.start(level: levelIndex) }; message = "Level \(level.id): \(level.challenge)"; report("The pilot started \(level.name). \(level.challenge)"); play("mission-start") }
+    func begin() {
+        enemyAttackCount = 0
+        health = maxHealth
+        damageInvulnerabilityRemaining = 0
+        configureLevel()
+        isPaused = false
+        isRunning = true
+        if audioEnabled && musicEnabled { TechnoMusicEngine.shared.start(level: levelIndex) }
+        message = "Level \(level.id): \(level.challenge)"
+        report("The pilot started \(level.name). \(level.challenge)")
+        play("mission-start")
+    }
+    @discardableResult
+    func pause() -> Bool {
+        guard isRunning else { return false }
+        stopDrive()
+        isChargingLaser = false
+        laserCharge = 0
+        isRunning = false
+        isPaused = true
+        if audioEnabled { TechnoMusicEngine.shared.stop() }
+        message = "Mission paused at Level \(level.id)."
+        return true
+    }
+    @discardableResult
+    func resume() -> Bool {
+        guard isPaused else { return false }
+        isPaused = false
+        isRunning = true
+        if audioEnabled && musicEnabled { TechnoMusicEngine.shared.start(level: levelIndex) }
+        message = "Level \(level.id) resumed."
+        return true
+    }
     func toggleMusic() { musicEnabled.toggle(); guard audioEnabled else { return }; if musicEnabled && isRunning { TechnoMusicEngine.shared.start(level: levelIndex) } else { TechnoMusicEngine.shared.stop() } }
     func setDrive(forward: Double, steering: Double) { forwardDemand = forward; steeringDemand = steering }
     func setTreads(left: Double, right: Double) {
@@ -377,6 +410,7 @@ final class GameSession {
     }
     func stopDrive() { setDrive(forward: 0, steering: 0); leftTread = 0; rightTread = 0 }
     func moveStep(forward: Double = 0, steering: Double = 0) {
+        guard !isPaused else { return }
         guard isRunning else { begin(); return }
         setDrive(forward: forward, steering: steering)
         tick(0.24)
@@ -794,6 +828,7 @@ final class GameSession {
             configureLevel()
             health = maxHealth
             damageInvulnerabilityRemaining = 1
+            isPaused = false
             isRunning = true
             message = "ROB was disabled by \(attack). Restarting level \(level.id) with full health."
         } else {
@@ -823,16 +858,16 @@ final class GameSession {
         if levelIndex < levels.count - 1 {
             levelIndex += 1
             if audioEnabled { TechnoMusicEngine.shared.setLevel(levelIndex) }
-            enemyAttackCount = 0; health = maxHealth; damageInvulnerabilityRemaining = 0; configureLevel(); isRunning = true
+            enemyAttackCount = 0; health = maxHealth; damageInvulnerabilityRemaining = 0; configureLevel(); isPaused = false; isRunning = true
             message = [reward, level.challenge].compactMap { $0 }.joined(separator: " ")
             report("ROB advanced to \(level.name). \(message)")
         } else {
-            isRunning = false
+            isPaused = false; isRunning = false
             if audioEnabled { TechnoMusicEngine.shared.stop() }
             message = [reward, "Fifteen-level campaign complete!"].compactMap { $0 }.joined(separator: " ")
             report(message)
         }
         play("level-complete")
     }
-    func reset() { levelIndex = 0; score = 0; health = maxHealth; damageInvulnerabilityRemaining = 0; enemyAttackCount = 0; configureLevel(); isRunning = false; if audioEnabled { TechnoMusicEngine.shared.stop() }; message = "ROB systems ready." }
+    func reset() { levelIndex = 0; score = 0; health = maxHealth; damageInvulnerabilityRemaining = 0; enemyAttackCount = 0; configureLevel(); isPaused = false; isRunning = false; if audioEnabled { TechnoMusicEngine.shared.stop() }; message = "ROB systems ready." }
 }
