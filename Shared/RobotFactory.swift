@@ -184,6 +184,12 @@ import UIKit
         robot.findEntity(named: "Left Lightsaber")?.isEnabled = session.meleeWeapon == .dualSabers
         robot.findEntity(named: "Right Lightsaber")?.isEnabled = session.meleeWeapon == .dualSabers
         robot.findEntity(named: "Power Hammer")?.isEnabled = session.meleeWeapon == .powerHammer
+        let bladeScale: Float = session.meleeWeapon == .dualSabers && session.saberAnimation > 0 ? 1 : 0.06
+        for (name, side) in [("Left Lightsaber", Float(-1)), ("Right Lightsaber", Float(1))] {
+            guard let blade = robot.findEntity(named: name) else { continue }
+            blade.scale = [1, bladeScale, 1]
+            blade.position = [side * 0.24, -0.64, -0.1 - 0.45 * bladeScale]
+        }
         for (prefix, angle) in [("Left", session.leftWheelAngle), ("Right", session.rightWheelAngle)] {
             for index in 1...3 { robot.findEntity(named: "\(prefix) Tri-Wheel \(index)")?.orientation = simd_quatf(angle: angle, axis: [1, 0, 0]) }
         }

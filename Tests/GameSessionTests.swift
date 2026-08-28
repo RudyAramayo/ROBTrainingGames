@@ -220,6 +220,70 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.steeringDemand, 0)
     }
 
+    func testROBChassisStopsBeforeThePerimeterWall() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        let startingPosition = game.robotPosition
+
+        game.setDrive(forward: -1, steering: 0)
+        game.tick(1)
+        game.stopDrive()
+
+        let wallSafeLimit = game.puzzle.arenaHalfExtent - 0.09 - GameSession.robotCollisionRadius
+        XCTAssertLessThanOrEqual(abs(game.robotPosition.z), wallSafeLimit + 0.001)
+        XCTAssertEqual(game.robotPosition.z, startingPosition.z, accuracy: 0.001)
+        XCTAssertTrue(game.message.localizedCaseInsensitiveContains("wall collision"))
+    }
+
+    func testSweptChassisCollisionCannotTunnelThroughAnInteriorWall() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        guard let wall = game.puzzle.barriers.first else { return XCTFail("Level needs an interior wall") }
+        let safeZ = wall.center.y + wall.size.y / 2 + GameSession.robotCollisionRadius + 0.03
+        game.robotPosition = [wall.center.x, 0, safeZ]
+        game.robotHeading = 0
+
+        game.setDrive(forward: 1, steering: 0)
+        game.tick(1)
+        game.stopDrive()
+
+        XCTAssertGreaterThanOrEqual(game.robotPosition.z, wall.center.y + wall.size.y / 2 + GameSession.robotCollisionRadius)
+        XCTAssertEqual(game.robotPosition.z, safeZ, accuracy: 0.001)
+    }
+
+    func testChassisCanStillUnlockAndPassThroughAProperlyAlignedDoorway() {
+        let game = GameSession(audioEnabled: false)
+        game.levelIndex = 1
+        game.begin()
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        game.collectKey()
+        guard let door = game.puzzle.door else { return XCTFail("Level 2 needs a door") }
+        let approach = door.size.x < door.size.y
+            ? SIMD3<Float>(door.center.x + 0.68, 0, door.center.y)
+            : SIMD3<Float>(door.center.x, 0, door.center.y + 0.68)
+        game.robotPosition = approach
+
+        game.tick(1.0 / 30.0)
+
+        XCTAssertTrue(game.doorOpen)
+        if door.size.x < door.size.y {
+            game.robotHeading = .pi / 2
+        } else {
+            game.robotHeading = 0
+        }
+        game.setDrive(forward: 1, steering: 0)
+        game.tick(1.6)
+        game.stopDrive()
+
+        if door.size.x < door.size.y {
+            XCTAssertLessThan(game.robotPosition.x, door.center.x - 0.6)
+        } else {
+            XCTAssertLessThan(game.robotPosition.z, door.center.y - 0.6)
+        }
+    }
+
     func testStopDriveImmediatelyClearsAStuckTurn() {
         let game = GameSession(audioEnabled: false)
         game.begin()
@@ -304,7 +368,8 @@ final class GameSessionTests: XCTestCase {
         game.saberAttack()
         XCTAssertEqual(game.enemies[spiderIndex].shields, shields)
 
-        game.robotPosition = game.enemies[spiderIndex].position + SIMD3<Float>(0, 0, 0.7)
+        game.robotPosition = [0, 0, -2.2]
+        game.enemies[spiderIndex].position = [0, 0, -3.2]
         game.robotHeading = 0
         game.saberAttack()
 
@@ -312,10 +377,47 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(game.message.contains("dual-saber"))
     }
 
+    func testWallBlocksSaberAnimationAndDamage() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        guard let wall = game.puzzle.barriers.first, let targetIndex = game.enemies.indices.first else { return XCTFail("Missing wall or target") }
+        for index in game.enemies.indices where index != targetIndex { game.enemies[index].isActive = false }
+        let clearance = GameSession.robotCollisionRadius + 0.03
+        game.robotPosition = [wall.center.x, 0, wall.center.y + wall.size.y / 2 + clearance]
+        game.robotHeading = 0
+        game.enemies[targetIndex].position = [wall.center.x, 0, wall.center.y - wall.size.y / 2 - clearance]
+        let shields = game.enemies[targetIndex].shields
+
+        game.saberAttack()
+
+        XCTAssertEqual(game.enemies[targetIndex].shields, shields)
+        XCTAssertEqual(game.saberAnimation, 0)
+        XCTAssertNil(game.saberStyle)
+        XCTAssertTrue(game.message.localizedCaseInsensitiveContains("blocked by the wall"))
+    }
+
+    func testSaberBladesStayRetractedUntilAValidAttack() {
+        let game = GameSession(audioEnabled: false)
+        let robot = RobotFactory.makeROB()
+        game.begin()
+
+        RobotFactory.applyWeapons(to: robot, session: game)
+        guard let blade = robot.findEntity(named: "Left Lightsaber") else { return XCTFail("Missing saber") }
+        XCTAssertLessThan(blade.scale.y, 0.1)
+
+        game.robotPosition = [0, 0, -2.2]
+        game.robotHeading = 0
+        game.saberAttack()
+        RobotFactory.applyWeapons(to: robot, session: game)
+
+        XCTAssertEqual(blade.scale.y, 1, accuracy: 0.001)
+    }
+
     func testThirdSaberPressTriggersSpinAndHitsBehindROB() {
         let game = GameSession(audioEnabled: false)
         game.begin()
         let index = game.enemies.startIndex
+        game.robotPosition = [0, 0, -2.2]
         game.enemies[index].position = game.robotPosition + SIMD3<Float>(0, 0, 1.25)
         let shields = game.enemies[index].shields
 
@@ -415,6 +517,7 @@ final class GameSessionTests: XCTestCase {
         let game = GameSession(audioEnabled: false)
         let robot = RobotFactory.makeROB()
         game.begin()
+        game.robotPosition = [0, 0, -2.2]
         game.saberAttack(); game.saberAttack(); game.saberAttack()
 
         RobotFactory.applyWeapons(to: robot, session: game)
