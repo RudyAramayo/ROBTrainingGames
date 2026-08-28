@@ -26,17 +26,53 @@ import UIKit
         for side: Float in [-1, 1] {
             let prefix = side < 0 ? "Left" : "Right"
             let tread = Entity(); tread.name = "\(prefix) Tri-Wheel Tread"; tread.position = [side * 0.47, 0, 0]; root.addChild(tread)
-            part("\(prefix) Lower Tread Belt", [0.22, 0.075, 0.82], [0, 0.085, 0], UIColor(white: 0.025, alpha: 1), parent: tread)
-            for end: Float in [-1, 1] {
-                let belt = part("\(prefix) Sloped Tread Belt", [0.22, 0.075, 0.43], [0, 0.28, end * 0.18], UIColor(white: 0.025, alpha: 1), parent: tread)
-                belt.orientation = simd_quatf(angle: end * 0.51, axis: [1, 0, 0])
+
+            // ROB's physical base uses a continuous cleated belt wrapped around a
+            // triangular three-wheel bogie. Build the belt from tangent rails and
+            // individual shoes so its silhouette matches the real tracked base.
+            let beltPath: [SIMD2<Float>] = [
+                [-0.51, 0.06], [0.51, 0.06], [0.43, 0.28],
+                [0.18, 0.59], [-0.18, 0.59], [-0.43, 0.28],
+            ]
+            var shoeIndex = 0
+            for segmentIndex in beltPath.indices {
+                let start = beltPath[segmentIndex]
+                let end = beltPath[(segmentIndex + 1) % beltPath.count]
+                let delta = end - start
+                let length = simd_length(delta)
+                let angle = atan2(-delta.y, delta.x)
+                let center = (start + end) / 2
+                let rail = part(
+                    "\(prefix) Track Belt Segment \(segmentIndex + 1)",
+                    [0.27, 0.07, length + 0.025],
+                    [0, center.y, center.x],
+                    UIColor(white: 0.018, alpha: 1),
+                    parent: tread
+                )
+                rail.orientation = simd_quatf(angle: angle, axis: [1, 0, 0])
+
+                let segmentShoeCount = max(1, Int((length / 0.115).rounded(.up)))
+                for offset in 0..<segmentShoeCount {
+                    shoeIndex += 1
+                    let progress = (Float(offset) + 0.5) / Float(segmentShoeCount)
+                    let point = start + delta * progress
+                    let shoe = part(
+                        "\(prefix) Tread Shoe \(shoeIndex)",
+                        [0.31, 0.1, min(0.09, length / Float(segmentShoeCount) * 0.82)],
+                        [0, point.y, point.x],
+                        UIColor(white: 0.055, alpha: 1),
+                        parent: tread
+                    )
+                    shoe.orientation = simd_quatf(angle: angle, axis: [1, 0, 0])
+                }
             }
-            let wheelLayout: [(z: Float, y: Float, radius: Float)] = [(-0.36, 0.18, 0.14), (0, 0.38, 0.16), (0.36, 0.18, 0.14)]
+
+            let wheelLayout: [(z: Float, y: Float, radius: Float)] = [(-0.35, 0.22, 0.16), (0, 0.43, 0.15), (0.35, 0.22, 0.16)]
             for (index, wheelSpec) in wheelLayout.enumerated() {
                 let wheel = Entity(); wheel.name = "\(prefix) Tri-Wheel \(index + 1)"; wheel.position = [0, wheelSpec.y, wheelSpec.z]; tread.addChild(wheel)
-                cylinder("\(prefix) Tri-Wheel Tire", radius: wheelSpec.radius, height: 0.225, position: .zero, color: UIColor(white: 0.025, alpha: 1), sideways: true, parent: wheel)
-                cylinder("\(prefix) Tri-Wheel Rim", radius: wheelSpec.radius * 0.67, height: 0.235, position: .zero, color: .darkGray, sideways: true, parent: wheel)
-                cylinder("\(prefix) Tri-Wheel Hub", radius: wheelSpec.radius * 0.25, height: 0.245, position: .zero, color: .systemOrange, sideways: true, parent: wheel)
+                cylinder("\(prefix) Tri-Wheel Tire", radius: wheelSpec.radius, height: 0.285, position: .zero, color: UIColor(white: 0.025, alpha: 1), sideways: true, parent: wheel)
+                cylinder("\(prefix) Tri-Wheel Rim", radius: wheelSpec.radius * 0.67, height: 0.3, position: .zero, color: .darkGray, sideways: true, parent: wheel)
+                cylinder("\(prefix) Tri-Wheel Hub", radius: wheelSpec.radius * 0.25, height: 0.315, position: .zero, color: .systemOrange, sideways: true, parent: wheel)
             }
         }
 

@@ -381,10 +381,22 @@ private struct WorkshopRobotPreview: View {
         ZStack {
             Ellipse().fill(.cyan.opacity(0.18)).frame(width: 280, height: 54).offset(y: 105).blur(radius: 8)
             ForEach([-1.0, 1.0], id: \.self) { side in
-                Capsule().fill(.black).frame(width: 48, height: 128).overlay(Capsule().stroke(.gray, lineWidth: 4)).offset(x: CGFloat(side * 78), y: 52)
-                ForEach([-38.0, 0, 38.0], id: \.self) { wheelY in
-                    Circle().fill(.gray).frame(width: 29, height: 29).overlay(Circle().stroke(.orange, lineWidth: 4)).offset(x: CGFloat(side * 78), y: CGFloat(52 + wheelY))
+                ZStack {
+                    TriWheelTreadShape().fill(.black)
+                    VStack(spacing: 8) {
+                        ForEach(0..<10, id: \.self) { _ in Rectangle().fill(.gray.opacity(0.72)).frame(width: 52, height: 3) }
+                    }
+                    .clipShape(TriWheelTreadShape())
+                    Circle().fill(.gray).frame(width: 27, height: 27).overlay(Circle().stroke(.orange, lineWidth: 4)).offset(y: -34)
+                    HStack(spacing: 4) {
+                        Circle().fill(.gray).frame(width: 27, height: 27).overlay(Circle().stroke(.orange, lineWidth: 4))
+                        Circle().fill(.gray).frame(width: 27, height: 27).overlay(Circle().stroke(.orange, lineWidth: 4))
+                    }
+                    .offset(y: 31)
                 }
+                .frame(width: 64, height: 126)
+                .overlay(TriWheelTreadShape().stroke(.gray, lineWidth: 3))
+                .offset(x: CGFloat(side * 86), y: 52)
                 Capsule().fill(finish).frame(width: 22, height: 108).rotationEffect(.degrees(side * -12)).offset(x: CGFloat(side * 88), y: 5)
             }
             RoundedRectangle(cornerRadius: 18).fill(finish.gradient).frame(width: 142, height: 104).overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.55), lineWidth: 2)).offset(y: 24)
@@ -440,6 +452,19 @@ private struct WorkshopRobotPreview: View {
                 RoundedRectangle(cornerRadius: 6).fill(.orange).frame(width: 67, height: 34).offset(y: -56)
             }.rotationEffect(.degrees(24)).offset(x: 118, y: -7)
         }
+    }
+}
+
+private struct TriWheelTreadShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.34))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.34))
+        path.closeSubpath()
+        return path
     }
 }
 

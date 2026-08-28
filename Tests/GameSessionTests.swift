@@ -485,7 +485,21 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNotNil(robot.findEntity(named: "Shoulder Laser Beam"))
         XCTAssertNotNil(robot.findEntity(named: "Left Tri-Wheel Tread"))
         XCTAssertNotNil(robot.findEntity(named: "Right Tri-Wheel Tread"))
-        for side in ["Left", "Right"] { for index in 1...3 { XCTAssertNotNil(robot.findEntity(named: "\(side) Tri-Wheel \(index)")) } }
+        for side in ["Left", "Right"] {
+            guard let tread = robot.findEntity(named: "\(side) Tri-Wheel Tread") else { return XCTFail("Missing \(side) tread") }
+            XCTAssertGreaterThanOrEqual(tread.children.filter { $0.name.hasPrefix("\(side) Tread Shoe ") }.count, 18)
+            for index in 1...6 { XCTAssertNotNil(robot.findEntity(named: "\(side) Track Belt Segment \(index)")) }
+            for index in 1...3 { XCTAssertNotNil(robot.findEntity(named: "\(side) Tri-Wheel \(index)")) }
+            guard
+                let frontWheel = robot.findEntity(named: "\(side) Tri-Wheel 1"),
+                let raisedWheel = robot.findEntity(named: "\(side) Tri-Wheel 2"),
+                let rearWheel = robot.findEntity(named: "\(side) Tri-Wheel 3")
+            else { return XCTFail("Missing \(side) tri-wheel bogie") }
+            XCTAssertGreaterThan(raisedWheel.position.y, frontWheel.position.y)
+            XCTAssertEqual(frontWheel.position.y, rearWheel.position.y, accuracy: 0.001)
+            XCTAssertLessThan(frontWheel.position.z, raisedWheel.position.z)
+            XCTAssertGreaterThan(rearWheel.position.z, raisedWheel.position.z)
+        }
 
         game.begin()
         RobotFactory.applyWeapons(to: robot, session: game)

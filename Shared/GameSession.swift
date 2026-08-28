@@ -172,7 +172,7 @@ struct PuzzleGeometry: Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let robotCollisionRadius: Float = 0.55
+    static let robotCollisionRadius: Float = 0.62
     let maxHealth = 100
     let levels = [
         ROBLevel(id: 1, name: "Calibration Deck", lesson: "Arrow controls mix forward speed and steering into two tread demands.", cellCount: 3, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 900, requiresKey: false, challenge: "Learn smooth turns, evade three active enemies, collect three cells, and reach the dock."),
