@@ -130,6 +130,7 @@ final class GameSession {
     private(set) var isChargingLaser = false
     private(set) var laserShotCharge = 0.0
     private(set) var laserShotHeading: Float = 0
+    private var laserShotOrigin = SIMD2<Float>.zero
     private(set) var lockedEnemyID: Int?
     var selectedComponent: ROBComponent?
     var message = "ROB systems ready."
@@ -188,7 +189,8 @@ final class GameSession {
             PuzzleBarrier(center: [door.center.x, (far + half) / 2], size: [0.24, half - far]),
             PuzzleBarrier(center: [-2.0, -2.2], size: [2.8, 0.24]),
         ]
-        return PuzzleGeometry(arenaHalfExtent: half, key: [-margin, margin], door: door, barriers: walls, cells: cells.map { SIMD2<Float>($0.x > 0 ? $0.x : abs($0.x) + 0.6, $0.y) }, dock: [margin, -margin])
+        let key: SIMD2<Float> = level.id == 2 ? [-2.6, 2.8] : [-margin, margin]
+        return PuzzleGeometry(arenaHalfExtent: half, key: key, door: door, barriers: walls, cells: cells.map { SIMD2<Float>($0.x > 0 ? $0.x : abs($0.x) + 0.6, $0.y) }, dock: [margin, -margin])
     }
 
     private func report(_ situation: String) { lastSituation = situation; situationCount += 1 }
@@ -215,7 +217,7 @@ final class GameSession {
     private func configureLevel() {
         elapsed = 0; collectedCells = 0
         hasKey = false; doorOpen = !level.requiresKey; collectedCellIndices = []; saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
-        laserDistance = nil; laserCharge = 0; laserShotCharge = 0; isChargingLaser = false; lockedEnemyID = nil
+        laserDistance = nil; laserCharge = 0; laserShotCharge = 0; laserShotOrigin = .zero; isChargingLaser = false; lockedEnemyID = nil
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
         robotPosition = SIMD3<Float>(0, 0, puzzle.arenaHalfExtent - 0.8); robotHeading = 0; leftWheelAngle = 0; rightWheelAngle = 0
         enemyBolts = []; nextBoltID = 0; wasAtDock = false; enemies = configuredEnemies()
@@ -262,15 +264,120 @@ final class GameSession {
             if saberAnimation == 0 { saberStyle = nil }
         }
         if isChargingLaser { laserCharge = min(1, laserCharge + delta / 1.25) }
-        if let distance = laserDistance {
-            let next = distance + Float(delta) * (5.5 + Float(laserShotCharge) * 3.5)
-            laserDistance = next > puzzle.arenaHalfExtent * 2.2 ? nil : next
-        }
+        updateLaserProjectile(delta)
         updateEnemies(delta)
         updateLaserLock()
     }
     private static func intersects(_ position: SIMD3<Float>, barrier: PuzzleBarrier, radius: Float = 0.32) -> Bool {
         abs(position.x - barrier.center.x) < barrier.size.x / 2 + radius && abs(position.z - barrier.center.y) < barrier.size.y / 2 + radius
+    }
+    private var projectileBlockers: [PuzzleBarrier] {
+        let half = puzzle.arenaHalfExtent
+        let perimeter = [
+            PuzzleBarrier(center: [0, -half], size: [half * 2, 0.18]),
+            PuzzleBarrier(center: [0, half], size: [half * 2, 0.18]),
+            PuzzleBarrier(center: [-half, 0], size: [0.18, half * 2]),
+            PuzzleBarrier(center: [half, 0], size: [0.18, half * 2]),
+        ]
+        return puzzle.barriers + perimeter + ((!doorOpen && puzzle.door != nil) ? [puzzle.door!] : [])
+    }
+    private static func segmentHitFraction(
+        from start: SIMD2<Float>,
+        to end: SIMD2<Float>,
+        barrier: PuzzleBarrier,
+        padding: Float
+    ) -> Float? {
+        let delta = end - start
+        let minimum = barrier.center - barrier.size / 2 - SIMD2<Float>(repeating: padding)
+        let maximum = barrier.center + barrier.size / 2 + SIMD2<Float>(repeating: padding)
+        var entry: Float = 0
+        var exit: Float = 1
+
+        for axis in 0..<2 {
+            if abs(delta[axis]) < 0.000_001 {
+                guard start[axis] >= minimum[axis], start[axis] <= maximum[axis] else { return nil }
+                continue
+            }
+            let first = (minimum[axis] - start[axis]) / delta[axis]
+            let second = (maximum[axis] - start[axis]) / delta[axis]
+            entry = max(entry, min(first, second))
+            exit = min(exit, max(first, second))
+            if entry > exit { return nil }
+        }
+        return entry
+    }
+    private static func segmentHitFraction(
+        from start: SIMD2<Float>,
+        to end: SIMD2<Float>,
+        center: SIMD2<Float>,
+        radius: Float
+    ) -> Float? {
+        let delta = end - start
+        let offset = start - center
+        let a = simd_dot(delta, delta)
+        guard a > 0.000_001 else { return simd_length_squared(offset) <= radius * radius ? 0 : nil }
+        let c = simd_dot(offset, offset) - radius * radius
+        if c <= 0 { return 0 }
+        let b = 2 * simd_dot(offset, delta)
+        let discriminant = b * b - 4 * a * c
+        guard discriminant >= 0 else { return nil }
+        let root = sqrt(discriminant)
+        let first = (-b - root) / (2 * a)
+        let second = (-b + root) / (2 * a)
+        if (0...1).contains(first) { return first }
+        if (0...1).contains(second) { return second }
+        return nil
+    }
+    private func updateLaserProjectile(_ delta: TimeInterval) {
+        guard let distance = laserDistance else { return }
+        let maximumDistance = puzzle.arenaHalfExtent * 2.2
+        let nextDistance = min(maximumDistance, distance + Float(delta) * (5.5 + Float(laserShotCharge) * 3.5))
+        let direction = SIMD2<Float>(-sin(laserShotHeading), -cos(laserShotHeading))
+        let start = laserShotOrigin + direction * distance
+        let end = laserShotOrigin + direction * nextDistance
+
+        enum Impact {
+            case barrier
+            case enemy(Int)
+        }
+        var nearestImpact: (fraction: Float, impact: Impact)?
+        for blocker in projectileBlockers {
+            guard let fraction = Self.segmentHitFraction(from: start, to: end, barrier: blocker, padding: 0.07) else { continue }
+            if nearestImpact.map({ fraction < $0.fraction }) ?? true {
+                nearestImpact = (fraction, .barrier)
+            }
+        }
+        for index in enemies.indices where enemies[index].isActive {
+            let enemy = enemies[index]
+            let radius: Float = enemy.kind == .spider ? 0.34 : 0.4
+            guard let fraction = Self.segmentHitFraction(
+                from: start,
+                to: end,
+                center: [enemy.position.x, enemy.position.z],
+                radius: radius
+            ) else { continue }
+            if nearestImpact.map({ fraction < $0.fraction }) ?? true {
+                nearestImpact = (fraction, .enemy(index))
+            }
+        }
+
+        if let nearestImpact {
+            laserDistance = nil
+            switch nearestImpact.impact {
+            case .barrier:
+                message = "Shoulder laser struck the wall. Reposition for a clear shot."
+                report(message)
+            case let .enemy(index):
+                let damage = 1 + Int(floor(laserShotCharge * 2.1))
+                damageEnemy(
+                    at: index,
+                    weapon: laserShotCharge > 0.72 ? "charged shoulder laser" : "shoulder laser",
+                    amount: damage
+                )
+            }
+        } else {
+            laserDistance = nextDistance >= maximumDistance ? nil : nextDistance
+        }
     }
     private func moveEnemy(_ enemy: inout TrainingEnemy, toward target: SIMD3<Float>, speed: Float, delta: TimeInterval) {
         var direction = target - enemy.position; direction.y = 0
@@ -401,12 +508,14 @@ final class GameSession {
     private func fireLaser(charge: Double) {
         guard isRunning, laserDistance == nil else { return }
         updateLaserLock()
-        guard let targetID = lockedEnemyID, let index = enemies.firstIndex(where: { $0.id == targetID && $0.isActive }), let heading = laserLockHeading else {
+        guard let targetID = lockedEnemyID, enemies.contains(where: { $0.id == targetID && $0.isActive }), let heading = laserLockHeading else {
             message = "Shoulder gatling still scanning. Turn or move closer until the lock indicator turns red."; report(message); return
         }
-        let clampedCharge = min(1, max(0, charge)), damage = 1 + Int(floor(clampedCharge * 2.1))
-        laserShotCharge = clampedCharge; laserShotHeading = heading; laserDistance = 0.55
-        damageEnemy(at: index, weapon: clampedCharge > 0.72 ? "charged shoulder laser" : "shoulder laser", amount: damage)
+        let clampedCharge = min(1, max(0, charge))
+        laserShotCharge = clampedCharge; laserShotHeading = heading
+        laserShotOrigin = [robotPosition.x, robotPosition.z]; laserDistance = 0.55
+        message = "Shoulder laser fired."
+        report(message)
         if audioEnabled { SoundPlayer.shared.playLaser(charge: clampedCharge) }
     }
     func saberAttack() {

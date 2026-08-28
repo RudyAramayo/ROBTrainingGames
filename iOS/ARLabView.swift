@@ -175,8 +175,7 @@ struct ROBARView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> ARView {
-        let view = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false)
-        view.environment.background = .cameraFeed(exposureCompensation: 0.35)
+        let view = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: true)
         view.renderOptions.formUnion([.disableGroundingShadows, .disableMotionBlur, .disableDepthOfField])
         view.environment.sceneUnderstanding.options.remove(.occlusion)
 
@@ -190,7 +189,7 @@ struct ROBARView: UIViewRepresentable {
         view.installGestures([.translation, .rotation, .scale], for: rob)
 
         context.coordinator.robot = rob
-        context.coordinator.setSessionActive(isActive, in: view)
+        context.coordinator.adoptAutomaticallyConfiguredSession(isActive: isActive, in: view)
         return view
     }
 
@@ -233,10 +232,15 @@ struct ROBARView: UIViewRepresentable {
         var robot: Entity?
         private var sessionIsRunning = false
 
+        func adoptAutomaticallyConfiguredSession(isActive: Bool, in view: ARView) {
+            sessionIsRunning = isActive
+            if !isActive { view.session.pause() }
+        }
+
         func setSessionActive(_ active: Bool, in view: ARView) {
             guard active != sessionIsRunning else { return }
             if active {
-                view.session.run(ROBARView.makeConfiguration(), options: [.resetTracking, .removeExistingAnchors])
+                view.session.run(ROBARView.makeConfiguration())
             } else {
                 view.session.pause()
             }

@@ -58,6 +58,30 @@ final class GameSessionTests: XCTestCase {
         XCTAssertFalse(game.message.localizedCaseInsensitiveContains("key"))
     }
 
+    func testLevelTwoHasAVisibleReachableKeyOnTheStartingSide() {
+        let game = GameSession(audioEnabled: false)
+        game.levelIndex = 1
+        game.begin()
+
+        guard let key = game.puzzle.key, let door = game.puzzle.door else {
+            return XCTFail("Level 2 must provide both a key and a locked door")
+        }
+        XCTAssertLessThan(key.x, door.center.x)
+        XCTAssertLessThan(abs(key.x), game.puzzle.arenaHalfExtent - 0.35)
+        XCTAssertLessThan(abs(key.y), game.puzzle.arenaHalfExtent - 0.35)
+
+        let room = RobotFactory.makeTrainingRoom(level: game.levelIndex, puzzle: game.puzzle)
+        guard let renderedKey = room.findEntity(named: "Puzzle Key") else {
+            return XCTFail("Level 2 did not render its key")
+        }
+        XCTAssertNotNil(renderedKey.findEntity(named: "Puzzle Key Beacon"))
+        XCTAssertGreaterThan(renderedKey.children.count, 3)
+
+        game.robotPosition = [key.x, 0, key.y]
+        game.tick(1.0 / 30.0)
+        XCTAssertTrue(game.hasKey)
+    }
+
     func testVoiceRejectsInvalidMicrophoneFormatsBeforeInstallingATap() {
         XCTAssertFalse(RobotVoice.isUsableInputFormat(sampleRate: 0, channelCount: 1))
         XCTAssertFalse(RobotVoice.isUsableInputFormat(sampleRate: 48_000, channelCount: 0))
@@ -237,7 +261,9 @@ final class GameSessionTests: XCTestCase {
     func testShoulderLaserLocksAndChargedShotDealsMoreDamage() {
         let game = GameSession(audioEnabled: false)
         game.begin()
-        guard let targetID = game.lockedEnemyID, let targetIndex = game.enemies.firstIndex(where: { $0.id == targetID }) else { return XCTFail("Shoulder laser did not acquire a target") }
+        guard let targetIndex = game.enemies.indices.first else { return XCTFail("Missing training target") }
+        for index in game.enemies.indices where index != targetIndex { game.enemies[index].isActive = false }
+        game.enemies[targetIndex].position = game.robotPosition + SIMD3<Float>(0, 0, -1.7)
         let shields = game.enemies[targetIndex].shields
 
         game.beginLaserCharge()
@@ -246,8 +272,33 @@ final class GameSessionTests: XCTestCase {
 
         XCTAssertFalse(game.isChargingLaser)
         XCTAssertGreaterThan(game.laserShotCharge, 0.7)
-        XCTAssertLessThanOrEqual(game.enemies[targetIndex].shields, shields - 2)
+        XCTAssertEqual(game.enemies[targetIndex].shields, shields, "Firing should not damage a target before the projectile arrives")
         XCTAssertNotNil(game.laserDistance)
+
+        for _ in 0..<60 where game.laserDistance != nil { game.tick(1.0 / 60.0) }
+
+        XCTAssertLessThanOrEqual(game.enemies[targetIndex].shields, shields - 2)
+        XCTAssertNil(game.laserDistance)
+    }
+
+    func testShoulderLaserStopsAtAWallBeforeDamagingAnEnemy() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        guard let targetIndex = game.enemies.indices.first else { return XCTFail("Missing training target") }
+        for index in game.enemies.indices where index != targetIndex { game.enemies[index].isActive = false }
+        game.robotPosition = [0, 0, 2.8]
+        game.enemies[targetIndex].position = [0, 0, 0.8]
+        let shields = game.enemies[targetIndex].shields
+
+        game.fireLaser()
+        XCTAssertNotNil(game.laserDistance)
+        XCTAssertEqual(game.enemies[targetIndex].shields, shields)
+
+        game.tick(0.5)
+
+        XCTAssertNil(game.laserDistance)
+        XCTAssertEqual(game.enemies[targetIndex].shields, shields)
+        XCTAssertTrue(game.message.localizedCaseInsensitiveContains("wall"))
     }
 
     func testROBGeometryContainsSwingingArmsAndShoulderGatling() {
