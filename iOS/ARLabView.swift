@@ -73,6 +73,11 @@ struct ARLabView: View {
             .padding(10)
             .background(.ultraThinMaterial, in: Capsule())
 
+            CombatHealthBars(session: session, compact: true)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+
             Text(componentMode ? "Tap a ROB part, then use the guide below." : "Move the phone to find a surface · drag ROB to reposition")
                 .font(.callout.bold())
                 .padding(10)

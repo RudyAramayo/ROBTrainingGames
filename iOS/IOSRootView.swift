@@ -46,7 +46,13 @@ struct MissionView: View {
                     if compactPhoneLayout {
                         CompactMissionStats(session: session).padding(.horizontal, 8)
                     } else {
-                        HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Spacer(); MissionKeyStatus(session: session); Text("Cells \(session.collectedCells)/\(session.level.cellCount)").monospacedDigit(); Text("Targets \(session.remainingEnemies)").monospacedDigit(); Text("Score \(session.score)").monospacedDigit(); Text("Best \(highScore)").foregroundStyle(.cyan).monospacedDigit() }.font(.headline).padding(10).background(.ultraThinMaterial, in: Capsule()).padding(.horizontal)
+                        VStack(spacing: 7) {
+                            HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Spacer(); MissionKeyStatus(session: session); Text("Cells \(session.collectedCells)/\(session.level.cellCount)").monospacedDigit(); Text("Targets \(session.remainingEnemies)").monospacedDigit(); Text("Score \(session.score)").monospacedDigit(); Text("Best \(highScore)").foregroundStyle(.cyan).monospacedDigit() }.font(.headline)
+                            CombatHealthBars(session: session).frame(maxWidth: 460)
+                        }
+                        .padding(10)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                        .padding(.horizontal)
                     }
                     Spacer()
                     Text(session.message).font(.subheadline.bold()).lineLimit(compactPhoneLayout ? 1 : 2).padding(.horizontal, 14).padding(.vertical, 8).background(.black.opacity(0.65), in: Capsule())
@@ -102,6 +108,7 @@ private struct CompactMissionStats: View {
             }
             .font(.caption.bold())
             .monospacedDigit()
+            CombatHealthBars(session: session, compact: true)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

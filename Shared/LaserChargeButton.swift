@@ -1,5 +1,58 @@
 import SwiftUI
 
+struct CombatHealthBars: View {
+    @Bindable var session: GameSession
+    var compact = false
+
+    var body: some View {
+        VStack(spacing: compact ? 4 : 6) {
+            meter(
+                title: "ROB HEALTH",
+                value: session.health,
+                maximum: session.maxHealth,
+                color: healthColor,
+                icon: "heart.fill"
+            )
+            if let boss = session.activeBoss {
+                meter(
+                    title: "BOSS SHIELDS",
+                    value: max(0, boss.shields),
+                    maximum: boss.maxShields,
+                    color: .red,
+                    icon: "shield.lefthalf.filled"
+                )
+            }
+        }
+        .monospacedDigit()
+    }
+
+    private func meter(title: String, value: Int, maximum: Int, color: Color, icon: String) -> some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                Text(title)
+                Spacer(minLength: 4)
+                Text("\(value)/\(maximum)")
+            }
+            .font(compact ? .caption2.bold() : .caption.bold())
+            .foregroundStyle(color)
+            ProgressView(value: Double(value), total: Double(maximum))
+                .progressViewStyle(.linear)
+                .tint(color)
+                .accessibilityLabel(title)
+                .accessibilityValue("\(value) of \(maximum)")
+        }
+    }
+
+    private var healthColor: Color {
+        switch session.healthFraction {
+        case ..<0.25: .red
+        case ..<0.55: .orange
+        default: .green
+        }
+    }
+}
+
 struct LaserChargeButton: View {
     @Bindable var session: GameSession
     var title = "Shoulder laser"

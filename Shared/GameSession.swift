@@ -33,20 +33,29 @@ enum SpiderSoundCue: Sendable {
 struct TrainingEnemy: Identifiable, Sendable {
     let id: Int
     let kind: TrainingEnemyKind
+    let isBoss: Bool
     var position: SIMD3<Float>
     let origin: SIMD3<Float>
     var heading: Float = 0
     var shields: Int
+    let maxShields: Int
     var isActive = true
     var nextAttack: TimeInterval
     var nextSkitterSound: TimeInterval = 0
     var lungeRemaining = 0.0
+
+    var displayName: String { isBoss ? "Boss \(kind.displayName)" : kind.displayName }
+    var contactDamage: Int { isBoss ? 10 : (kind == .spider ? 6 : 5) }
+    var projectileDamage: Int { isBoss ? 10 : 4 }
 }
 
 struct TrainingEnemyBolt: Identifiable, Sendable {
     let id: Int
     var position: SIMD3<Float>
     let velocity: SIMD3<Float>
+    let damage: Int
+    let sourceName: String
+    let isBoss: Bool
 }
 
 enum SaberAttackStyle: Sendable, Equatable {
@@ -163,6 +172,7 @@ struct PuzzleGeometry: Sendable {
 
 @MainActor @Observable
 final class GameSession {
+    let maxHealth = 100
     let levels = [
         ROBLevel(id: 1, name: "Calibration Deck", lesson: "Arrow controls mix forward speed and steering into two tread demands.", cellCount: 3, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 900, requiresKey: false, challenge: "Learn smooth turns, evade three active enemies, collect three cells, and reach the dock."),
         ROBLevel(id: 2, name: "Key Workshop", lesson: "A key changes the state of a matching locked door.", cellCount: 3, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 1_100, requiresKey: true, challenge: "Find the cyan key while a three-robot patrol guards the workshop door."),
@@ -190,6 +200,7 @@ final class GameSession {
     ]
     var levelIndex = 0
     var score = 0
+    private(set) var health = 100
     var collectedCells = 0
     var enemies: [TrainingEnemy] = []
     var enemyBolts: [TrainingEnemyBolt] = []
@@ -230,12 +241,15 @@ final class GameSession {
     private(set) var meleeWeapon: ROBMeleeWeapon = .dualSabers
     private var nextBoltID = 0
     private var wasAtDock = false
+    private var damageInvulnerabilityRemaining = 0.0
     private let audioEnabled: Bool
     private let progressStore: UserDefaults?
     var level: ROBLevel { levels[levelIndex] }
     var remainingEnemies: Int { enemies.filter(\.isActive).count }
     var lockedEnemy: TrainingEnemy? { enemies.first(where: { $0.id == lockedEnemyID && $0.isActive }) }
-    var laserLockDescription: String { lockedEnemy.map { "LOCK: \($0.kind.displayName.uppercased())" } ?? "SCANNING" }
+    var activeBoss: TrainingEnemy? { enemies.first(where: { $0.isBoss && $0.isActive }) }
+    var healthFraction: Double { Double(health) / Double(maxHealth) }
+    var laserLockDescription: String { lockedEnemy.map { "LOCK: \($0.displayName.uppercased())" } ?? "SCANNING" }
     var laserLockHeading: Float? {
         guard let target = lockedEnemy else { return nil }
         return atan2(-(target.position.x - robotPosition.x), -(target.position.z - robotPosition.z))
@@ -337,7 +351,9 @@ final class GameSession {
         let spawns = available.isEmpty ? candidates : available
         return level.enemyKinds.enumerated().map { index, kind in
             let origin = spawns[index % spawns.count]
-            return TrainingEnemy(id: index, kind: kind, position: origin, origin: origin, shields: level.enemyShields, nextAttack: 1.6 + Double(index) * 0.65, nextSkitterSound: 0.8 + Double(index) * 0.38)
+            let isBoss = level.id.isMultiple(of: 5) && index == 0
+            let shields = isBoss ? max(10, level.enemyShields * 3) : level.enemyShields
+            return TrainingEnemy(id: index, kind: kind, isBoss: isBoss, position: origin, origin: origin, shields: shields, maxShields: shields, nextAttack: 1.6 + Double(index) * 0.65, nextSkitterSound: 0.8 + Double(index) * 0.38)
         }
     }
     private func configureLevel() {
@@ -349,7 +365,7 @@ final class GameSession {
         enemyBolts = []; nextBoltID = 0; wasAtDock = false; enemies = configuredEnemies()
         updateLaserLock()
     }
-    func begin() { enemyAttackCount = 0; configureLevel(); isRunning = true; if audioEnabled && musicEnabled { TechnoMusicEngine.shared.start(level: levelIndex) }; message = "Level \(level.id): \(level.challenge)"; report("The pilot started \(level.name). \(level.challenge)"); play("mission-start") }
+    func begin() { enemyAttackCount = 0; health = maxHealth; damageInvulnerabilityRemaining = 0; configureLevel(); isRunning = true; if audioEnabled && musicEnabled { TechnoMusicEngine.shared.start(level: levelIndex) }; message = "Level \(level.id): \(level.challenge)"; report("The pilot started \(level.name). \(level.challenge)"); play("mission-start") }
     func toggleMusic() { musicEnabled.toggle(); guard audioEnabled else { return }; if musicEnabled && isRunning { TechnoMusicEngine.shared.start(level: levelIndex) } else { TechnoMusicEngine.shared.stop() } }
     func setDrive(forward: Double, steering: Double) { forwardDemand = forward; steeringDemand = steering }
     func setTreads(left: Double, right: Double) {
@@ -368,6 +384,7 @@ final class GameSession {
     func tick(_ delta: TimeInterval) {
         guard isRunning else { return }
         elapsed += delta
+        damageInvulnerabilityRemaining = max(0, damageInvulnerabilityRemaining - delta)
         let targetLeft = max(-1, min(1, forwardDemand - steeringDemand * 0.72))
         let targetRight = max(-1, min(1, forwardDemand + steeringDemand * 0.72))
         let smoothing = min(1, delta * 8)
@@ -480,7 +497,7 @@ final class GameSession {
         }
         for index in enemies.indices where enemies[index].isActive {
             let enemy = enemies[index]
-            let radius: Float = enemy.kind == .spider ? 0.34 : 0.4
+            let radius: Float = (enemy.kind == .spider ? 0.34 : 0.4) * (enemy.isBoss ? 1.35 : 1)
             guard let fraction = Self.segmentHitFraction(
                 from: start,
                 to: end,
@@ -558,9 +575,10 @@ final class GameSession {
             }
             let facing = robotPosition - enemy.position; enemy.heading = atan2(-facing.x, -facing.z)
             moveEnemy(&enemy, toward: target, speed: speed, delta: delta); enemies[index] = enemy
-            if simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(enemy.position.x, enemy.position.z)) < (enemy.kind == .spider ? 0.5 : 0.44) {
+            let contactRadius: Float = (enemy.kind == .spider ? 0.5 : 0.44) * (enemy.isBoss ? 1.35 : 1)
+            if simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(enemy.position.x, enemy.position.z)) < contactRadius {
                 if enemy.kind == .spider { playSpider(.impact) } else { playEnemyAttack(.fax) }
-                enemyContact(enemy.kind == .spider ? "Spider bot lunge" : "Dalek-style sentry collision"); return
+                if enemyContact(enemy.kind == .spider ? "\(enemy.displayName) lunge" : "\(enemy.displayName) collision", damage: enemy.contactDamage) { return }
             }
         }
         var survivingBolts: [TrainingEnemyBolt] = []
@@ -568,7 +586,10 @@ final class GameSession {
         for var bolt in enemyBolts {
             bolt.position += bolt.velocity * Float(delta)
             if simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(bolt.position.x, bolt.position.z)) < 0.32 {
-                playEnemyAttack(.fax); enemyContact("Dalek-style sentry laser"); return
+                playEnemyAttack(.fax)
+                enemyBolts = survivingBolts
+                enemyContact(bolt.sourceName, damage: bolt.damage)
+                return
             }
             let outside = abs(bolt.position.x) > puzzle.arenaHalfExtent || abs(bolt.position.z) > puzzle.arenaHalfExtent
             if !outside && !blockers.contains(where: { Self.intersects(bolt.position, barrier: $0, radius: 0.04) }) { survivingBolts.append(bolt) }
@@ -579,7 +600,7 @@ final class GameSession {
         var direction = robotPosition - enemy.position; direction.y = 0
         guard simd_length_squared(direction) > 0.001 else { return }
         direction = simd_normalize(direction)
-        enemyBolts.append(TrainingEnemyBolt(id: nextBoltID, position: enemy.position + direction * 0.38 + SIMD3<Float>(0, 0.55, 0), velocity: direction * (2.45 + Float(levelIndex) * 0.06)))
+        enemyBolts.append(TrainingEnemyBolt(id: nextBoltID, position: enemy.position + direction * 0.38 + SIMD3<Float>(0, 0.55, 0), velocity: direction * (2.45 + Float(levelIndex) * 0.06), damage: enemy.projectileDamage, sourceName: "\(enemy.displayName) laser", isBoss: enemy.isBoss))
         nextBoltID += 1
     }
     private func resolveSpatialObjectives() {
@@ -622,11 +643,12 @@ final class GameSession {
         enemies[index].shields -= amount; score += 50 * amount
         if enemies[index].kind == .spider { playSpider(enemies[index].shields <= 0 ? .shutdown : .impact) }
         if enemies[index].shields <= 0 {
-            let kind = enemies[index].kind; enemies[index].isActive = false; score += 300
+            let kind = enemies[index].kind, name = enemies[index].displayName, wasBoss = enemies[index].isBoss
+            enemies[index].isActive = false; score += wasBoss ? 1_000 : 300
             if kind == .fax { playEnemyAttack(kind) }
-            message = "\(kind.displayName) disabled by \(weapon). \(remainingEnemies) targets remain."
+            message = "\(name) disabled by \(weapon). \(remainingEnemies) targets remain."
         } else {
-            message = "\(enemies[index].kind.displayName) hit by \(weapon) — \(enemies[index].shields) shields remain."
+            message = "\(enemies[index].displayName) hit by \(weapon) — \(enemies[index].shields) shields remain."
         }
         report(message)
         updateLaserLock()
@@ -697,7 +719,25 @@ final class GameSession {
     func collectCell() { guard isRunning, collectedCells < level.cellCount else { return }; collectedCells += 1; score += 150; message = "Energy cell \(collectedCells) of \(level.cellCount)."; report(message); play("pickup") }
     func collectKey() { guard isRunning, level.requiresKey, !hasKey else { return }; hasKey = true; score += 250; message = "Key secured. Bring it to the locked door."; report(message); play("pickup") }
     func openDoor() { guard isRunning, level.requiresKey, !doorOpen else { return }; guard hasKey else { message = "The door is locked. Find the key first."; return }; doorOpen = true; score += 300; message = "Key accepted. Door open."; report(message); play("pickup") }
-    func enemyContact(_ attack: String = "Enemy contact") { guard isRunning else { return }; score = max(0, score - 200); configureLevel(); isRunning = true; message = "\(attack) damaged ROB. Restarting level \(level.id)."; report(message) }
+    @discardableResult
+    func enemyContact(_ attack: String = "Enemy contact", damage: Int = 5) -> Bool {
+        guard isRunning, damageInvulnerabilityRemaining <= 0 else { return false }
+        let appliedDamage = max(0, damage)
+        health = max(0, health - appliedDamage)
+        score = max(0, score - appliedDamage * 20)
+        damageInvulnerabilityRemaining = 0.75
+        if health == 0 {
+            configureLevel()
+            health = maxHealth
+            damageInvulnerabilityRemaining = 1
+            isRunning = true
+            message = "ROB was disabled by \(attack). Restarting level \(level.id) with full health."
+        } else {
+            message = "\(attack) dealt \(appliedDamage) damage. ROB health: \(health)/\(maxHealth)."
+        }
+        report(message)
+        return true
+    }
     func nextLevel() {
         guard canFinish else { message = "Finish every objective before leaving the level."; return }
         let completedLevel = level.id
@@ -719,7 +759,7 @@ final class GameSession {
         if levelIndex < levels.count - 1 {
             levelIndex += 1
             if audioEnabled { TechnoMusicEngine.shared.setLevel(levelIndex) }
-            enemyAttackCount = 0; configureLevel(); isRunning = true
+            enemyAttackCount = 0; health = maxHealth; damageInvulnerabilityRemaining = 0; configureLevel(); isRunning = true
             message = [reward, level.challenge].compactMap { $0 }.joined(separator: " ")
             report("ROB advanced to \(level.name). \(message)")
         } else {
@@ -730,5 +770,5 @@ final class GameSession {
         }
         play("level-complete")
     }
-    func reset() { levelIndex = 0; score = 0; enemyAttackCount = 0; configureLevel(); isRunning = false; if audioEnabled { TechnoMusicEngine.shared.stop() }; message = "ROB systems ready." }
+    func reset() { levelIndex = 0; score = 0; health = maxHealth; damageInvulnerabilityRemaining = 0; enemyAttackCount = 0; configureLevel(); isRunning = false; if audioEnabled { TechnoMusicEngine.shared.stop() }; message = "ROB systems ready." }
 }

@@ -206,7 +206,8 @@ final class RobotVoice {
 
     private func respond(to prompt: String, game: GameSession) async {
         isThinking = true; status = "ROB is thinking on device…"
-        let context = "Level \(game.level.id), \(game.level.name); score \(game.score); cells \(game.collectedCells)/\(game.level.cellCount); training enemies remaining \(game.remainingEnemies)."
+        let bossContext = game.activeBoss.map { "; boss shields \($0.shields)/\($0.maxShields)" } ?? ""
+        let context = "Level \(game.level.id), \(game.level.name); ROB health \(game.health)/\(game.maxHealth); score \(game.score); cells \(game.collectedCells)/\(game.level.cellCount); training enemies remaining \(game.remainingEnemies)\(bossContext)."
         do {
             if #available(iOS 26.0, visionOS 26.0, *) {
                 guard SystemLanguageModel.default.isAvailable else { throw RobotVoiceError.modelUnavailable }

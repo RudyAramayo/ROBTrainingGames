@@ -142,6 +142,70 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(game.isRunning)
     }
 
+    func testRegularDamageReducesHealthWithoutRestartingMissionProgress() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        game.collectedCells = 1
+        let enemyShields = game.enemies.map(\.shields)
+
+        XCTAssertTrue(game.enemyContact("Spider bot lunge", damage: 6))
+
+        XCTAssertEqual(game.health, 94)
+        XCTAssertEqual(game.collectedCells, 1)
+        XCTAssertEqual(game.enemies.map(\.shields), enemyShields)
+        XCTAssertTrue(game.isRunning)
+        XCTAssertTrue(game.message.contains("6 damage"))
+        XCTAssertFalse(game.enemyContact("Overlapping collision", damage: 6), "The hit cooldown should prevent damage every rendered frame")
+        XCTAssertEqual(game.health, 94)
+    }
+
+    func testDepletedHealthRestartsOnlyTheCurrentLevel() {
+        let game = GameSession(audioEnabled: false)
+        game.levelIndex = 2
+        game.begin()
+        game.collectedCells = 2
+
+        game.enemyContact("Critical hit", damage: game.maxHealth)
+
+        XCTAssertEqual(game.level.id, 3)
+        XCTAssertEqual(game.health, game.maxHealth)
+        XCTAssertEqual(game.collectedCells, 0)
+        XCTAssertTrue(game.isRunning)
+        XCTAssertTrue(game.message.contains("Restarting level 3"))
+    }
+
+    func testEveryFifthLevelHasAReinforcedBossThatDealsTenDamage() {
+        let game = GameSession(audioEnabled: false)
+        XCTAssertNil(game.activeBoss)
+        for levelIndex in [4, 9, 14] {
+            game.levelIndex = levelIndex
+            game.begin()
+            guard let boss = game.activeBoss else { return XCTFail("Level \(levelIndex + 1) needs a boss") }
+            XCTAssertTrue(boss.isBoss)
+            XCTAssertGreaterThanOrEqual(boss.maxShields, 10)
+            XCTAssertEqual(boss.shields, boss.maxShields)
+            XCTAssertEqual(boss.contactDamage, 10)
+            XCTAssertEqual(boss.projectileDamage, 10)
+        }
+
+        guard let boss = game.activeBoss else { return XCTFail("Level 15 needs a boss") }
+        game.enemyContact(boss.displayName, damage: boss.contactDamage)
+        XCTAssertEqual(game.health, 90)
+    }
+
+    func testBossHasDistinctLargerGeometryAndShieldCore() {
+        let game = GameSession(audioEnabled: false)
+        game.levelIndex = 4
+        game.begin()
+        guard let boss = game.activeBoss else { return XCTFail("Level 5 needs a boss") }
+        let layer = RobotFactory.makeCombatLayer(session: game)
+        guard let entity = layer.findEntity(named: "Training Enemy \(boss.id)") else { return XCTFail("Missing boss model") }
+
+        XCTAssertGreaterThan(entity.scale.x, 1.3)
+        XCTAssertNotNil(entity.findEntity(named: "Boss Core"))
+        XCTAssertNotNil(entity.findEntity(named: "Boss Beacon"))
+    }
+
     func testDriveInputMovesROBAndStopClearsDemand() {
         let game = GameSession(audioEnabled: false)
         game.begin()

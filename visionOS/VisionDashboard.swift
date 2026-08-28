@@ -15,6 +15,7 @@ struct VisionDashboard: View {
                 Image("rob-training-key-art").resizable().scaledToFit().frame(maxHeight: 310).clipShape(RoundedRectangle(cornerRadius: 24))
                 Text("ROB Spatial Workshop").font(.largeTitle.bold()); Text("Place ROB at full scale, evade patrolling spider and sentry robots, complete missions, and reveal the systems inside.").multilineTextAlignment(.center).foregroundStyle(.secondary)
                 HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Label("Score \(session.score)", systemImage: "star.fill"); Label("Targets \(session.remainingEnemies)", systemImage: "scope"); Label(session.hasKey ? "Key secured" : "Find key", systemImage: session.hasKey ? "key.fill" : "key") }.monospacedDigit()
+                CombatHealthBars(session: session).frame(width: 420)
                 Text("Keyboard: WASD or arrows to move · Space for saber combo · hold Q to charge laser").font(.callout.monospaced()).foregroundStyle(.cyan)
                 Text(session.laserLockDescription).font(.headline.monospaced()).foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
                 HStack { Button(session.musicEnabled ? "Generated techno on" : "Music off", systemImage: session.musicEnabled ? "music.note" : "speaker.slash") { session.toggleMusic() }; Button(immersive ? "Leave Spatial Workshop" : "Enter Spatial Workshop", systemImage: immersive ? "rectangle.portrait.and.arrow.right" : "vision.pro") { Task { if immersive { await dismissImmersiveSpace(); immersive = false } else { immersive = await openImmersiveSpace(id: "ROBWorkshop") == .opened } } } }.buttonStyle(.borderedProminent)
@@ -47,6 +48,7 @@ struct ImmersiveROBWorkshop: View {
                     Slider(value: Binding(get: { Double(scale) }, set: { scale = Float($0) }), in: 0.3...1.3) { Text("Scale") }.frame(width: 320)
                     HStack { LaserChargeButton(session: session, title: session.rangedWeapon.displayName); Button(session.meleeWeapon.displayName) { session.saberAttack() }.buttonStyle(.borderedProminent).tint(.pink) }
                     Text(session.laserLockDescription).font(.caption.bold().monospaced()).foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
+                    CombatHealthBars(session: session, compact: true).frame(width: 360)
                     Button(session.musicEnabled ? "♫ Generated techno" : "Music off") { session.toggleMusic() }
                     Text("\(session.remainingEnemies) targets · spiders lunge · sentry robots circle and fire").font(.caption.bold()).foregroundStyle(.cyan)
                     Text("Navigate ROB onto keys, doors, and cells; locked partitions block every bypass.").font(.caption).frame(width: 420)

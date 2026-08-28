@@ -129,6 +129,17 @@ import UIKit
             let eye = ModelEntity(mesh: .generateBox(size: [0.08, 0.08, 0.48], cornerRadius: 0.02), materials: [SimpleMaterial(color: .systemCyan, isMetallic: true)]); eye.position = [0, 0.96, -0.37]; root.addChild(eye)
             for y: Float in [0.18, 0.38, 0.58] { for x: Float in [-0.22, 0, 0.22] { let light = ModelEntity(mesh: .generateSphere(radius: 0.055), materials: [SimpleMaterial(color: .systemBlue, isMetallic: true)]); light.position = [x, y, -0.31]; root.addChild(light) } }
         }
+        if enemy.isBoss {
+            root.scale = .init(repeating: 1.35)
+            let core = ModelEntity(mesh: .generateSphere(radius: 0.13), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)])
+            core.name = "Boss Core"
+            core.position = [0, enemy.kind == .spider ? 0.55 : 1.18, 0]
+            root.addChild(core)
+            let beacon = ModelEntity(mesh: .generateCylinder(height: 0.08, radius: 0.22), materials: [SimpleMaterial(color: .systemOrange, isMetallic: true)])
+            beacon.name = "Boss Beacon"
+            beacon.position = core.position + SIMD3<Float>(0, 0.18, 0)
+            root.addChild(beacon)
+        }
         return root
     }
 
@@ -145,7 +156,7 @@ import UIKit
             let name = "Enemy Bolt \(bolt.id)"
             let entity: Entity
             if let existing = layer.findEntity(named: name) { entity = existing }
-            else { let created = ModelEntity(mesh: .generateSphere(radius: 0.055), materials: [SimpleMaterial(color: .systemCyan, isMetallic: true)]); created.name = name; layer.addChild(created); entity = created }
+            else { let created = ModelEntity(mesh: .generateSphere(radius: bolt.isBoss ? 0.09 : 0.055), materials: [SimpleMaterial(color: bolt.isBoss ? .systemRed : .systemCyan, isMetallic: true)]); created.name = name; layer.addChild(created); entity = created }
             entity.position = bolt.position
         }
     }
