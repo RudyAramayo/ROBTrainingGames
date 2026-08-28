@@ -102,8 +102,9 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(configuration.planeDetection, [.horizontal])
         XCTAssertTrue(configuration.isLightEstimationEnabled)
         XCTAssertEqual(configuration.environmentTexturing, .automatic)
-        XCTAssertEqual(lightRig.children.count, 2)
-        XCTAssertTrue(lightRig.children.allSatisfy { $0.components[PointLightComponent.self] != nil })
+        XCTAssertEqual(lightRig.children.count, 3)
+        XCTAssertEqual(lightRig.children.filter { $0.components[PointLightComponent.self] != nil }.count, 2)
+        XCTAssertEqual(lightRig.children.filter { $0.components[DirectionalLightComponent.self] != nil }.count, 1)
     }
 
     nonisolated func testVoiceAudioTapRunsOutsideMainActor() {

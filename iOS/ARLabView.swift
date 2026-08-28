@@ -180,28 +180,41 @@ struct ROBARView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> ARView {
-        let view = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: true)
+        let view = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false)
         view.renderOptions.formUnion([.disableGroundingShadows, .disableMotionBlur, .disableDepthOfField])
         view.environment.sceneUnderstanding.options.remove(.occlusion)
 
         let anchor = AnchorEntity(.plane(.horizontal, classification: .any, minimumBounds: [0.25, 0.25]))
-        let rob = RobotFactory.makeROB(componentMode: componentMode)
+        let rob = RobotFactory.makeROB(componentMode: componentMode, arPresentation: true)
         rob.scale = [0.32, 0.32, 0.32]
-        RobotFactory.applyWeapons(to: rob, session: session, componentMode: componentMode)
+        RobotFactory.applyWeapons(to: rob, session: session, componentMode: componentMode, arPresentation: true)
         anchor.addChild(rob)
         anchor.addChild(Self.makeFillLightRig())
         view.scene.addAnchor(anchor)
         view.installGestures([.translation, .rotation, .scale], for: rob)
 
+        let coaching = ARCoachingOverlayView()
+        coaching.session = view.session
+        coaching.goal = .horizontalPlane
+        coaching.activatesAutomatically = true
+        coaching.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(coaching)
+        NSLayoutConstraint.activate([
+            coaching.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            coaching.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            coaching.topAnchor.constraint(equalTo: view.topAnchor),
+            coaching.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+
         context.coordinator.robot = rob
-        context.coordinator.adoptAutomaticallyConfiguredSession(isActive: isActive, in: view)
+        context.coordinator.setSessionActive(isActive, in: view, resetTracking: true)
         return view
     }
 
     func updateUIView(_ view: ARView, context: Context) {
         context.coordinator.setSessionActive(isActive, in: view)
         if let robot = context.coordinator.robot {
-            RobotFactory.applyWeapons(to: robot, session: session, componentMode: componentMode)
+            RobotFactory.applyWeapons(to: robot, session: session, componentMode: componentMode, arPresentation: true)
         }
     }
 
@@ -220,9 +233,16 @@ struct ROBARView: UIViewRepresentable {
     static func makeFillLightRig() -> Entity {
         let rig = Entity()
         rig.name = "AR Fill Lights"
+
+        let daylight = Entity()
+        daylight.name = "AR Directional Light"
+        daylight.look(at: [0, 0.45, 0], from: [-1.2, 2.4, 1.2], relativeTo: nil)
+        daylight.components.set(DirectionalLightComponent(color: .white, intensity: 4_500))
+        rig.addChild(daylight)
+
         for (name, position, intensity) in [
-            ("AR Key Light", SIMD3<Float>(-1.2, 2.4, 1.2), Float(18_000)),
-            ("AR Fill Light", SIMD3<Float>(1.1, 1.4, 0.8), Float(9_000)),
+            ("AR Key Light", SIMD3<Float>(-0.8, 1.5, 0.8), Float(24_000)),
+            ("AR Fill Light", SIMD3<Float>(0.9, 1.1, 0.6), Float(12_000)),
         ] {
             let light = Entity()
             light.name = name
@@ -237,16 +257,13 @@ struct ROBARView: UIViewRepresentable {
         var robot: Entity?
         private var sessionIsRunning = false
 
-        func adoptAutomaticallyConfiguredSession(isActive: Bool, in view: ARView) {
-            sessionIsRunning = isActive
-            if !isActive { view.session.pause() }
-        }
-
-        func setSessionActive(_ active: Bool, in view: ARView) {
-            guard active != sessionIsRunning else { return }
+        func setSessionActive(_ active: Bool, in view: ARView, resetTracking: Bool = false) {
             if active {
-                view.session.run(ROBARView.makeConfiguration())
+                guard !sessionIsRunning || resetTracking else { return }
+                let options: ARSession.RunOptions = resetTracking ? [.resetTracking, .removeExistingAnchors] : []
+                view.session.run(ROBARView.makeConfiguration(), options: options)
             } else {
+                guard sessionIsRunning else { return }
                 view.session.pause()
             }
             sessionIsRunning = active

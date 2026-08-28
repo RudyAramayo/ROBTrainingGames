@@ -12,11 +12,14 @@ import UIKit
         }
     }
 
-    static func makeROB(componentMode: Bool = false) -> ModelEntity {
+    static func makeROB(
+        componentMode: Bool = false,
+        arPresentation: Bool = false
+    ) -> ModelEntity {
         let root = ModelEntity(); root.name = "ROB"
-        @discardableResult func part(_ name: String, _ size: SIMD3<Float>, _ position: SIMD3<Float>, _ color: UIColor, parent: Entity? = nil) -> ModelEntity { let entity = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.015), materials: [SimpleMaterial(color: color, isMetallic: true)]); entity.name = name; entity.position = position; (parent ?? root).addChild(entity); return entity }
+        @discardableResult func part(_ name: String, _ size: SIMD3<Float>, _ position: SIMD3<Float>, _ color: UIColor, parent: Entity? = nil) -> ModelEntity { let entity = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.015), materials: [SimpleMaterial(color: color, isMetallic: !arPresentation)]); entity.name = name; entity.position = position; (parent ?? root).addChild(entity); return entity }
         func cylinder(_ name: String, radius: Float, height: Float, position: SIMD3<Float>, color: UIColor, faceForward: Bool = false, sideways: Bool = false, parent: Entity? = nil) {
-            let entity = ModelEntity(mesh: .generateCylinder(height: height, radius: radius), materials: [SimpleMaterial(color: color, isMetallic: true)])
+            let entity = ModelEntity(mesh: .generateCylinder(height: height, radius: radius), materials: [SimpleMaterial(color: color, isMetallic: !arPresentation)])
             entity.name = name; entity.position = position
             if faceForward { entity.orientation = simd_quatf(angle: .pi / 2, axis: [1, 0, 0]) }
             if sideways { entity.orientation = simd_quatf(angle: .pi / 2, axis: [0, 0, 1]) }
@@ -130,7 +133,7 @@ import UIKit
         let beam = ModelEntity(mesh: .generateBox(size: [1, 1, 0.55], cornerRadius: 0.04), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); beam.name = "Shoulder Laser Beam"; beam.isEnabled = false; shot.addChild(beam)
 
         part("Sensor Mast", [0.1, 0.48, 0.1], [0, 1.2, 0], .gray, parent: torso)
-        let head = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: .black, isMetallic: true)]); head.name = "Camera Head"; head.position = [0, 1.52, 0]; head.scale.z = 0.82; torso.addChild(head)
+        let head = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: .black, isMetallic: !arPresentation)]); head.name = "Camera Head"; head.position = [0, 1.52, 0]; head.scale.z = 0.82; torso.addChild(head)
         cylinder("Head Camera", radius: 0.055, height: 0.045, position: [0, 1.52, -0.2], color: .systemGreen, faceForward: true, parent: torso)
         root.components.set(InputTargetComponent())
         root.generateCollisionShapes(recursive: true)
@@ -196,18 +199,23 @@ import UIKit
         }
     }
 
-    static func applyWeapons(to robot: Entity, session: GameSession, componentMode: Bool = false) {
+    static func applyWeapons(
+        to robot: Entity,
+        session: GameSession,
+        componentMode: Bool = false,
+        arPresentation: Bool = false
+    ) {
         let appearanceName = "Applied Appearance \(componentMode ? "components" : session.robotFinish.rawValue)"
         if robot.children.first(where: { $0.name == appearanceName }) == nil {
             for marker in Array(robot.children) where marker.name.hasPrefix("Applied Appearance ") { marker.removeFromParent() }
             let marker = Entity(); marker.name = appearanceName; robot.addChild(marker)
-            let bodyMaterial = SimpleMaterial(color: componentMode ? finishColor(for: .graphite) : finishColor(for: session.robotFinish), isMetallic: true)
+            let bodyMaterial = SimpleMaterial(color: componentMode ? finishColor(for: .graphite) : finishColor(for: session.robotFinish), isMetallic: !arPresentation)
             for name in ["Tri-Wheel Chassis", "Cerebro Torso", "Camera Head"] {
                 (robot.findEntity(named: name) as? ModelEntity)?.model?.materials = [bodyMaterial]
             }
             for side in ["Left", "Right"] {
                 let color: UIColor = componentMode ? (side == "Left" ? .systemGreen : .systemBlue) : finishColor(for: session.robotFinish)
-                let material = SimpleMaterial(color: color, isMetallic: true)
+                let material = SimpleMaterial(color: color, isMetallic: !arPresentation)
                 for name in ["\(side) Upper Arm", "\(side) Forearm"] {
                     (robot.findEntity(named: name) as? ModelEntity)?.model?.materials = [material]
                 }
