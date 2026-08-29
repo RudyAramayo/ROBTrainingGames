@@ -27,7 +27,7 @@ final class GameSessionTests: XCTestCase {
     func testCalibrationMatchesBrowserCampaign() {
         let game = GameSession(audioEnabled: false)
 
-        XCTAssertEqual(game.level.cellCount, 3)
+        XCTAssertEqual(game.level.cellCount, 5)
         XCTAssertEqual(game.level.enemyShields, 2)
         XCTAssertEqual(game.enemies.map(\.kind), [.spider, .fax, .spider])
         XCTAssertEqual(game.remainingEnemies, 3)
@@ -60,7 +60,7 @@ final class GameSessionTests: XCTestCase {
         game.tick(1.0 / 30.0)
 
         XCTAssertEqual(game.level.id, 1)
-        XCTAssertTrue(game.message.contains("3 more energy cells"))
+        XCTAssertTrue(game.message.contains("5 more energy cells"))
         XCTAssertTrue(game.message.contains("3 more targets"))
         XCTAssertFalse(game.message.localizedCaseInsensitiveContains("key"))
     }
@@ -210,7 +210,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(game.isRunning)
     }
 
-    func testRegularDamageReducesHealthWithoutRestartingMissionProgress() {
+    func testROBShieldAbsorbsDamageWithoutRestartingMissionProgress() {
         let game = GameSession(audioEnabled: false)
         game.begin()
         game.collectedCells = 1
@@ -218,13 +218,26 @@ final class GameSessionTests: XCTestCase {
 
         XCTAssertTrue(game.enemyContact("Spider bot lunge", damage: 6))
 
-        XCTAssertEqual(game.health, 94)
+        XCTAssertEqual(game.shields, 34)
+        XCTAssertEqual(game.health, game.maxHealth)
         XCTAssertEqual(game.collectedCells, 1)
         XCTAssertEqual(game.enemies.map(\.shields), enemyShields)
         XCTAssertTrue(game.isRunning)
-        XCTAssertTrue(game.message.contains("6 damage"))
+        XCTAssertTrue(game.message.contains("6 shield points"))
         XCTAssertFalse(game.enemyContact("Overlapping collision", damage: 6), "The hit cooldown should prevent damage every rendered frame")
+        XCTAssertEqual(game.shields, 34)
+        XCTAssertEqual(game.health, game.maxHealth)
+    }
+
+    func testDamageSpillsThroughAnEmptyShieldIntoHealth() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+
+        XCTAssertTrue(game.enemyContact("Heavy laser", damage: game.maxShields + 6))
+
+        XCTAssertEqual(game.shields, 0)
         XCTAssertEqual(game.health, 94)
+        XCTAssertTrue(game.message.contains("6 hull damage"))
     }
 
     func testDepletedHealthRestartsOnlyTheCurrentLevel() {
@@ -233,7 +246,7 @@ final class GameSessionTests: XCTestCase {
         game.begin()
         game.collectedCells = 2
 
-        game.enemyContact("Critical hit", damage: game.maxHealth)
+        game.enemyContact("Critical hit", damage: game.maxHealth + game.maxShields)
 
         XCTAssertEqual(game.level.id, 3)
         XCTAssertEqual(game.health, game.maxHealth)
@@ -258,7 +271,8 @@ final class GameSessionTests: XCTestCase {
 
         guard let boss = game.activeBoss else { return XCTFail("Level 15 needs a boss") }
         game.enemyContact(boss.displayName, damage: boss.contactDamage)
-        XCTAssertEqual(game.health, 90)
+        XCTAssertEqual(game.shields, 30)
+        XCTAssertEqual(game.health, game.maxHealth)
     }
 
     func testBossHasDistinctLargerGeometryAndShieldCore() {
@@ -404,13 +418,14 @@ final class GameSessionTests: XCTestCase {
         for levelIndex in game.levels.indices {
             game.levelIndex = levelIndex
             game.begin()
+            XCTAssertEqual(game.puzzle.cells.count, game.level.cellCount)
             XCTAssertTrue(
                 game.isRobotPositionClear(game.robotPosition),
                 "Level \(game.level.id) starts ROB inside a wall collision envelope"
             )
 
             game.doorOpen = true
-            var objectives = game.puzzle.cells + [game.puzzle.dock]
+            var objectives = game.puzzle.cells + game.puzzle.shieldPickups + game.puzzle.repairPickups + [game.puzzle.dock]
             if let key = game.puzzle.key { objectives.append(key) }
             if let terminal = game.puzzle.hackTerminal { objectives.append(terminal) }
             for objective in objectives {
@@ -533,6 +548,33 @@ final class GameSessionTests: XCTestCase {
         XCTAssertLessThan(game.energy, recoveredEnergy, "Pivoting the powered treads should also consume energy")
     }
 
+    func testShieldAndRepairPickupsRestoreDamageAndDisappear() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        let room = RobotFactory.makeTrainingRoom(level: game.levelIndex, puzzle: game.puzzle)
+
+        XCTAssertNotNil(room.findEntity(named: "Shield Pickup 0"))
+        XCTAssertNotNil(room.findEntity(named: "Repair Pickup 0"))
+        game.enemyContact("Heavy laser", damage: game.maxShields + 10)
+        XCTAssertEqual(game.shields, 0)
+        XCTAssertEqual(game.health, 90)
+
+        let shieldPickup = game.puzzle.shieldPickups[0]
+        game.robotPosition = [shieldPickup.x, 0, shieldPickup.y]
+        game.tick(0.01)
+        XCTAssertEqual(game.shields, game.shieldPickupStrength)
+
+        let repairPickup = game.puzzle.repairPickups[0]
+        game.robotPosition = [repairPickup.x, 0, repairPickup.y]
+        game.tick(0.01)
+        XCTAssertEqual(game.health, game.maxHealth)
+
+        RobotFactory.applyPuzzleState(to: room, session: game)
+        XCTAssertFalse(room.findEntity(named: "Shield Pickup 0")?.isEnabled ?? true)
+        XCTAssertFalse(room.findEntity(named: "Repair Pickup 0")?.isEnabled ?? true)
+    }
+
     func testPerformanceUpgradesSpendPersistentPointsAndIncreaseCapabilities() {
         let suiteName = "ROBTrainingUpgrades.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -548,7 +590,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.energyUpgradeLevel, 1)
         XCTAssertEqual(game.weaponUpgradeLevel, 1)
         XCTAssertEqual(game.maxEnergy, 125)
-        XCTAssertGreaterThan(game.driveSpeedMultiplier, 1)
+        XCTAssertEqual(game.driveSpeedMultiplier, 1.35, accuracy: 0.0001)
         XCTAssertEqual(game.weaponDamageBonus, 1)
         let restored = GameSession(audioEnabled: false, progressStore: defaults)
         XCTAssertEqual(restored.speedUpgradeLevel, 1)

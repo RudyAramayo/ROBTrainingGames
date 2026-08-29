@@ -13,6 +13,13 @@ struct CombatHealthBars: View {
                 color: healthColor,
                 icon: "heart.fill"
             )
+            meter(
+                title: "ROB SHIELDS",
+                value: session.shields,
+                maximum: session.maxShields,
+                color: session.shields == 0 ? .gray : .cyan,
+                icon: "shield.fill"
+            )
             energyMeter
             if session.isSecurityAlerted {
                 Label("SECURITY ALERT · REACH A SHADOW ZONE", systemImage: "video.fill")

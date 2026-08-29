@@ -170,6 +170,14 @@ import UIKit
         root.collision = CollisionComponent(shapes: [
             .generateBox(size: [1.6, 1.85, 1.6]).offsetBy(translation: [0, 0.86, -0.28]),
         ])
+        let shieldField = ModelEntity(
+            mesh: .generateSphere(radius: 1.05),
+            materials: [SimpleMaterial(color: UIColor.systemCyan.withAlphaComponent(0.11), isMetallic: false)]
+        )
+        shieldField.name = "ROB Shield Field"
+        shieldField.position = [0, 0.92, -0.08]
+        shieldField.scale = [1, 0.92, 1]
+        root.addChild(shieldField)
         return root
     }
 
@@ -268,6 +276,11 @@ import UIKit
         robot.findEntity(named: "Left Lightsaber")?.isEnabled = session.meleeWeapon == .dualSabers
         robot.findEntity(named: "Right Lightsaber")?.isEnabled = session.meleeWeapon == .dualSabers
         robot.findEntity(named: "Power Hammer")?.isEnabled = session.meleeWeapon == .powerHammer
+        if let shieldField = robot.findEntity(named: "ROB Shield Field") {
+            shieldField.isEnabled = session.shields > 0
+            let pulse = 0.98 + Float(sin(session.elapsed * 3.2)) * 0.025
+            shieldField.scale = [pulse, pulse * 0.92, pulse]
+        }
         let bladeScale: Float = session.meleeWeapon == .dualSabers && session.saberAnimation > 0 ? 1 : 0.06
         for (name, side) in [("Left Lightsaber", Float(-1)), ("Right Lightsaber", Float(1))] {
             guard let blade = robot.findEntity(named: name) else { continue }
@@ -392,6 +405,20 @@ import UIKit
             room.addChild(entity)
         }
         for (index, cell) in puzzle.cells.enumerated() { let entity = ModelEntity(mesh: .generateCylinder(height: 0.28, radius: 0.11), materials: [SimpleMaterial(color: .systemYellow, isMetallic: true)]); entity.name = "Puzzle Cell \(index)"; entity.position = [cell.x, 0.2, cell.y]; room.addChild(entity) }
+        for (index, pickup) in puzzle.shieldPickups.enumerated() {
+            let root = Entity(); root.name = "Shield Pickup \(index)"; root.position = [pickup.x, 0.24, pickup.y]
+            let core = ModelEntity(mesh: .generateSphere(radius: 0.16), materials: [UnlitMaterial(color: .systemCyan)]); root.addChild(core)
+            let halo = ModelEntity(mesh: .generateCylinder(height: 0.035, radius: 0.27), materials: [SimpleMaterial(color: UIColor.systemBlue.withAlphaComponent(0.58), isMetallic: true)]); halo.position.y = 0.02; root.addChild(halo)
+            room.addChild(root)
+        }
+        for (index, pickup) in puzzle.repairPickups.enumerated() {
+            let root = Entity(); root.name = "Repair Pickup \(index)"; root.position = [pickup.x, 0.2, pickup.y]
+            let kit = ModelEntity(mesh: .generateBox(size: [0.34, 0.24, 0.26], cornerRadius: 0.045), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); root.addChild(kit)
+            for size in [SIMD3<Float>(0.2, 0.055, 0.025), SIMD3<Float>(0.055, 0.2, 0.025)] {
+                let cross = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.012), materials: [UnlitMaterial(color: .white)]); cross.position.z = -0.14; root.addChild(cross)
+            }
+            room.addChild(root)
+        }
         let dock = ModelEntity(mesh: .generateBox(size: [0.7, 0.025, 0.7], cornerRadius: 0.08), materials: [SimpleMaterial(color: .systemOrange, isMetallic: false)]); dock.name = "Puzzle Dock"; dock.position = [puzzle.dock.x, 0.02, puzzle.dock.y]; room.addChild(dock)
         return room
     }
@@ -440,6 +467,8 @@ import UIKit
             room.findEntity(named: "Conveyor \(conveyor.id)")?.position.y = 0.018 + Float(sin(session.elapsed * 5 + Double(conveyor.id))) * 0.006
         }
         for index in session.puzzle.cells.indices { room.findEntity(named: "Puzzle Cell \(index)")?.isEnabled = !session.collectedCellIndices.contains(index) }
+        for index in session.puzzle.shieldPickups.indices { room.findEntity(named: "Shield Pickup \(index)")?.isEnabled = !session.collectedShieldPickupIndices.contains(index) }
+        for index in session.puzzle.repairPickups.indices { room.findEntity(named: "Repair Pickup \(index)")?.isEnabled = !session.collectedRepairPickupIndices.contains(index) }
         if let dock = room.findEntity(named: "Puzzle Dock") as? ModelEntity {
             dock.model?.materials = [SimpleMaterial(color: session.canFinish ? .systemGreen : .systemOrange, isMetallic: false)]
         }

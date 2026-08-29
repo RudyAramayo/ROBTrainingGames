@@ -207,6 +207,8 @@ struct PuzzleGeometry: Sendable {
     let door: PuzzleBarrier?
     let barriers: [PuzzleBarrier]
     let cells: [SIMD2<Float>]
+    let shieldPickups: [SIMD2<Float>]
+    let repairPickups: [SIMD2<Float>]
     let dock: SIMD2<Float>
     let hackTerminal: SIMD2<Float>?
     let conveyors: [PuzzleConveyor]
@@ -229,7 +231,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
     }
     var summary: String {
         switch self {
-        case .speedBoost: "Raises tread speed by 18% per upgrade."
+        case .speedBoost: "Raises tread speed by 35% per upgrade."
         case .energyCapacity: "Adds 25 energy and improves passive charging."
         case .weaponPower: "Adds one shield point of damage to every hit."
         }
@@ -246,27 +248,30 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.01"
+    static let gameplayRulesetVersion = "2026.09.02"
     static let robotCollisionRadius: Float = 0.62
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
     let maxHealth = 100
+    let maxShields = 40
+    let shieldPickupStrength = 24
+    let repairPickupStrength = 35
     let levels = [
-        ROBLevel(id: 1, name: "Calibration Deck", lesson: "Arrow controls mix forward speed and steering into two tread demands.", cellCount: 3, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 900, requiresKey: false, challenge: "Learn smooth turns, evade three active enemies, collect three cells, and reach the dock."),
-        ROBLevel(id: 2, name: "Key Workshop", lesson: "A key changes the state of a matching locked door.", cellCount: 3, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 1_100, requiresKey: true, challenge: "Find the cyan key while a three-robot patrol guards the workshop door."),
-        ROBLevel(id: 3, name: "Crossroads", lesson: "Plan a route before entering a narrow passage.", cellCount: 4, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 1_300, requiresKey: true, challenge: "Choose the safe branch, secure the key, then break through the center patrol."),
-        ROBLevel(id: 4, name: "Sensor Hall", lesson: "Wide clearance is often faster than scraping along obstacles.", cellCount: 4, enemyKinds: [.spider, .fax, .spider, .fax], enemyShields: 2, timeBonus: 1_500, requiresKey: false, challenge: "Use the expanded hall to separate four sentries guarding the cells."),
-        ROBLevel(id: 5, name: "Amber Armory", lesson: "A seven-joint arm trades reach for a larger collision envelope.", cellCount: 4, enemyKinds: [.fax, .spider, .fax, .spider], enemyShields: 3, timeBonus: 1_700, requiresKey: true, challenge: "Recover the armory key and chain wide saber swings without touching enemies."),
-        ROBLevel(id: 6, name: "Switchback Foundry", lesson: "Slow before turning so both treads can follow the planned curve.", cellCount: 5, enemyKinds: [.spider, .fax, .spider, .fax, .spider], enemyShields: 3, timeBonus: 1_900, requiresKey: true, challenge: "Navigate alternating turns while five guards coordinate their attacks."),
-        ROBLevel(id: 7, name: "Twin Sentinel Bay", lesson: "Keep one escape route open while engaging moving obstacles.", cellCount: 5, enemyKinds: [.fax, .fax, .spider, .spider, .fax], enemyShields: 3, timeBonus: 2_100, requiresKey: false, challenge: "Separate the sentinel wave and keep moving through crossfire."),
-        ROBLevel(id: 8, name: "Power Relay", lesson: "Complete prerequisites in the right order: key, door, cells, then dock.", cellCount: 5, enemyKinds: [.spider, .fax, .spider, .fax, .spider], enemyShields: 4, timeBonus: 2_300, requiresKey: true, challenge: "Unlock the relay room before clearing its reinforced defenders."),
-        ROBLevel(id: 9, name: "Guardian Maze", lesson: "Reliable autonomy needs state, perception, and a recoverable plan.", cellCount: 6, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 4, timeBonus: 2_600, requiresKey: true, challenge: "Find the key in the outer loop and survive the six-robot guardian wave."),
-        ROBLevel(id: 10, name: "Mission Control", lesson: "Combine driving, sequencing, tool use, and safe separation.", cellCount: 6, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 4, timeBonus: 3_000, requiresKey: true, challenge: "Complete the full safety sequence under alternating ranged and melee attacks."),
-        ROBLevel(id: 11, name: "Reactor Run", lesson: "A target lock is useful only when the route remains safe.", cellCount: 6, enemyKinds: [.spider, .spider, .fax, .spider, .fax, .fax], enemyShields: 4, timeBonus: 3_300, requiresKey: false, challenge: "Cross the reactor floor while charging shoulder shots between lunges."),
-        ROBLevel(id: 12, name: "Eclipse Hangar", lesson: "Scan, prioritize, and reposition before committing to an attack.", cellCount: 6, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 4, timeBonus: 3_600, requiresKey: true, challenge: "Open the hangar partition and defeat a balanced six-robot squad."),
-        ROBLevel(id: 13, name: "Quantum Causeway", lesson: "Short control cycles preserve options in crowded spaces.", cellCount: 7, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 5, timeBonus: 3_900, requiresKey: true, challenge: "Use spin attacks to make room without stopping in the causeway."),
-        ROBLevel(id: 14, name: "Siege Foundry", lesson: "Threat management matters more than attacking the nearest target.", cellCount: 7, enemyKinds: [.fax, .fax, .spider, .fax, .spider, .spider, .fax], enemyShields: 5, timeBonus: 4_200, requiresKey: true, challenge: "Break the foundry siege by charging shots only when the lane is clear."),
-        ROBLevel(id: 15, name: "Final Citadel", lesson: "Integrate mobility, target lock, timing, and tool choice.", cellCount: 8, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 5, timeBonus: 4_800, requiresKey: true, challenge: "Clear the eight-robot citadel wave and complete the expanded campaign."),
+        ROBLevel(id: 1, name: "Calibration Deck", lesson: "Arrow controls mix forward speed and steering into two tread demands.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 900, requiresKey: false, challenge: "Learn smooth turns, evade three active enemies, collect five cells, and reach the dock."),
+        ROBLevel(id: 2, name: "Key Workshop", lesson: "A key changes the state of a matching locked door.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 1_100, requiresKey: true, challenge: "Find the cyan key while a three-robot patrol guards the workshop door."),
+        ROBLevel(id: 3, name: "Crossroads", lesson: "Plan a route before entering a narrow passage.", cellCount: 6, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 1_300, requiresKey: true, challenge: "Choose the safe branch, secure the key, then break through the center patrol."),
+        ROBLevel(id: 4, name: "Sensor Hall", lesson: "Wide clearance is often faster than scraping along obstacles.", cellCount: 6, enemyKinds: [.spider, .fax, .spider, .fax], enemyShields: 2, timeBonus: 1_500, requiresKey: false, challenge: "Use the expanded hall to separate four sentries guarding the cells."),
+        ROBLevel(id: 5, name: "Amber Armory", lesson: "A seven-joint arm trades reach for a larger collision envelope.", cellCount: 6, enemyKinds: [.fax, .spider, .fax, .spider], enemyShields: 3, timeBonus: 1_700, requiresKey: true, challenge: "Recover the armory key and chain wide saber swings without touching enemies."),
+        ROBLevel(id: 6, name: "Switchback Foundry", lesson: "Slow before turning so both treads can follow the planned curve.", cellCount: 7, enemyKinds: [.spider, .fax, .spider, .fax, .spider], enemyShields: 3, timeBonus: 1_900, requiresKey: true, challenge: "Navigate alternating turns while five guards coordinate their attacks."),
+        ROBLevel(id: 7, name: "Twin Sentinel Bay", lesson: "Keep one escape route open while engaging moving obstacles.", cellCount: 7, enemyKinds: [.fax, .fax, .spider, .spider, .fax], enemyShields: 3, timeBonus: 2_100, requiresKey: false, challenge: "Separate the sentinel wave and keep moving through crossfire."),
+        ROBLevel(id: 8, name: "Power Relay", lesson: "Complete prerequisites in the right order: key, door, cells, then dock.", cellCount: 7, enemyKinds: [.spider, .fax, .spider, .fax, .spider], enemyShields: 4, timeBonus: 2_300, requiresKey: true, challenge: "Unlock the relay room before clearing its reinforced defenders."),
+        ROBLevel(id: 9, name: "Guardian Maze", lesson: "Reliable autonomy needs state, perception, and a recoverable plan.", cellCount: 8, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 4, timeBonus: 2_600, requiresKey: true, challenge: "Find the key in the outer loop and survive the six-robot guardian wave."),
+        ROBLevel(id: 10, name: "Mission Control", lesson: "Combine driving, sequencing, tool use, and safe separation.", cellCount: 8, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 4, timeBonus: 3_000, requiresKey: true, challenge: "Complete the full safety sequence under alternating ranged and melee attacks."),
+        ROBLevel(id: 11, name: "Reactor Run", lesson: "A target lock is useful only when the route remains safe.", cellCount: 8, enemyKinds: [.spider, .spider, .fax, .spider, .fax, .fax], enemyShields: 4, timeBonus: 3_300, requiresKey: false, challenge: "Cross the reactor floor while charging shoulder shots between lunges."),
+        ROBLevel(id: 12, name: "Eclipse Hangar", lesson: "Scan, prioritize, and reposition before committing to an attack.", cellCount: 8, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 4, timeBonus: 3_600, requiresKey: true, challenge: "Open the hangar partition and defeat a balanced six-robot squad."),
+        ROBLevel(id: 13, name: "Quantum Causeway", lesson: "Short control cycles preserve options in crowded spaces.", cellCount: 9, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 5, timeBonus: 3_900, requiresKey: true, challenge: "Use spin attacks to make room without stopping in the causeway."),
+        ROBLevel(id: 14, name: "Siege Foundry", lesson: "Threat management matters more than attacking the nearest target.", cellCount: 9, enemyKinds: [.fax, .fax, .spider, .fax, .spider, .spider, .fax], enemyShields: 5, timeBonus: 4_200, requiresKey: true, challenge: "Break the foundry siege by charging shots only when the lane is clear."),
+        ROBLevel(id: 15, name: "Final Citadel", lesson: "Integrate mobility, target lock, timing, and tool choice.", cellCount: 10, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 5, timeBonus: 4_800, requiresKey: true, challenge: "Clear the eight-robot citadel wave and complete the expanded campaign."),
     ]
     let components = [
         ROBComponent(id: "base", name: "Tri-Wheel Tracked Base", summary: "Three-wheel triangular tread pods expose the road wheels while a drive mixer preserves independent left and right tread speeds.", color: 0x263746),
@@ -280,6 +285,7 @@ final class GameSession {
     var score = 0
     private(set) var upgradePoints = 0
     private(set) var health = 100
+    private(set) var shields = 40
     private(set) var energy = 100.0
     var collectedCells = 0
     var enemies: [TrainingEnemy] = []
@@ -300,6 +306,8 @@ final class GameSession {
     private(set) var hackingProgress = 0.0
     private(set) var securityAlertRemaining = 0.0
     var collectedCellIndices: Set<Int> = []
+    var collectedShieldPickupIndices: Set<Int> = []
+    var collectedRepairPickupIndices: Set<Int> = []
     var saberAnimation = 0.0
     var saberStyle: SaberAttackStyle?
     private(set) var saberComboCount = 0
@@ -338,9 +346,10 @@ final class GameSession {
     var lockedEnemy: TrainingEnemy? { enemies.first(where: { $0.id == lockedEnemyID && $0.isActive }) }
     var activeBoss: TrainingEnemy? { enemies.first(where: { $0.isBoss && $0.isActive }) }
     var healthFraction: Double { Double(health) / Double(maxHealth) }
+    var shieldFraction: Double { Double(shields) / Double(maxShields) }
     var maxEnergy: Double { 100 + Double(energyUpgradeLevel * 25) }
     var energyFraction: Double { energy / maxEnergy }
-    var driveSpeedMultiplier: Double { 1 + Double(speedUpgradeLevel) * 0.18 }
+    var driveSpeedMultiplier: Double { 1 + Double(speedUpgradeLevel) * 0.35 }
     var weaponDamageBonus: Int { weaponUpgradeLevel }
     var isSecurityAlerted: Bool { securityAlertRemaining > 0 }
     var isInShadow: Bool {
@@ -451,26 +460,88 @@ final class GameSession {
 
     private static func puzzleGeometry(for level: ROBLevel) -> PuzzleGeometry {
         let half = level.arenaHalfExtent, margin = half - 0.8
-        let columns: [Float] = [-margin, -margin * 0.5, 0, margin * 0.5, margin]
+        let columns: [Float] = [-margin, -margin * 0.45, 0, margin * 0.45]
         let cells = (0..<level.cellCount).map { index in
             SIMD2<Float>(columns[index % columns.count], -margin + Float(index / columns.count) * 2.0)
         }
         let environment = environmentalGeometry(for: level, margin: margin)
+        func makeGeometry(
+            key: SIMD2<Float>?,
+            door: PuzzleBarrier?,
+            barriers: [PuzzleBarrier],
+            cells: [SIMD2<Float>],
+            dock: SIMD2<Float>,
+            hackTerminal: SIMD2<Float>?
+        ) -> PuzzleGeometry {
+            let blockers = barriers + (door.map { [$0] } ?? [])
+            var reserved = [dock]
+            if let key { reserved.append(key) }
+            if let hackTerminal { reserved.append(hackTerminal) }
+            let gridSteps: [Float] = [-1, -0.72, -0.45, -0.18, 0.18, 0.45, 0.72, 1]
+            let gridCandidates = gridSteps.flatMap { y in gridSteps.map { x in SIMD2<Float>(x * margin, y * margin) } }
+            let gridRotation = level.id * 3 % gridCandidates.count
+            let orderedGrid = Array(gridCandidates[gridRotation...]) + Array(gridCandidates[..<gridRotation])
+            var safeCells: [SIMD2<Float>] = []
+            for candidate in cells + orderedGrid where safeCells.count < level.cellCount {
+                guard reserved.allSatisfy({ simd_distance(candidate, $0) > 0.68 }) else { continue }
+                guard blockers.allSatisfy({
+                    !intersects(SIMD3<Float>(candidate.x, 0, candidate.y), barrier: $0, radius: robotCollisionRadius)
+                }) else { continue }
+                safeCells.append(candidate)
+                reserved.append(candidate)
+            }
+
+            let candidates: [SIMD2<Float>] = [
+                [-margin * 0.82, -margin * 0.62], [margin * 0.78, -margin * 0.48],
+                [-margin * 0.72, margin * 0.18], [margin * 0.74, margin * 0.34],
+                [-margin * 0.28, margin * 0.72], [margin * 0.22, -margin * 0.78],
+                [0, margin * 0.46], [-margin * 0.48, -margin * 0.08],
+                [margin * 0.46, margin * 0.02], [0, -margin * 0.42],
+            ]
+            let rotation = level.id % candidates.count
+            let ordered = Array(candidates[rotation...]) + Array(candidates[..<rotation])
+            var available = ordered.filter { candidate in
+                abs(candidate.x) < margin && abs(candidate.y) < margin
+                    && reserved.allSatisfy { simd_distance(candidate, $0) > 0.68 }
+                    && blockers.allSatisfy {
+                        !intersects(SIMD3<Float>(candidate.x, 0, candidate.y), barrier: $0, radius: robotCollisionRadius)
+                    }
+            }
+            func takePickup() -> SIMD2<Float> {
+                guard !available.isEmpty else { return [0, 0] }
+                let pickup = available.removeFirst()
+                reserved.append(pickup)
+                available.removeAll { simd_distance($0, pickup) <= 0.75 }
+                return pickup
+            }
+            let shieldPickups = (0..<(level.id >= 8 ? 2 : 1)).map { _ in takePickup() }
+            let repairPickups = (0..<(level.id >= 10 ? 2 : 1)).map { _ in takePickup() }
+            return PuzzleGeometry(
+                arenaHalfExtent: half,
+                key: key,
+                door: door,
+                barriers: barriers,
+                cells: safeCells,
+                shieldPickups: shieldPickups,
+                repairPickups: repairPickups,
+                dock: dock,
+                hackTerminal: hackTerminal,
+                conveyors: environment.conveyors,
+                securityCameras: environment.cameras,
+                shadowZones: environment.shadows
+            )
+        }
         guard level.requiresKey else {
             let zigzag = (0..<min(5, max(2, level.id / 3 + 1))).map { index in
                 PuzzleBarrier(center: [index.isMultiple(of: 2) ? -1.35 : 1.35, 1.8 - Float(index) * zigzagSpacing], size: [half * 1.05, 0.24])
             }
-            return PuzzleGeometry(
-                arenaHalfExtent: half,
+            return makeGeometry(
                 key: nil,
                 door: nil,
                 barriers: zigzag,
                 cells: cells,
                 dock: [margin, -margin],
-                hackTerminal: nil,
-                conveyors: environment.conveyors,
-                securityCameras: environment.cameras,
-                shadowZones: environment.shadows
+                hackTerminal: nil
             )
         }
         let horizontal = ![2, 6, 8, 12, 14].contains(level.id)
@@ -483,17 +554,13 @@ final class GameSession {
                 PuzzleBarrier(center: [(right + half) / 2, door.center.y], size: [half - right, 0.24]),
                 PuzzleBarrier(center: [level.id.isMultiple(of: 2) ? -2.1 : 2.1, -2.2], size: [0.24, 2.7]),
             ]
-            return PuzzleGeometry(
-                arenaHalfExtent: half,
+            return makeGeometry(
                 key: [level.id.isMultiple(of: 3) ? margin : -margin, margin],
                 door: door,
                 barriers: walls,
                 cells: cells,
                 dock: [margin, -margin],
-                hackTerminal: [door.center.x, door.center.y + 0.85],
-                conveyors: environment.conveyors,
-                securityCameras: environment.cameras,
-                shadowZones: environment.shadows
+                hackTerminal: [door.center.x, door.center.y + 0.85]
             )
         }
         let door = PuzzleBarrier(center: [0.45, -0.45], size: [0.24, doorwayWidth])
@@ -510,17 +577,13 @@ final class GameSession {
             let horizontalProgress = (cell.x + margin) / (margin * 2)
             return SIMD2<Float>(cellMinimumX + (margin - cellMinimumX) * horizontalProgress, cell.y)
         }
-        return PuzzleGeometry(
-            arenaHalfExtent: half,
+        return makeGeometry(
             key: key,
             door: door,
             barriers: walls,
             cells: adjustedCells,
             dock: [margin, -margin],
-            hackTerminal: [door.center.x - 0.85, door.center.y],
-            conveyors: environment.conveyors,
-            securityCameras: environment.cameras,
-            shadowZones: environment.shadows
+            hackTerminal: [door.center.x - 0.85, door.center.y]
         )
     }
 
@@ -586,7 +649,8 @@ final class GameSession {
     private func configureLevel() {
         elapsed = 0; collectedCells = 0
         hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingProgress = 0; securityAlertRemaining = 0
-        collectedCellIndices = []; saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
+        collectedCellIndices = []; collectedShieldPickupIndices = []; collectedRepairPickupIndices = []
+        saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
         laserDistance = nil; laserCharge = 0; laserShotCharge = 0; laserShotWeapon = rangedWeapon; laserShotOrigin = .zero; isChargingLaser = false; lockedEnemyID = nil
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
         energy = maxEnergy; wasEnergyDepleted = false
@@ -604,6 +668,7 @@ final class GameSession {
     func begin() {
         enemyAttackCount = 0
         health = maxHealth
+        shields = maxShields
         damageInvulnerabilityRemaining = 0
         configureLevel()
         isPaused = false
@@ -1103,6 +1168,14 @@ final class GameSession {
         for (index, cell) in puzzle.cells.enumerated() where !collectedCellIndices.contains(index) && simd_distance(point, cell) < 0.45 {
             collectedCellIndices.insert(index); collectCell()
         }
+        for (index, pickup) in puzzle.shieldPickups.enumerated()
+            where shields < maxShields && !collectedShieldPickupIndices.contains(index) && simd_distance(point, pickup) < 0.48 {
+            collectedShieldPickupIndices.insert(index); collectShieldPickup()
+        }
+        for (index, pickup) in puzzle.repairPickups.enumerated()
+            where health < maxHealth && !collectedRepairPickupIndices.contains(index) && simd_distance(point, pickup) < 0.48 {
+            collectedRepairPickupIndices.insert(index); collectRepairPickup()
+        }
         let atDock = simd_distance(point, puzzle.dock) < 0.55
         if atDock && canFinish {
             nextLevel()
@@ -1234,6 +1307,26 @@ final class GameSession {
         message = "Energy cell \(collectedCells) of \(level.cellCount). Battery recharged."
         report(message); play("pickup")
     }
+    @discardableResult
+    func collectShieldPickup() -> Bool {
+        guard isRunning, shields < maxShields else { return false }
+        let restored = min(shieldPickupStrength, maxShields - shields)
+        shields += restored
+        awardMissionPoints(100)
+        message = "Shield capacitor restored \(restored) points. ROB shields: \(shields)/\(maxShields)."
+        report(message); play("pickup")
+        return true
+    }
+    @discardableResult
+    func collectRepairPickup() -> Bool {
+        guard isRunning, health < maxHealth else { return false }
+        let repaired = min(repairPickupStrength, maxHealth - health)
+        health += repaired
+        awardMissionPoints(100)
+        message = "Repair kit restored \(repaired) hull points. ROB health: \(health)/\(maxHealth)."
+        report(message); play("pickup")
+        return true
+    }
     func collectKey() {
         guard isRunning, level.requiresKey, !hasKey else { return }
         hasKey = true
@@ -1255,18 +1348,26 @@ final class GameSession {
     func enemyContact(_ attack: String = "Enemy contact", damage: Int = 5) -> Bool {
         guard isRunning, damageInvulnerabilityRemaining <= 0 else { return false }
         let appliedDamage = max(0, damage)
-        health = max(0, health - appliedDamage)
+        let absorbedDamage = min(shields, appliedDamage)
+        shields -= absorbedDamage
+        let hullDamage = appliedDamage - absorbedDamage
+        health = max(0, health - hullDamage)
         score = max(0, score - appliedDamage * 20)
         damageInvulnerabilityRemaining = 0.75
         if health == 0 {
             configureLevel()
             health = maxHealth
+            shields = maxShields
             damageInvulnerabilityRemaining = 1
             isPaused = false
             isRunning = true
             message = "ROB was disabled by \(attack). Restarting level \(level.id) with full health."
+        } else if hullDamage > 0, absorbedDamage > 0 {
+            message = "\(attack) broke ROB’s shield and dealt \(hullDamage) hull damage. Health: \(health)/\(maxHealth)."
+        } else if absorbedDamage > 0 {
+            message = "\(attack) drained \(absorbedDamage) shield points. ROB shields: \(shields)/\(maxShields)."
         } else {
-            message = "\(attack) dealt \(appliedDamage) damage. ROB health: \(health)/\(maxHealth)."
+            message = "\(attack) dealt \(hullDamage) hull damage. ROB health: \(health)/\(maxHealth)."
         }
         report(message)
         return true
@@ -1292,7 +1393,7 @@ final class GameSession {
         if levelIndex < levels.count - 1 {
             levelIndex += 1
             if audioEnabled { TechnoMusicEngine.shared.setLevel(levelIndex) }
-            enemyAttackCount = 0; health = maxHealth; damageInvulnerabilityRemaining = 0; configureLevel(); isPaused = false; isRunning = true
+            enemyAttackCount = 0; health = maxHealth; shields = maxShields; damageInvulnerabilityRemaining = 0; configureLevel(); isPaused = false; isRunning = true
             message = [reward, level.challenge].compactMap { $0 }.joined(separator: " ")
             report("ROB advanced to \(level.name). \(message)")
         } else {
@@ -1303,5 +1404,5 @@ final class GameSession {
         }
         play("level-complete")
     }
-    func reset() { levelIndex = 0; score = 0; health = maxHealth; damageInvulnerabilityRemaining = 0; enemyAttackCount = 0; configureLevel(); isPaused = false; isRunning = false; if audioEnabled { TechnoMusicEngine.shared.stop() }; message = "ROB systems ready." }
+    func reset() { levelIndex = 0; score = 0; health = maxHealth; shields = maxShields; damageInvulnerabilityRemaining = 0; enemyAttackCount = 0; configureLevel(); isPaused = false; isRunning = false; if audioEnabled { TechnoMusicEngine.shared.stop() }; message = "ROB systems ready." }
 }
