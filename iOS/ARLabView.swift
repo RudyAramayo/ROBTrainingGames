@@ -12,27 +12,30 @@ struct ARLabView: View {
     @Bindable var session: GameSession
     let onExit: () -> Void
     @Environment(\.scenePhase) private var scenePhase
-    @State private var componentMode = false
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var cameraAccess: ROBCameraAccess = .checking
     @State private var isActive = false
+    @State private var placementID = UUID()
+    @State private var timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ZStack(alignment: .bottom) {
             switch cameraAccess {
             case .authorized:
-                ROBARView(componentMode: componentMode, session: session, isActive: isActive)
+                ROBARView(session: session, isActive: isActive)
+                    .id(placementID)
                     .ignoresSafeArea()
-                controls
+                missionControls
             case .checking:
                 ARLabUnavailableView(
                     title: "Preparing the camera",
-                    message: "ROB is calibrating the AR view.",
+                    message: "ROB is finding a surface for the training arena.",
                     symbol: "camera.aperture"
                 )
             case .denied:
                 ARLabUnavailableView(
                     title: "Camera access is off",
-                    message: "Allow camera access in Settings so the AR Lab can show your room behind ROB.",
+                    message: "Allow camera access in Settings so AR missions can appear in your room.",
                     symbol: "camera.fill",
                     actionTitle: "Open Settings",
                     action: openSettings
@@ -40,22 +43,33 @@ struct ARLabView: View {
             case .unsupported:
                 ARLabUnavailableView(
                     title: "AR is unavailable",
-                    message: "This device does not support the world tracking required by the ROB AR Lab.",
+                    message: "This device does not support the world tracking required by ROB AR missions.",
                     symbol: "arkit"
                 )
             }
         }
-        .overlay(alignment: .topLeading) {
-            Button(action: onExit) {
-                Label("Menu", systemImage: "xmark.circle.fill")
-                    .font(.headline)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: Capsule())
+        .overlay(alignment: .top) {
+            HStack {
+                Button(action: onExit) {
+                    Label("Menu", systemImage: "xmark.circle.fill")
+                }
+                .accessibilityLabel("Pause AR mission and return to menu")
+
+                Spacer()
+
+                if cameraAccess == .authorized {
+                    Button { placementID = UUID() } label: {
+                        Label("Place Again", systemImage: "viewfinder")
+                    }
+                    .accessibilityHint("Scans for a new horizontal surface and places the arena again")
+                }
             }
+            .font(.headline)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial, in: Capsule())
             .buttonStyle(.plain)
             .padding()
-            .accessibilityLabel("Exit AR Lab to menu")
         }
         .background {
             LinearGradient(colors: [.indigo.opacity(0.8), .black], startPoint: .top, endPoint: .bottom)
@@ -63,89 +77,150 @@ struct ARLabView: View {
         }
         .task { await updateCameraAccess(requestIfNeeded: true) }
         .onAppear {
-            session.pause()
-            isActive = true
+            isActive = scenePhase == .active
+            startOrResumeMission()
         }
-        .onDisappear { isActive = false }
+        .onDisappear {
+            isActive = false
+            session.stopDrive()
+        }
         .onChange(of: scenePhase) { _, phase in
             isActive = phase == .active
             if phase == .active {
                 Task { await updateCameraAccess(requestIfNeeded: false) }
+                startOrResumeMission()
+            } else {
+                session.pause()
             }
+        }
+        .onReceive(timer) { _ in
+            guard cameraAccess == .authorized, isActive else { return }
+            session.tick(1.0 / 30.0)
         }
     }
 
-    private var controls: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Label("ROB AR LAB", systemImage: "arkit")
-                Spacer()
-                Text(session.robotFinish.displayName)
-            }
-            .font(.caption.bold())
-            .padding(10)
-            .background(.ultraThinMaterial, in: Capsule())
+    private var missionControls: some View {
+        VStack(spacing: verticalSizeClass == .compact ? 5 : 9) {
+            ARMissionStats(session: session, compact: verticalSizeClass == .compact)
 
-            Text(componentMode ? "Tap a ROB part, then use the guide below." : "Move the phone to find a surface · drag ROB to reposition")
-                .font(.callout.bold())
-                .padding(10)
-                .background(.ultraThinMaterial, in: Capsule())
+            Spacer(minLength: 8)
 
-            Toggle("Component Explorer", isOn: $componentMode)
-                .padding()
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-
-            if componentMode {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack {
-                        ForEach(session.components) { item in
-                            Button(item.name) { session.selectedComponent = item }
-                                .buttonStyle(.borderedProminent)
-                                .tint(.cyan)
-                        }
-                    }
-                    .padding(.horizontal)
+            if session.canFinish {
+                Button(session.levelIndex == session.levels.count - 1 ? "Finish Campaign" : "Enter Next Level") {
+                    session.nextLevel()
                 }
-                if let item = session.selectedComponent {
-                    Text(item.summary)
-                        .font(.footnote)
-                        .padding()
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-                }
+                .buttonStyle(.borderedProminent)
+                .tint(.green)
             }
 
-            Label("Mission simulation paused", systemImage: "pause.circle.fill")
+            Text(session.message)
                 .font(.caption.bold())
-                .foregroundStyle(.cyan)
+                .lineLimit(verticalSizeClass == .compact ? 1 : 2)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: Capsule())
+                .padding(.vertical, 7)
+                .background(.black.opacity(0.72), in: Capsule())
+
+            MobileTankControls(session: session)
         }
-        .padding()
+        .padding(.horizontal, 8)
+        .padding(.top, verticalSizeClass == .compact ? 54 : 68)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func startOrResumeMission() {
+        if session.isPaused { session.resume() }
+        else if !session.isRunning { session.begin() }
     }
 
     private func updateCameraAccess(requestIfNeeded: Bool) async {
         guard ARWorldTrackingConfiguration.isSupported else {
             cameraAccess = .unsupported
+            session.pause()
             return
         }
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             cameraAccess = .authorized
+            if isActive { startOrResumeMission() }
         case .notDetermined where requestIfNeeded:
-            cameraAccess = await AVCaptureDevice.requestAccess(for: .video) ? .authorized : .denied
+            let granted = await AVCaptureDevice.requestAccess(for: .video)
+            cameraAccess = granted ? .authorized : .denied
+            if granted && isActive { startOrResumeMission() }
+            else if !granted { session.pause() }
         case .notDetermined:
             cameraAccess = .checking
         case .denied, .restricted:
             cameraAccess = .denied
+            session.pause()
         @unknown default:
             cameraAccess = .denied
+            session.pause()
         }
     }
 
     private func openSettings() {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
+    }
+}
+
+private struct ARMissionStats: View {
+    @Bindable var session: GameSession
+    let compact: Bool
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                Label("L\(session.level.id)", systemImage: "flag.checkered")
+                if !compact {
+                    Text(session.level.name).lineLimit(1)
+                }
+                Spacer(minLength: 2)
+                Button { session.toggleMusic() } label: {
+                    Image(systemName: session.musicEnabled ? "music.note" : "speaker.slash")
+                }
+                Button {
+                    if session.isRunning { session.pause() }
+                    else { startOrResume() }
+                } label: {
+                    Image(systemName: session.isRunning ? "pause.fill" : "play.fill")
+                }
+                Button { session.begin() } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                }
+                .accessibilityLabel("Restart current level")
+            }
+            .font(.subheadline.bold())
+
+            HStack(spacing: compact ? 8 : 14) {
+                keyStatus
+                Spacer(minLength: 0)
+                Label("\(session.collectedCells)/\(session.level.cellCount)", systemImage: "bolt.fill")
+                Label("\(session.remainingEnemies)", systemImage: "scope")
+                Label("\(session.score)", systemImage: "star.fill")
+            }
+            .font(.caption.bold())
+            .monospacedDigit()
+
+            CombatHealthBars(session: session, compact: true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    @ViewBuilder private var keyStatus: some View {
+        if !session.level.requiresKey {
+            Label("No key", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+        } else {
+            Label(session.hasKey ? "Key" : "Find key", systemImage: session.hasKey ? "key.fill" : "key")
+        }
+    }
+
+    private func startOrResume() {
+        if session.isPaused { session.resume() }
+        else { session.begin() }
     }
 }
 
@@ -171,9 +246,11 @@ private struct ARLabUnavailableView: View {
 }
 
 struct ROBARView: UIViewRepresentable {
-    let componentMode: Bool
     @Bindable var session: GameSession
     let isActive: Bool
+
+    static let missionRootName = "AR Mission Root"
+    static let arenaScale: Float = 0.16
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -182,14 +259,11 @@ struct ROBARView: UIViewRepresentable {
         view.renderOptions.formUnion([.disableGroundingShadows, .disableMotionBlur, .disableDepthOfField])
         view.environment.sceneUnderstanding.options.remove(.occlusion)
 
-        let anchor = AnchorEntity(.plane(.horizontal, classification: .any, minimumBounds: [0.25, 0.25]))
-        let rob = RobotFactory.makeROB(componentMode: componentMode, arPresentation: true)
-        rob.scale = [0.32, 0.32, 0.32]
-        RobotFactory.applyWeapons(to: rob, session: session, componentMode: componentMode, arPresentation: true)
-        anchor.addChild(rob)
+        let anchor = AnchorEntity(.plane(.horizontal, classification: .any, minimumBounds: [0.55, 0.55]))
+        let missionRoot = Self.makeMissionRoot(session: session)
+        anchor.addChild(missionRoot)
         anchor.addChild(Self.makeFillLightRig())
         view.scene.addAnchor(anchor)
-        view.installGestures([.translation, .rotation, .scale], for: rob)
 
         let coaching = ARCoachingOverlayView()
         coaching.session = view.session
@@ -204,20 +278,65 @@ struct ROBARView: UIViewRepresentable {
             coaching.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
-        context.coordinator.robot = rob
+        context.coordinator.missionRoot = missionRoot
         context.coordinator.setSessionActive(isActive, in: view, resetTracking: true)
         return view
     }
 
     func updateUIView(_ view: ARView, context: Context) {
         context.coordinator.setSessionActive(isActive, in: view)
-        if let robot = context.coordinator.robot {
-            RobotFactory.applyWeapons(to: robot, session: session, componentMode: componentMode, arPresentation: true)
+        if let missionRoot = context.coordinator.missionRoot {
+            Self.updateMissionRoot(missionRoot, session: session)
         }
     }
 
     static func dismantleUIView(_ view: ARView, coordinator: Coordinator) {
         coordinator.setSessionActive(false, in: view)
+    }
+
+    static func makeMissionRoot(session: GameSession) -> Entity {
+        let root = Entity()
+        root.name = missionRootName
+        root.scale = .init(repeating: arenaScale)
+
+        root.addChild(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle, arPresentation: true))
+
+        let robot = RobotFactory.makeROB(arPresentation: true)
+        robot.position = session.robotPosition
+        robot.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0])
+        RobotFactory.applyWeapons(to: robot, session: session, arPresentation: true)
+        root.addChild(robot)
+
+        root.addChild(RobotFactory.makeCombatLayer(session: session))
+        return root
+    }
+
+    static func updateMissionRoot(_ root: Entity, session: GameSession) {
+        if let robot = root.findEntity(named: "ROB") {
+            robot.position = session.robotPosition
+            robot.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0])
+            RobotFactory.applyWeapons(to: robot, session: session, arPresentation: true)
+        }
+
+        let roomName = "Training Room-\(session.levelIndex)"
+        if let room = root.children.first(where: { $0.name == roomName }) {
+            RobotFactory.applyPuzzleState(to: room, session: session)
+        } else {
+            for child in Array(root.children) where child.name.hasPrefix("Training Room-") {
+                child.removeFromParent()
+            }
+            root.addChild(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle, arPresentation: true))
+        }
+
+        let combatName = RobotFactory.combatLayerName(level: session.levelIndex)
+        if let combat = root.children.first(where: { $0.name == combatName }) {
+            RobotFactory.applyCombatState(to: combat, session: session)
+        } else {
+            for child in Array(root.children) where child.name.hasPrefix("Combat Layer-") {
+                child.removeFromParent()
+            }
+            root.addChild(RobotFactory.makeCombatLayer(session: session))
+        }
     }
 
     static func makeConfiguration() -> ARWorldTrackingConfiguration {
@@ -252,7 +371,7 @@ struct ROBARView: UIViewRepresentable {
     }
 
     @MainActor final class Coordinator {
-        var robot: Entity?
+        var missionRoot: Entity?
         private var sessionIsRunning = false
 
         func setSessionActive(_ active: Bool, in view: ARView, resetTracking: Bool = false) {

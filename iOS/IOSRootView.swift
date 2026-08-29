@@ -43,11 +43,13 @@ struct IOSRootView: View {
     }
 
     private func launchARLab() {
-        session.pause()
+        if session.isPaused { session.resume() }
+        else if !session.isRunning { session.begin() }
         fullScreenExperience = .arLab
     }
 
     private func exitARLab() {
+        session.pause()
         fullScreenExperience = nil
     }
 }
@@ -157,15 +159,15 @@ private struct ARLabLaunchView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         ExperienceHero(
-                            title: "ROB AR Lab",
-                            message: "Place ROB in your room, inspect its systems, and adjust its loadout without running the training mission.",
+                            title: "ROB AR Missions",
+                            message: "Place the full training arena in your room, drive ROB, fight enemies, collect cells, unlock doors, and finish the same campaign in augmented reality.",
                             symbol: "arkit",
                             colors: [.purple, .cyan]
                         )
 
                         VStack(alignment: .leading, spacing: 12) {
-                            Label("Separate AR Session", systemImage: "pause.circle.fill").font(.headline)
-                            Text("Opening AR pauses any active mission and stops its movement, attacks, timer, and music. Return to Play when you are ready to resume.")
+                            Label("Live Campaign", systemImage: "gamecontroller.fill").font(.headline)
+                            Text("AR uses your current level, health, objectives, weapons, and progress. Leaving the arena pauses the mission safely.")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                             Divider()
@@ -176,7 +178,7 @@ private struct ARLabLaunchView: View {
                         .experienceCard()
 
                         Button(action: launch) {
-                            Label("Enter Full-Screen AR Lab", systemImage: "camera.viewfinder")
+                            Label(session.isPaused ? "Resume Full-Screen AR Mission" : "Start Full-Screen AR Mission", systemImage: "camera.viewfinder")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 7)
@@ -383,7 +385,7 @@ private struct RobotVoiceScreen: View {
     }
 }
 
-private struct MobileTankControls: View {
+struct MobileTankControls: View {
     @Bindable var session: GameSession
     @Environment(\.scenePhase) private var scenePhase
     @State private var leftDemand = 0.0

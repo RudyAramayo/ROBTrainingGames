@@ -140,6 +140,40 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(lightRig.children.filter { $0.components[DirectionalLightComponent.self] != nil }.count, 1)
     }
 
+    func testARLabRendersAndUpdatesThePlayableMission() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        let root = ROBARView.makeMissionRoot(session: game)
+
+        XCTAssertEqual(root.name, ROBARView.missionRootName)
+        XCTAssertEqual(root.scale, SIMD3<Float>(repeating: ROBARView.arenaScale))
+        XCTAssertNotNil(root.findEntity(named: "Training Room-0"))
+        XCTAssertNotNil(root.findEntity(named: "Training Floor"))
+        XCTAssertNotNil(root.findEntity(named: RobotFactory.combatLayerName(level: 0)))
+        XCTAssertNotNil(root.findEntity(named: "Puzzle Cell 0"))
+        XCTAssertNotNil(root.findEntity(named: "Training Enemy 0"))
+
+        game.robotPosition = [1.25, 0, -0.75]
+        game.robotHeading = .pi / 3
+        game.enemies[0].isActive = false
+        game.collectedCellIndices.insert(0)
+        ROBARView.updateMissionRoot(root, session: game)
+
+        XCTAssertEqual(root.findEntity(named: "ROB")?.position, game.robotPosition)
+        XCTAssertFalse(root.findEntity(named: "Training Enemy 0")?.isEnabled ?? true)
+        XCTAssertFalse(root.findEntity(named: "Puzzle Cell 0")?.isEnabled ?? true)
+
+        game.levelIndex = 1
+        game.begin()
+        ROBARView.updateMissionRoot(root, session: game)
+
+        XCTAssertNil(root.findEntity(named: "Training Room-0"))
+        XCTAssertNil(root.findEntity(named: RobotFactory.combatLayerName(level: 0)))
+        XCTAssertNotNil(root.findEntity(named: "Training Room-1"))
+        XCTAssertNotNil(root.findEntity(named: "Puzzle Key"))
+        XCTAssertNotNil(root.findEntity(named: RobotFactory.combatLayerName(level: 1)))
+    }
+
     nonisolated func testVoiceAudioTapRunsOutsideMainActor() {
         let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
         let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 32)!

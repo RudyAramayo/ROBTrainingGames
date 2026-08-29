@@ -295,18 +295,21 @@ import UIKit
         }
     }
 
-    static func makeTrainingRoom(level: Int, puzzle: PuzzleGeometry) -> Entity {
+    static func makeTrainingRoom(level: Int, puzzle: PuzzleGeometry, arPresentation: Bool = false) -> Entity {
         let room = Entity(); room.name = "Training Room-\(level)"
         let color: UIColor = level == 1 ? .systemIndigo : UIColor(white: 0.16, alpha: 1)
         let size = puzzle.arenaHalfExtent * 2
-        let floor = ModelEntity(mesh: .generatePlane(width: size, depth: size), materials: [SimpleMaterial(color: color, isMetallic: false)]); room.addChild(floor)
+        let floorColor = arPresentation ? color.withAlphaComponent(0.38) : color
+        let wallColor = UIColor(white: 0.12, alpha: arPresentation ? 0.82 : 1)
+        let barrierColor = UIColor(white: 0.28, alpha: arPresentation ? 0.88 : 1)
+        let floor = ModelEntity(mesh: .generatePlane(width: size, depth: size), materials: [SimpleMaterial(color: floorColor, isMetallic: false)]); floor.name = "Training Floor"; room.addChild(floor)
         for (position, wallSize) in [
             (SIMD3<Float>(0, 0.55, -puzzle.arenaHalfExtent), SIMD3<Float>(size, 1.1, 0.18)),
             (SIMD3<Float>(0, 0.55, puzzle.arenaHalfExtent), SIMD3<Float>(size, 1.1, 0.18)),
             (SIMD3<Float>(-puzzle.arenaHalfExtent, 0.55, 0), SIMD3<Float>(0.18, 1.1, size)),
             (SIMD3<Float>(puzzle.arenaHalfExtent, 0.55, 0), SIMD3<Float>(0.18, 1.1, size)),
-        ] { let wall = ModelEntity(mesh: .generateBox(size: wallSize, cornerRadius: 0.03), materials: [SimpleMaterial(color: UIColor(white: 0.12, alpha: 1), isMetallic: true)]); wall.position = position; room.addChild(wall) }
-        for barrier in puzzle.barriers { let block = ModelEntity(mesh: .generateBox(size: [barrier.size.x, 0.75, barrier.size.y], cornerRadius: 0.03), materials: [SimpleMaterial(color: UIColor(white: 0.28, alpha: 1), isMetallic: true)]); block.position = [barrier.center.x, 0.375, barrier.center.y]; room.addChild(block) }
+        ] { let wall = ModelEntity(mesh: .generateBox(size: wallSize, cornerRadius: 0.03), materials: [SimpleMaterial(color: wallColor, isMetallic: !arPresentation)]); wall.position = position; room.addChild(wall) }
+        for barrier in puzzle.barriers { let block = ModelEntity(mesh: .generateBox(size: [barrier.size.x, 0.75, barrier.size.y], cornerRadius: 0.03), materials: [SimpleMaterial(color: barrierColor, isMetallic: !arPresentation)]); block.position = [barrier.center.x, 0.375, barrier.center.y]; room.addChild(block) }
         if let door = puzzle.door { let entity = ModelEntity(mesh: .generateBox(size: [door.size.x, 0.9, door.size.y], cornerRadius: 0.025), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); entity.name = "Puzzle Door"; entity.position = [door.center.x, 0.45, door.center.y]; room.addChild(entity) }
         if let key = puzzle.key {
             let entity = makePuzzleKey()
