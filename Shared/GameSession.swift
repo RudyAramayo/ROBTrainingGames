@@ -173,6 +173,9 @@ struct PuzzleGeometry: Sendable {
 @MainActor @Observable
 final class GameSession {
     static let robotCollisionRadius: Float = 0.62
+    static let doorwayWidth: Float = 2.1
+    static let zigzagSpacing: Float = 1.9
+    private static let doorSensorClearance: Float = 0.16
     let maxHealth = 100
     let levels = [
         ROBLevel(id: 1, name: "Calibration Deck", lesson: "Arrow controls mix forward speed and steering into two tread demands.", cellCount: 3, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 900, requiresKey: false, challenge: "Learn smooth turns, evade three active enemies, collect three cells, and reach the dock."),
@@ -307,13 +310,13 @@ final class GameSession {
         }
         guard level.requiresKey else {
             let zigzag = (0..<min(5, max(2, level.id / 3 + 1))).map { index in
-                PuzzleBarrier(center: [index.isMultiple(of: 2) ? -1.35 : 1.35, 1.8 - Float(index) * 1.45], size: [half * 1.05, 0.24])
+                PuzzleBarrier(center: [index.isMultiple(of: 2) ? -1.35 : 1.35, 1.8 - Float(index) * zigzagSpacing], size: [half * 1.05, 0.24])
             }
             return PuzzleGeometry(arenaHalfExtent: half, key: nil, door: nil, barriers: zigzag, cells: cells, dock: [margin, -margin])
         }
         let horizontal = ![2, 6, 8, 12, 14].contains(level.id)
         if horizontal {
-            let door = PuzzleBarrier(center: [level.id.isMultiple(of: 3) ? -1.45 : 0.65, 0.35], size: [1.25, 0.24])
+            let door = PuzzleBarrier(center: [level.id.isMultiple(of: 3) ? -1.45 : 0.65, 0.35], size: [doorwayWidth, 0.24])
             let left = door.center.x - door.size.x / 2
             let right = door.center.x + door.size.x / 2
             let walls = [
@@ -323,7 +326,7 @@ final class GameSession {
             ]
             return PuzzleGeometry(arenaHalfExtent: half, key: [level.id.isMultiple(of: 3) ? margin : -margin, margin], door: door, barriers: walls, cells: cells, dock: [margin, -margin])
         }
-        let door = PuzzleBarrier(center: [0.45, -0.45], size: [0.24, 1.25])
+        let door = PuzzleBarrier(center: [0.45, -0.45], size: [0.24, doorwayWidth])
         let near = door.center.y - door.size.y / 2
         let far = door.center.y + door.size.y / 2
         let walls = [
@@ -332,7 +335,12 @@ final class GameSession {
             PuzzleBarrier(center: [-2.0, -2.2], size: [2.8, 0.24]),
         ]
         let key: SIMD2<Float> = level.id == 2 ? [-2.6, 2.8] : [-margin, margin]
-        return PuzzleGeometry(arenaHalfExtent: half, key: key, door: door, barriers: walls, cells: cells.map { SIMD2<Float>($0.x > 0 ? $0.x : abs($0.x) + 0.6, $0.y) }, dock: [margin, -margin])
+        let cellMinimumX = door.center.x + door.size.x / 2 + robotCollisionRadius + 0.25
+        let adjustedCells = cells.map { cell in
+            let horizontalProgress = (cell.x + margin) / (margin * 2)
+            return SIMD2<Float>(cellMinimumX + (margin - cellMinimumX) * horizontalProgress, cell.y)
+        }
+        return PuzzleGeometry(arenaHalfExtent: half, key: key, door: door, barriers: walls, cells: adjustedCells, dock: [margin, -margin])
     }
 
     private func report(_ situation: String) { lastSituation = situation; situationCount += 1 }
@@ -363,7 +371,14 @@ final class GameSession {
         hasKey = false; doorOpen = !level.requiresKey; collectedCellIndices = []; saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
         laserDistance = nil; laserCharge = 0; laserShotCharge = 0; laserShotWeapon = rangedWeapon; laserShotOrigin = .zero; isChargingLaser = false; lockedEnemyID = nil
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
-        robotPosition = SIMD3<Float>(0, 0, puzzle.arenaHalfExtent - 0.8); robotHeading = 0; leftWheelAngle = 0; rightWheelAngle = 0
+        let layout = puzzle
+        let startingX: Float
+        if let door = layout.door, door.size.x < door.size.y {
+            startingX = door.center.x - door.size.x / 2 - Self.robotCollisionRadius - 0.35
+        } else {
+            startingX = 0
+        }
+        robotPosition = SIMD3<Float>(startingX, 0, layout.arenaHalfExtent - 0.8); robotHeading = 0; leftWheelAngle = 0; rightWheelAngle = 0
         enemyBolts = []; nextBoltID = 0; wasAtDock = false; enemies = configuredEnemies()
         updateLaserLock()
     }
@@ -468,10 +483,14 @@ final class GameSession {
     private var robotMovementBlockers: [PuzzleBarrier] {
         puzzle.barriers + ((!doorOpen && puzzle.door != nil) ? [puzzle.door!] : [])
     }
-    private func isRobotMoveClear(from start: SIMD3<Float>, to end: SIMD3<Float>) -> Bool {
+    func isRobotPositionClear(_ position: SIMD3<Float>) -> Bool {
         let wallInset: Float = 0.09 + Self.robotCollisionRadius
         let movementLimit = puzzle.arenaHalfExtent - wallInset
-        guard abs(end.x) <= movementLimit, abs(end.z) <= movementLimit else { return false }
+        guard abs(position.x) <= movementLimit, abs(position.z) <= movementLimit else { return false }
+        return !robotMovementBlockers.contains { Self.intersects(position, barrier: $0, radius: Self.robotCollisionRadius) }
+    }
+    private func isRobotMoveClear(from start: SIMD3<Float>, to end: SIMD3<Float>) -> Bool {
+        guard isRobotPositionClear(end) else { return false }
         let start2D = SIMD2<Float>(start.x, start.z)
         let end2D = SIMD2<Float>(end.x, end.z)
         return !robotMovementBlockers.contains { blocker in
@@ -702,7 +721,11 @@ final class GameSession {
     private func resolveSpatialObjectives() {
         let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
         if let key = puzzle.key, !hasKey, simd_distance(point, key) < 0.48 { collectKey() }
-        if let door = puzzle.door, !doorOpen, simd_distance(point, door.center) < 0.72 { openDoor() }
+        if let door = puzzle.door,
+           !doorOpen,
+           Self.distance(from: point, to: door) <= Self.robotCollisionRadius + Self.doorSensorClearance {
+            openDoor()
+        }
         for (index, cell) in puzzle.cells.enumerated() where !collectedCellIndices.contains(index) && simd_distance(point, cell) < 0.45 {
             collectedCellIndices.insert(index); collectCell()
         }

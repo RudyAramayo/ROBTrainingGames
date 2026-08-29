@@ -321,34 +321,86 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.robotPosition.z, safeZ, accuracy: 0.001)
     }
 
-    func testChassisCanStillUnlockAndPassThroughAProperlyAlignedDoorway() {
+    func testChassisCanUnlockAndPassThroughEveryLevelDoorway() {
         let game = GameSession(audioEnabled: false)
-        game.levelIndex = 1
-        game.begin()
-        for index in game.enemies.indices { game.enemies[index].isActive = false }
-        game.collectKey()
-        guard let door = game.puzzle.door else { return XCTFail("Level 2 needs a door") }
-        let approach = door.size.x < door.size.y
-            ? SIMD3<Float>(door.center.x + 0.68, 0, door.center.y)
-            : SIMD3<Float>(door.center.x, 0, door.center.y + 0.68)
-        game.robotPosition = approach
+        for levelIndex in game.levels.indices where game.levels[levelIndex].requiresKey {
+            game.levelIndex = levelIndex
+            game.begin()
+            for index in game.enemies.indices { game.enemies[index].isActive = false }
+            game.collectKey()
+            guard let door = game.puzzle.door else {
+                return XCTFail("Level \(game.level.id) needs a door")
+            }
 
-        game.tick(1.0 / 30.0)
+            let openingWidth = max(door.size.x, door.size.y)
+            XCTAssertGreaterThanOrEqual(
+                openingWidth - GameSession.robotCollisionRadius * 2,
+                0.8,
+                "Level \(game.level.id) doorway needs useful steering clearance"
+            )
 
-        XCTAssertTrue(game.doorOpen)
-        if door.size.x < door.size.y {
-            game.robotHeading = .pi / 2
-        } else {
-            game.robotHeading = 0
+            let crossingOffset = GameSession.robotCollisionRadius + min(door.size.x, door.size.y) / 2 + 0.28
+            if door.size.x < door.size.y {
+                game.robotPosition = [door.center.x + crossingOffset, 0, door.center.y]
+                game.robotHeading = .pi / 2
+            } else {
+                game.robotPosition = [door.center.x, 0, door.center.y + crossingOffset]
+                game.robotHeading = 0
+            }
+
+            game.setDrive(forward: 1, steering: 0)
+            for _ in 0..<240 { game.tick(1.0 / 60.0) }
+            game.stopDrive()
+
+            XCTAssertTrue(game.doorOpen, "Level \(game.level.id) door did not unlock from a collision-safe approach")
+            if door.size.x < door.size.y {
+                XCTAssertLessThan(
+                    game.robotPosition.x,
+                    door.center.x - crossingOffset,
+                    "ROB could not drive through Level \(game.level.id)'s vertical doorway"
+                )
+            } else {
+                XCTAssertLessThan(
+                    game.robotPosition.z,
+                    door.center.y - crossingOffset,
+                    "ROB could not drive through Level \(game.level.id)'s horizontal doorway"
+                )
+            }
         }
-        game.setDrive(forward: 1, steering: 0)
-        game.tick(1.6)
-        game.stopDrive()
+    }
 
-        if door.size.x < door.size.y {
-            XCTAssertLessThan(game.robotPosition.x, door.center.x - 0.6)
-        } else {
-            XCTAssertLessThan(game.robotPosition.z, door.center.y - 0.6)
+    func testEveryLevelProvidesClearSpawnsObjectivesAndCorridors() {
+        let game = GameSession(audioEnabled: false)
+
+        for levelIndex in game.levels.indices {
+            game.levelIndex = levelIndex
+            game.begin()
+            XCTAssertTrue(
+                game.isRobotPositionClear(game.robotPosition),
+                "Level \(game.level.id) starts ROB inside a wall collision envelope"
+            )
+
+            game.doorOpen = true
+            var objectives = game.puzzle.cells + [game.puzzle.dock]
+            if let key = game.puzzle.key { objectives.append(key) }
+            for objective in objectives {
+                XCTAssertTrue(
+                    game.isRobotPositionClear([objective.x, 0, objective.y]),
+                    "Level \(game.level.id) places an objective outside ROB's navigable space at \(objective)"
+                )
+            }
+
+            guard !game.level.requiresKey else { continue }
+            let walls = game.puzzle.barriers.sorted { $0.center.y > $1.center.y }
+            for (first, second) in zip(walls, walls.dropFirst()) {
+                let physicalGap = abs(first.center.y - second.center.y) - (first.size.y + second.size.y) / 2
+                let steeringClearance = physicalGap - GameSession.robotCollisionRadius * 2
+                XCTAssertGreaterThanOrEqual(
+                    steeringClearance,
+                    0.4,
+                    "Level \(game.level.id) zigzag is too narrow for ROB to change sides"
+                )
+            }
         }
     }
 
@@ -485,7 +537,7 @@ final class GameSessionTests: XCTestCase {
         let game = GameSession(audioEnabled: false)
         game.begin()
         let index = game.enemies.startIndex
-        game.robotPosition = [0, 0, -2.2]
+        game.robotPosition = [0, 0, -2.65]
         game.enemies[index].position = game.robotPosition + SIMD3<Float>(0, 0, 1.25)
         let shields = game.enemies[index].shields
 
@@ -619,7 +671,7 @@ final class GameSessionTests: XCTestCase {
         let game = GameSession(audioEnabled: false)
         let robot = RobotFactory.makeROB()
         game.begin()
-        game.robotPosition = [0, 0, -2.2]
+        game.robotPosition = [0, 0, -2.65]
         game.saberAttack(); game.saberAttack(); game.saberAttack()
 
         RobotFactory.applyWeapons(to: robot, session: game)
