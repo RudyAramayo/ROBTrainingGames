@@ -893,7 +893,7 @@ final class GameSession {
         camera: PuzzleSecurityCamera,
         heading: Float,
         blockers: [PuzzleBarrier],
-        rayCount: Int = 25
+        rayCount: Int = 49
     ) -> [Float] {
         let count = max(2, rayCount)
         return (0..<count).map { index in
@@ -910,7 +910,7 @@ final class GameSession {
 
     func securityCameraVisionDistances(
         for camera: PuzzleSecurityCamera,
-        rayCount: Int = 25
+        rayCount: Int = 49
     ) -> [Float] {
         Self.securityCameraVisionDistances(
             camera: camera,
@@ -920,20 +920,33 @@ final class GameSession {
         )
     }
 
-    func securityCameraCanSee(_ point: SIMD2<Float>, camera: PuzzleSecurityCamera) -> Bool {
+    static func securityCameraCanSee(
+        _ point: SIMD2<Float>,
+        camera: PuzzleSecurityCamera,
+        heading: Float,
+        blockers: [PuzzleBarrier]
+    ) -> Bool {
         let offset = point - camera.position
         let distance = simd_length(offset)
         guard distance > 0.001, distance <= camera.range else { return false }
-        let heading = securityCameraHeading(camera)
         let forward = SIMD2<Float>(-sin(heading), -cos(heading))
-        guard simd_dot(offset / distance, forward) >= cos(Self.securityCameraHalfAngle) else { return false }
+        guard simd_dot(offset / distance, forward) >= cos(securityCameraHalfAngle) else { return false }
         let targetHeading = atan2(-offset.x, -offset.y)
-        return distance <= Self.securityCameraSightDistance(
+        return distance <= securityCameraSightDistance(
             camera: camera,
             heading: heading,
             angleOffset: targetHeading - heading,
-            blockers: projectileBlockers
+            blockers: blockers
         ) + 0.001
+    }
+
+    func securityCameraCanSee(_ point: SIMD2<Float>, camera: PuzzleSecurityCamera) -> Bool {
+        Self.securityCameraCanSee(
+            point,
+            camera: camera,
+            heading: securityCameraHeading(camera),
+            blockers: projectileBlockers
+        )
     }
 
     private func updateSecurityCameras() {

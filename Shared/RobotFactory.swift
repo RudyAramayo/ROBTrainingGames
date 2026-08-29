@@ -374,6 +374,44 @@ import UIKit
         }
     }
 
+    /// Dense rays keep the red edge tight to corners while the camera sweeps.
+    private static let securityCameraVisionRayCount = 49
+
+    private static func securityCameraVisionMesh(
+        camera: PuzzleSecurityCamera,
+        distances: [Float]
+    ) -> MeshResource? {
+        guard distances.count >= 2 else { return nil }
+        var positions = [SIMD3<Float>(0, 0, 0)]
+        positions.reserveCapacity(distances.count + 1)
+        for (index, distance) in distances.enumerated() {
+            let angle = -GameSession.securityCameraHalfAngle
+                + GameSession.securityCameraHalfAngle * 2 * Float(index) / Float(distances.count - 1)
+            positions.append([-sin(angle) * distance, 0, -cos(angle) * distance])
+        }
+        var indices: [UInt32] = []
+        indices.reserveCapacity((distances.count - 1) * 3)
+        for index in 0..<(distances.count - 1) {
+            indices.append(contentsOf: [0, UInt32(index + 1), UInt32(index + 2)])
+        }
+        var descriptor = MeshDescriptor(name: "Security Camera Vision \(camera.id)")
+        descriptor.positions = MeshBuffers.Positions(positions)
+        descriptor.primitives = .triangles(indices)
+        descriptor.materials = .allFaces(0)
+        return try? MeshResource.generate(from: [descriptor])
+    }
+
+    private static func initialSecurityCameraBlockers(for puzzle: PuzzleGeometry) -> [PuzzleBarrier] {
+        let half = puzzle.arenaHalfExtent
+        let perimeter = [
+            PuzzleBarrier(center: [0, -half], size: [half * 2, 0.18]),
+            PuzzleBarrier(center: [0, half], size: [half * 2, 0.18]),
+            PuzzleBarrier(center: [-half, 0], size: [0.18, half * 2]),
+            PuzzleBarrier(center: [half, 0], size: [0.18, half * 2]),
+        ]
+        return puzzle.barriers + perimeter + (puzzle.door.map { [$0] } ?? [])
+    }
+
     static func makeTrainingRoom(level: Int, puzzle: PuzzleGeometry, arPresentation: Bool = false) -> Entity {
         let room = Entity(); room.name = "Training Room-\(level)"
         let color: UIColor = level == 1 ? .systemIndigo : UIColor(white: 0.16, alpha: 1)
@@ -417,12 +455,22 @@ import UIKit
             }
             room.addChild(zone)
         }
+        let initialCameraBlockers = initialSecurityCameraBlockers(for: puzzle)
         for camera in puzzle.securityCameras {
             let root = Entity(); root.name = "Security Camera \(camera.id)"; root.position = [camera.position.x, 0, camera.position.y]; root.orientation = simd_quatf(angle: camera.heading, axis: [0, 1, 0])
             let post = ModelEntity(mesh: .generateCylinder(height: 1.25, radius: 0.055), materials: [SimpleMaterial(color: .darkGray, isMetallic: true)]); post.position.y = 0.625; root.addChild(post)
             let housing = ModelEntity(mesh: .generateBox(size: [0.34, 0.22, 0.46], cornerRadius: 0.04), materials: [SimpleMaterial(color: .lightGray, isMetallic: true)]); housing.position = [0, 1.2, -0.18]; root.addChild(housing)
             let lens = ModelEntity(mesh: .generateSphere(radius: 0.07), materials: [UnlitMaterial(color: .systemRed)]); lens.name = "Security Camera Lens \(camera.id)"; lens.position = [0, 1.2, -0.43]; root.addChild(lens)
-            let beam = ModelEntity(mesh: .generateBox(size: [1.2, 0.012, camera.range], cornerRadius: 0.08), materials: [SimpleMaterial(color: UIColor.systemRed.withAlphaComponent(arPresentation ? 0.09 : 0.13), isMetallic: false)]); beam.name = "Security Camera Beam \(camera.id)"; beam.position = [0, 0.04, -camera.range / 2]; root.addChild(beam)
+            let distances = GameSession.securityCameraVisionDistances(
+                camera: camera,
+                heading: camera.heading,
+                blockers: initialCameraBlockers,
+                rayCount: securityCameraVisionRayCount
+            )
+            if let visionMesh = securityCameraVisionMesh(camera: camera, distances: distances) {
+                let beam = ModelEntity(mesh: visionMesh, materials: [UnlitMaterial(color: UIColor.systemRed.withAlphaComponent(arPresentation ? 0.09 : 0.13))])
+                beam.name = "Security Camera Beam \(camera.id)"; beam.position.y = 0.04; root.addChild(beam)
+            }
             room.addChild(root)
         }
         if let key = puzzle.key {
@@ -500,6 +548,13 @@ import UIKit
         }
         for camera in session.puzzle.securityCameras {
             room.findEntity(named: "Security Camera \(camera.id)")?.orientation = simd_quatf(angle: session.securityCameraHeading(camera), axis: [0, 1, 0])
+            if let beam = room.findEntity(named: "Security Camera Beam \(camera.id)") as? ModelEntity,
+               let visionMesh = securityCameraVisionMesh(
+                   camera: camera,
+                   distances: session.securityCameraVisionDistances(for: camera, rayCount: securityCameraVisionRayCount)
+               ) {
+                beam.model?.mesh = visionMesh
+            }
             if let lens = room.findEntity(named: "Security Camera Lens \(camera.id)") as? ModelEntity {
                 lens.model?.materials = [UnlitMaterial(color: session.isSecurityAlerted ? .systemRed : .systemYellow)]
             }

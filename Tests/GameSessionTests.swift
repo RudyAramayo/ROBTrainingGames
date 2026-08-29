@@ -577,6 +577,29 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.enemies.filter(\.isMiniBoss).count, 1)
     }
 
+    func testSecurityCameraDetectionAndRedVisionFanStopAtWalls() {
+        let camera = PuzzleSecurityCamera(id: 0, position: [0, 2], heading: 0, sweep: 0, range: 8)
+        let wall = PuzzleBarrier(center: [0, 0], size: [8, 0.2])
+
+        XCTAssertTrue(GameSession.securityCameraCanSee([0, 1], camera: camera, heading: 0, blockers: [wall]))
+        XCTAssertFalse(GameSession.securityCameraCanSee([0, -2], camera: camera, heading: 0, blockers: [wall]))
+
+        let distances = GameSession.securityCameraVisionDistances(
+            camera: camera,
+            heading: 0,
+            blockers: [wall],
+            rayCount: 49
+        )
+        XCTAssertEqual(distances.count, 49)
+        XCTAssertTrue(distances.allSatisfy { $0 < 2.4 })
+        XCTAssertTrue(GameSession.securityCameraVisionDistances(
+            camera: camera,
+            heading: 0,
+            blockers: [],
+            rayCount: 5
+        ).allSatisfy { $0 == camera.range })
+    }
+
     func testEnergyDrainsWhileDrivingAndRecoversWhileStopped() {
         let game = GameSession(audioEnabled: false)
         game.begin()
