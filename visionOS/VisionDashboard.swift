@@ -4,75 +4,365 @@ import SwiftUI
 struct VisionDashboard: View {
     @Bindable var session: GameSession
     @Bindable var voice: RobotVoice
+    @Bindable var controller: VisionGameControllerInput
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    @Environment(\.openWindow) private var openWindow
     @State private var immersive = false
+
     var body: some View {
         NavigationSplitView {
             List {
-                Section("Campaign") { ForEach(session.levels) { level in Label("\(level.id). \(level.name)", systemImage: level.id - 1 <= session.levelIndex ? "checkmark.circle.fill" : "circle") } }
+                Section("Campaign") {
+                    ForEach(session.levels) { level in
+                        Label(
+                            "\(level.id). \(level.name)",
+                            systemImage: level.id - 1 <= session.levelIndex ? "checkmark.circle.fill" : "circle"
+                        )
+                    }
+                }
                 Section("ROB Loadout") {
                     Label("\(session.highestCompletedLevel)/\(session.levels.count) levels complete", systemImage: "wrench.and.screwdriver.fill")
                     VisionLoadoutMenu(session: session)
                 }
-                Section("Explore ROB") { ForEach(session.components) { component in Button(component.name) { session.selectedComponent = component } } }
-            }.navigationTitle("ROB Training")
+                Section("Explore ROB") {
+                    ForEach(session.components) { component in
+                        Button(component.name) { session.selectedComponent = component }
+                    }
+                }
+            }
+            .navigationTitle("ROB Training")
         } detail: {
             VStack(spacing: 18) {
-                Image("rob-training-key-art").resizable().scaledToFit().frame(maxHeight: 310).clipShape(RoundedRectangle(cornerRadius: 24))
-                Text("ROB Spatial Workshop").font(.largeTitle.bold()); Text("Place ROB at full scale, evade patrolling spider and sentry robots, complete missions, and reveal the systems inside.").multilineTextAlignment(.center).foregroundStyle(.secondary)
-                HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Label("Score \(session.score)", systemImage: "star.fill"); Label("Upgrade points \(session.upgradePoints)", systemImage: "star.circle.fill"); Label("Targets \(session.remainingEnemies)", systemImage: "scope"); Label(session.hasKey ? "Key secured" : "Find key", systemImage: session.hasKey ? "key.fill" : "key") }.monospacedDigit()
+                Image("rob-training-key-art")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 280)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                Text("ROB Spatial Workshop").font(.largeTitle.bold())
+                Text("Open the complete arena as a tabletop game, place the volume where it is comfortable, and drive with hand pinches, a gamepad, or two spatial controllers.")
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered")
+                    Label("Score \(session.score)", systemImage: "star.fill")
+                    Label("Upgrade points \(session.upgradePoints)", systemImage: "star.circle.fill")
+                    Label("Targets \(session.remainingEnemies)", systemImage: "scope")
+                }
+                .monospacedDigit()
                 CombatHealthBars(session: session).frame(width: 420)
-                Text("Keyboard: WASD or arrows to move · Space for saber combo · hold Q to charge laser").font(.callout.monospaced()).foregroundStyle(.cyan)
-                Text(session.laserLockDescription).font(.headline.monospaced()).foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
-                HStack { Button(session.musicEnabled ? "Generated techno on" : "Music off", systemImage: session.musicEnabled ? "music.note" : "speaker.slash") { session.toggleMusic() }; Button(immersive ? "Leave Spatial Workshop" : "Enter Spatial Workshop", systemImage: immersive ? "rectangle.portrait.and.arrow.right" : "vision.pro") { Task { if immersive { await dismissImmersiveSpace(); immersive = false } else { immersive = await openImmersiveSpace(id: "ROBWorkshop") == .opened } } } }.buttonStyle(.borderedProminent)
+                Label(controller.modeDescription, systemImage: controller.isConnected ? "gamecontroller.fill" : "hand.point.up.left.fill")
+                    .font(.callout.bold())
+                    .foregroundStyle(.cyan)
+                Text("Gamepad: both sticks drive matching treads · A/X saber · right trigger laser · B hack · Menu start/pause")
+                    .font(.caption.monospaced())
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                Text(session.laserLockDescription)
+                    .font(.headline.monospaced())
+                    .foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
+                HStack {
+                    Button("Open Tabletop Game", systemImage: "cube.transparent") {
+                        openWindow(id: "ROBTabletop")
+                    }
+                    Button(immersive ? "Leave Room-Scale Game" : "Enter Room-Scale Game", systemImage: immersive ? "rectangle.portrait.and.arrow.right" : "vision.pro") {
+                        Task {
+                            if immersive {
+                                await dismissImmersiveSpace()
+                                immersive = false
+                            } else {
+                                immersive = await openImmersiveSpace(id: "ROBWorkshop") == .opened
+                            }
+                        }
+                    }
+                    Button(session.musicEnabled ? "Generated techno on" : "Music off", systemImage: session.musicEnabled ? "music.note" : "speaker.slash") {
+                        session.toggleMusic()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                Text("Tabletop placement: grab the volume's window bar, move it onto a table, then rotate or resize the volume until the whole arena is comfortable to view.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 RobotVoicePanel(voice: voice, game: session).frame(maxWidth: 620)
-                if let component = session.selectedComponent { VStack(alignment: .leading) { Text(component.name).font(.title2.bold()); Text(component.summary).foregroundStyle(.secondary) }.padding().glassBackgroundEffect() }
-            }.padding(28)
+                if let component = session.selectedComponent {
+                    VStack(alignment: .leading) {
+                        Text(component.name).font(.title2.bold())
+                        Text(component.summary).foregroundStyle(.secondary)
+                    }
+                    .padding()
+                    .glassBackgroundEffect()
+                }
+            }
+            .padding(28)
         }
         .robGameKeyboardControls(session: session)
+        .onAppear { controller.start(session: session) }
+    }
+}
+
+struct TabletopROBWorkshop: View {
+    @Bindable var session: GameSession
+    @Bindable var controller: VisionGameControllerInput
+    @State private var arenaScale: Float = 0.085
+    @State private var timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        ROBSpatialArena(session: session, scale: arenaScale, position: [0, -0.3, 0])
+            .ornament(attachmentAnchor: .scene(.top)) {
+                VisionArenaStatus(session: session, controller: controller)
+                    .padding(10)
+            }
+            .ornament(attachmentAnchor: .scene(.bottom)) {
+                VisionControlDeck(
+                    session: session,
+                    controller: controller,
+                    arenaScale: $arenaScale,
+                    scaleRange: 0.065...0.105,
+                    placementHelp: "Grab the volume bar to place this arena on a tabletop."
+                )
+                .frame(width: 760)
+                .padding(12)
+            }
+            .robGameKeyboardControls(session: session)
+            .onAppear { controller.start(session: session) }
+            .onReceive(timer) { _ in session.tick(1.0 / 30.0) }
     }
 }
 
 struct ImmersiveROBWorkshop: View {
     @Bindable var session: GameSession
-    @Bindable var voice: RobotVoice
-    @State private var robot = RobotFactory.makeROB(componentMode: true)
-    @State private var scale: Float = 0.75
+    @Bindable var controller: VisionGameControllerInput
+    @State private var arenaScale: Float = 0.16
     @State private var timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
+
     var body: some View {
-        RealityView { content, attachments in
-            robot.position = [0, 0, -2]; robot.scale = .init(repeating: scale); content.add(robot); let room = RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle); room.position = [0, -0.02, -2]; content.add(room)
-            let combat = RobotFactory.makeCombatLayer(session: session); combat.position = [0, 0, -2]; content.add(combat)
-            if let controls = attachments.entity(for: "controls") { controls.position = [0, 1.9, -1.4]; content.add(controls) }
-        } update: { content, _ in robot.scale = .init(repeating: scale); robot.position = session.robotPosition + SIMD3<Float>(0, 0, -2); robot.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0]); RobotFactory.applyWeapons(to: robot, session: session, componentMode: true); let roomName = "Training Room-\(session.levelIndex)"; if let room = content.entities.first(where: { $0.name == roomName }) { RobotFactory.applyPuzzleState(to: room, session: session) } else { content.entities.filter { $0.name.hasPrefix("Training Room-") }.forEach { $0.removeFromParent() }; let room = RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle); room.position = [0, -0.02, -2]; content.add(room) }; let combatName = RobotFactory.combatLayerName(level: session.levelIndex); if let combat = content.entities.first(where: { $0.name == combatName }) { RobotFactory.applyCombatState(to: combat, session: session) } else { content.entities.filter { $0.name.hasPrefix("Combat Layer-") }.forEach { $0.removeFromParent() }; let combat = RobotFactory.makeCombatLayer(session: session); combat.position = [0, 0, -2]; content.add(combat) } } attachments: {
-            Attachment(id: "controls") {
-                VStack(spacing: 12) {
-                    Text("ROB Spatial Controls").font(.headline)
-                    Text("WASD / arrows · Space combo · hold Q to charge").font(.caption.monospaced()).foregroundStyle(.cyan)
-                    HStack { DriveHoldButton(session: session, title: "←", steering: 1); DriveHoldButton(session: session, title: "↑", forward: 1); DriveHoldButton(session: session, title: "→", steering: -1) }
-                    HStack { DriveHoldButton(session: session, title: "↓", forward: -1); Button("Stop") { session.stopDrive() } }
-                    Slider(value: Binding(get: { Double(scale) }, set: { scale = Float($0) }), in: 0.3...1.3) { Text("Scale") }.frame(width: 320)
-                    HStack { LaserChargeButton(session: session, title: session.rangedWeapon.displayName); Button(session.meleeWeapon.displayName) { session.saberAttack() }.buttonStyle(.borderedProminent).tint(.pink) }
-                    if session.level.requiresKey && !session.doorOpen {
-                        Button(session.doorHackDescription, systemImage: "lock.open.trianglebadge.exclamationmark") { session.startDoorHack() }
-                            .buttonStyle(.borderedProminent).tint(.orange).disabled(!session.canStartDoorHack)
-                    }
-                    VisionLoadoutMenu(session: session, compact: true)
-                    Text(session.laserLockDescription).font(.caption.bold().monospaced()).foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
-                    CombatHealthBars(session: session, compact: true).frame(width: 360)
-                    Button(session.musicEnabled ? "♫ Generated techno" : "Music off") { session.toggleMusic() }
-                    Text("\(session.remainingEnemies) targets · spiders lunge · sentry robots circle and fire").font(.caption.bold()).foregroundStyle(.cyan)
-                    Text("Navigate ROB onto keys, doors, and cells; locked partitions block every bypass.").font(.caption).frame(width: 420)
-                    HStack { Button(session.isRunning ? "Reset mission" : "Start mission") { session.isRunning ? session.reset() : session.begin() }; if session.canFinish { Button(session.levelIndex == session.levels.count - 1 ? "Finish campaign" : "Next level") { session.nextLevel() } } }
-                    Menu("Inspect a component") { ForEach(session.components) { component in Button(component.name) { session.selectedComponent = component } } }
-                    if let component = session.selectedComponent { Text(component.summary).font(.caption).frame(width: 420) }
-                    RobotVoicePanel(voice: voice, game: session, compact: true).frame(width: 440)
-                }.padding().glassBackgroundEffect()
+        ROBSpatialArena(session: session, scale: arenaScale, position: [0, 0.72, -2.0])
+            .ornament(attachmentAnchor: .scene(.top)) {
+                VisionArenaStatus(session: session, controller: controller)
+                    .padding(10)
+            }
+            .ornament(attachmentAnchor: .scene(.bottom)) {
+                VisionControlDeck(
+                    session: session,
+                    controller: controller,
+                    arenaScale: $arenaScale,
+                    scaleRange: 0.1...0.24,
+                    placementHelp: "Room-scale view keeps the entire arena grouped and centered."
+                )
+                .frame(width: 760)
+                .padding(12)
+            }
+            .robGameKeyboardControls(session: session)
+            .onAppear { controller.start(session: session) }
+            .onReceive(timer) { _ in session.tick(1.0 / 30.0) }
+    }
+}
+
+private struct ROBSpatialArena: View {
+    @Bindable var session: GameSession
+    let scale: Float
+    let position: SIMD3<Float>
+    @State private var arenaRoot = Entity()
+    @State private var robot = RobotFactory.makeROB(componentMode: true)
+
+    var body: some View {
+        RealityView { content in
+            arenaRoot.name = "ROB Spatial Arena Root"
+            arenaRoot.scale = .init(repeating: scale)
+            arenaRoot.position = position
+            robot.position = session.robotPosition
+            robot.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0])
+            arenaRoot.addChild(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle))
+            arenaRoot.addChild(RobotFactory.makeCombatLayer(session: session))
+            arenaRoot.addChild(robot)
+            content.add(arenaRoot)
+        } update: { _ in
+            arenaRoot.scale = .init(repeating: scale)
+            arenaRoot.position = position
+            robot.position = session.robotPosition
+            robot.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0])
+            RobotFactory.applyWeapons(to: robot, session: session, componentMode: true)
+
+            let roomName = "Training Room-\(session.levelIndex)"
+            if let room = arenaRoot.findEntity(named: roomName) {
+                RobotFactory.applyPuzzleState(to: room, session: session)
+            } else {
+                for child in Array(arenaRoot.children) where child.name.hasPrefix("Training Room-") {
+                    child.removeFromParent()
+                }
+                arenaRoot.addChild(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle))
+            }
+
+            let combatName = RobotFactory.combatLayerName(level: session.levelIndex)
+            if let combat = arenaRoot.findEntity(named: combatName) {
+                RobotFactory.applyCombatState(to: combat, session: session)
+            } else {
+                for child in Array(arenaRoot.children) where child.name.hasPrefix("Combat Layer-") {
+                    child.removeFromParent()
+                }
+                arenaRoot.addChild(RobotFactory.makeCombatLayer(session: session))
             }
         }
-        .robGameKeyboardControls(session: session)
-        .onReceive(timer) { _ in session.tick(1.0 / 30.0) }
+    }
+}
+
+private struct VisionArenaStatus: View {
+    @Bindable var session: GameSession
+    @Bindable var controller: VisionGameControllerInput
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Label("Level \(session.level.id)", systemImage: "flag.checkered")
+            Label("\(session.remainingEnemies) targets", systemImage: "scope")
+            Label(controller.modeDescription, systemImage: controller.spatialControllerCount >= 2 ? "vision.pro" : controller.isConnected ? "gamecontroller.fill" : "hand.raised.fill")
+            Text(session.laserLockDescription)
+                .foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
+        }
+        .font(.caption.bold())
+        .monospacedDigit()
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .glassBackgroundEffect()
+    }
+}
+
+private struct VisionControlDeck: View {
+    @Bindable var session: GameSession
+    @Bindable var controller: VisionGameControllerInput
+    @Binding var arenaScale: Float
+    let scaleRange: ClosedRange<Float>
+    let placementHelp: String
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text("HAND + CONTROLLER DRIVE DECK").font(.headline)
+            Text("Pinch each tread pad and drag up or down. Two hands can command the treads independently.")
+                .font(.caption)
+                .foregroundStyle(.cyan)
+            VisionHandDriveControls(session: session)
+            HStack {
+                LaserChargeButton(session: session, title: session.rangedWeapon.displayName, compact: true)
+                Button(session.meleeWeapon.displayName, systemImage: "bolt.fill") { session.saberAttack() }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.pink)
+                if session.level.requiresKey && !session.doorOpen {
+                    Button(session.doorHackDescription, systemImage: "lock.open.trianglebadge.exclamationmark") {
+                        session.startDoorHack()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+                    .disabled(!session.canStartDoorHack)
+                }
+                VisionLoadoutMenu(session: session, compact: true)
+            }
+            HStack {
+                Button(session.isRunning ? "Pause" : session.isPaused ? "Resume" : "Start Mission", systemImage: session.isRunning ? "pause.fill" : "play.fill") {
+                    if session.isRunning { _ = session.pause() }
+                    else if session.isPaused { _ = session.resume() }
+                    else { session.begin() }
+                }
+                Button("Reset", systemImage: "arrow.counterclockwise") { session.reset() }
+                if session.canFinish {
+                    Button(session.levelIndex == session.levels.count - 1 ? "Finish Campaign" : "Next Level") { session.nextLevel() }
+                }
+                Slider(value: $arenaScale, in: scaleRange) { Text("Arena size") }
+                    .frame(width: 180)
+            }
+            Label(controller.modeDescription, systemImage: controller.isConnected ? "gamecontroller.fill" : "hand.point.up.left.fill")
+                .font(.caption.bold())
+                .foregroundStyle(controller.spatialControllerCount >= 2 ? .green : .secondary)
+            Text(placementHelp).font(.caption2).foregroundStyle(.secondary)
+            CombatHealthBars(session: session, compact: true).frame(width: 390)
+        }
+        .padding(14)
+        .glassBackgroundEffect()
+        .onDisappear { session.stopDrive() }
+    }
+}
+
+private struct VisionHandDriveControls: View {
+    @Bindable var session: GameSession
+    @State private var left = 0.0
+    @State private var right = 0.0
+
+    var body: some View {
+        HStack(spacing: 18) {
+            VisionTreadPad(title: "LEFT TREAD", value: $left) { newValue in
+                left = newValue
+                apply()
+            }
+            Button("STOP", systemImage: "stop.fill") { stop() }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+                .keyboardShortcut(.escape, modifiers: [])
+            VisionTreadPad(title: "RIGHT TREAD", value: $right) { newValue in
+                right = newValue
+                apply()
+            }
+        }
+        .onDisappear(perform: stop)
+    }
+
+    private func apply() {
+        session.setTreads(left: left, right: right)
+    }
+
+    private func stop() {
+        left = 0
+        right = 0
+        session.stopDrive()
+    }
+}
+
+private struct VisionTreadPad: View {
+    let title: String
+    @Binding var value: Double
+    let changed: (Double) -> Void
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(title).font(.caption2.bold())
+            GeometryReader { proxy in
+                let travel = max(1, proxy.size.height * 0.38)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(.cyan.opacity(0.18))
+                    Capsule().fill(.white.opacity(0.18)).frame(width: 5)
+                    Circle()
+                        .fill(value == 0 ? .cyan : .white)
+                        .shadow(color: .cyan.opacity(0.7), radius: 8)
+                        .frame(width: 42, height: 42)
+                        .offset(y: -value * travel)
+                    VStack {
+                        Text("▲")
+                        Spacer()
+                        Text("▼")
+                    }
+                    .font(.caption.bold())
+                    .padding(8)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 18))
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { gesture in
+                            let raw = (proxy.size.height / 2 - gesture.location.y) / travel
+                            let newValue = min(1, max(-1, raw))
+                            value = newValue
+                            changed(newValue)
+                        }
+                        .onEnded { _ in
+                            value = 0
+                            changed(0)
+                        }
+                )
+            }
+            .frame(width: 112, height: 126)
+            Text(value.formatted(.number.precision(.fractionLength(2))))
+                .font(.caption2.monospacedDigit())
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityValue(value == 0 ? "Stopped" : value > 0 ? "Forward" : "Reverse")
     }
 }
 
@@ -122,9 +412,7 @@ private struct VisionLoadoutMenu: View {
                 ForEach(ROBUpgrade.allCases) { upgrade in
                     let level = session.upgradeLevel(upgrade)
                     let cost = session.upgradeCost(upgrade)
-                    Button {
-                        session.purchaseUpgrade(upgrade)
-                    } label: {
+                    Button { session.purchaseUpgrade(upgrade) } label: {
                         Label(
                             cost.map { "\(upgrade.displayName) L\(level) · \($0) points" } ?? "\(upgrade.displayName) · MAX",
                             systemImage: upgrade == .speedBoost ? "speedometer" : upgrade == .energyCapacity ? "battery.100percent.bolt" : "scope"
@@ -135,7 +423,7 @@ private struct VisionLoadoutMenu: View {
             }
         } label: {
             Label(
-                compact ? "Change ROB loadout" : "\(session.robotFinish.displayName) · \(session.rangedWeapon.shortName) · \(session.meleeWeapon.shortName)",
+                compact ? "Loadout" : "\(session.robotFinish.displayName) · \(session.rangedWeapon.shortName) · \(session.meleeWeapon.shortName)",
                 systemImage: "paintpalette.fill"
             )
         }

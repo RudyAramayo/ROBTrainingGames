@@ -17,6 +17,18 @@ private struct SendableAudioTapInvocation: @unchecked Sendable {
 
 @MainActor
 final class GameSessionTests: XCTestCase {
+    func testVisionTankInputMapsEachStickToItsMatchingTreadWithADeadzone() {
+        XCTAssertEqual(ROBTreadInput.tank(leftStickY: 0.08, rightStickY: -0.1), ROBTreadInput(left: 0, right: 0))
+
+        let input = ROBTreadInput.tank(leftStickY: 1, rightStickY: -1)
+        XCTAssertEqual(input.left, 1, accuracy: 0.001)
+        XCTAssertEqual(input.right, -1, accuracy: 0.001)
+
+        let partial = ROBTreadInput.tank(leftStickY: 0.56, rightStickY: 0.34)
+        XCTAssertGreaterThan(partial.left, partial.right)
+        XCTAssertGreaterThan(partial.right, 0)
+    }
+
     private func completeCurrentLevel(_ game: GameSession) {
         game.collectedCells = game.level.cellCount
         game.doorOpen = true

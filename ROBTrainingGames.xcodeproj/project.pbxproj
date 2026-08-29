@@ -33,6 +33,7 @@
 		81A5669F7DB12E4AC7CEC8EC /* LaserChargeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86F46D4F36051CC6C3E326B /* LaserChargeButton.swift */; };
 		8E92EDF0CC8A176364702C1A /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A494856CC93CF9C98076DE8A /* GameSession.swift */; };
 		8F5D5EA3ADB8F70CFA08BA08 /* SoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */; };
+		A6D4E0C0B3F24799A1020304 /* VisionGameControllerInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E5F1D1C4A358AAB2030405 /* VisionGameControllerInput.swift */; };
 		B0D1FEF0D8A64D0B703D8DE8 /* level-complete.m4a in Resources */ = {isa = PBXBuildFile; fileRef = DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */; };
 		B7203185730E33816035D094 /* laser.m4a in Resources */ = {isa = PBXBuildFile; fileRef = E0A2FF07C60F58B44ADD1698 /* laser.m4a */; };
 		B7C66E4EB88560CD50A43CFD /* mission-start.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 43C86D54778FEDD1EDB6D00E /* mission-start.m4a */; };
@@ -70,6 +71,7 @@
 		A494856CC93CF9C98076DE8A /* GameSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSession.swift; sourceTree = "<group>"; };
 		AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundPlayer.swift; sourceTree = "<group>"; };
 		BE8EABD4931412AA8A676C80 /* RobotFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotFactory.swift; sourceTree = "<group>"; };
+		B7E5F1D1C4A358AAB2030405 /* VisionGameControllerInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionGameControllerInput.swift; sourceTree = "<group>"; };
 		C02AE4063221AD16DBDA6B2F /* ROBTrainingiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ROBTrainingiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C86F46D4F36051CC6C3E326B /* LaserChargeButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaserChargeButton.swift; sourceTree = "<group>"; };
 		CAE0655626B80AE21B885AA7 /* ROBTrainingVisionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBTrainingVisionApp.swift; sourceTree = "<group>"; };
@@ -147,6 +149,7 @@
 				96C1B68B72E191DB240B3A84 /* Info.plist */,
 				CAE0655626B80AE21B885AA7 /* ROBTrainingVisionApp.swift */,
 				8D19BBDDC5D490212B965846 /* VisionDashboard.swift */,
+				B7E5F1D1C4A358AAB2030405 /* VisionGameControllerInput.swift */,
 			);
 			path = visionOS;
 			sourceTree = "<group>";
@@ -328,6 +331,7 @@
 				8F5D5EA3ADB8F70CFA08BA08 /* SoundPlayer.swift in Sources */,
 				DA309E8D3CFA1E7A097DD2AE /* TechnoMusicEngine.swift in Sources */,
 				374094AD795CF2CAD529E072 /* VisionDashboard.swift in Sources */,
+				A6D4E0C0B3F24799A1020304 /* VisionGameControllerInput.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

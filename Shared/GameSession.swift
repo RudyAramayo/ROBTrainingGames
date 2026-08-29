@@ -2,6 +2,26 @@ import Foundation
 import Observation
 import simd
 
+struct ROBTreadInput: Equatable, Sendable {
+    let left: Double
+    let right: Double
+
+    static func tank(leftStickY: Float, rightStickY: Float, deadzone: Float = 0.12) -> ROBTreadInput {
+        ROBTreadInput(
+            left: Double(normalize(leftStickY, deadzone: deadzone)),
+            right: Double(normalize(rightStickY, deadzone: deadzone))
+        )
+    }
+
+    private static func normalize(_ value: Float, deadzone: Float) -> Float {
+        let deadzone = min(0.45, max(0, deadzone))
+        let value = min(1, max(-1, value))
+        let magnitude = abs(value)
+        guard magnitude > deadzone else { return 0 }
+        return copysign((magnitude - deadzone) / (1 - deadzone), value)
+    }
+}
+
 struct ROBLevel: Identifiable, Sendable {
     let id: Int
     let name: String
