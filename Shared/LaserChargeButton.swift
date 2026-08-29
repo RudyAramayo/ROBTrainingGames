@@ -13,6 +13,18 @@ struct CombatHealthBars: View {
                 color: healthColor,
                 icon: "heart.fill"
             )
+            energyMeter
+            if session.isSecurityAlerted {
+                Label("SECURITY ALERT · REACH A SHADOW ZONE", systemImage: "video.fill")
+                    .font(compact ? .caption2.bold() : .caption.bold())
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if session.isInShadow {
+                Label("HIDDEN IN SHADOW", systemImage: "moon.fill")
+                    .font(compact ? .caption2.bold() : .caption.bold())
+                    .foregroundStyle(.indigo)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             if let boss = session.activeBoss {
                 meter(
                     title: "BOSS SHIELDS",
@@ -41,6 +53,24 @@ struct CombatHealthBars: View {
                 .tint(color)
                 .accessibilityLabel(title)
                 .accessibilityValue("\(value) of \(maximum)")
+        }
+    }
+
+    private var energyMeter: some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 5) {
+                Image(systemName: "bolt.batteryblock.fill")
+                Text("DRIVE ENERGY")
+                Spacer(minLength: 4)
+                Text("\(Int(session.energy))/\(Int(session.maxEnergy))")
+            }
+            .font(compact ? .caption2.bold() : .caption.bold())
+            .foregroundStyle(session.energyFraction < 0.2 ? .orange : .cyan)
+            ProgressView(value: session.energy, total: session.maxEnergy)
+                .progressViewStyle(.linear)
+                .tint(session.energyFraction < 0.2 ? .orange : .cyan)
+                .accessibilityLabel("Drive energy")
+                .accessibilityValue("\(Int(session.energy)) of \(Int(session.maxEnergy))")
         }
     }
 

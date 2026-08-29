@@ -328,8 +328,8 @@ final class GameSessionTests: XCTestCase {
             game.begin()
             for index in game.enemies.indices { game.enemies[index].isActive = false }
             game.collectKey()
-            guard let door = game.puzzle.door else {
-                return XCTFail("Level \(game.level.id) needs a door")
+            guard let door = game.puzzle.door, let terminal = game.puzzle.hackTerminal else {
+                return XCTFail("Level \(game.level.id) needs a door and hack terminal")
             }
 
             let openingWidth = max(door.size.x, door.size.y)
@@ -340,6 +340,12 @@ final class GameSessionTests: XCTestCase {
             )
 
             let crossingOffset = GameSession.robotCollisionRadius + min(door.size.x, door.size.y) / 2 + 0.28
+            game.robotPosition = [terminal.x, 0, terminal.y]
+            XCTAssertTrue(game.canStartDoorHack, "Level \(game.level.id) hack terminal is not reachable")
+            game.startDoorHack()
+            game.tick(2.3)
+            XCTAssertTrue(game.doorOpen, "Level \(game.level.id) Flipper Zero hack did not open the door")
+
             if door.size.x < door.size.y {
                 game.robotPosition = [door.center.x + crossingOffset, 0, door.center.y]
                 game.robotHeading = .pi / 2
@@ -352,7 +358,6 @@ final class GameSessionTests: XCTestCase {
             for _ in 0..<240 { game.tick(1.0 / 60.0) }
             game.stopDrive()
 
-            XCTAssertTrue(game.doorOpen, "Level \(game.level.id) door did not unlock from a collision-safe approach")
             if door.size.x < door.size.y {
                 XCTAssertLessThan(
                     game.robotPosition.x,
@@ -383,6 +388,7 @@ final class GameSessionTests: XCTestCase {
             game.doorOpen = true
             var objectives = game.puzzle.cells + [game.puzzle.dock]
             if let key = game.puzzle.key { objectives.append(key) }
+            if let terminal = game.puzzle.hackTerminal { objectives.append(terminal) }
             for objective in objectives {
                 XCTAssertTrue(
                     game.isRobotPositionClear([objective.x, 0, objective.y]),
@@ -402,6 +408,118 @@ final class GameSessionTests: XCTestCase {
                 )
             }
         }
+    }
+
+    func testDoorHackRequiresKeyProximityAndAutomaticHackTime() {
+        let game = GameSession(audioEnabled: false)
+        game.levelIndex = 1
+        game.begin()
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        guard let terminal = game.puzzle.hackTerminal else { return XCTFail("Missing hack terminal") }
+
+        game.robotPosition = [terminal.x, 0, terminal.y]
+        game.startDoorHack()
+        XCTAssertFalse(game.isHackingDoor)
+        XCTAssertFalse(game.doorOpen)
+
+        game.collectKey()
+        game.robotPosition = [terminal.x + 2, 0, terminal.y]
+        game.startDoorHack()
+        XCTAssertFalse(game.isHackingDoor)
+
+        game.robotPosition = [terminal.x, 0, terminal.y]
+        game.startDoorHack()
+        XCTAssertTrue(game.isHackingDoor)
+        game.tick(1.1)
+        XCTAssertEqual(game.hackingProgress, 0.5, accuracy: 0.02)
+        XCTAssertFalse(game.doorOpen)
+        game.tick(1.2)
+        XCTAssertTrue(game.doorOpen)
+        XCTAssertFalse(game.isHackingDoor)
+        XCTAssertTrue(game.message.contains("hack complete"))
+    }
+
+    func testConveyorCarriesROBInItsArrowDirection() {
+        let game = GameSession(audioEnabled: false)
+        game.levelIndex = 1
+        game.begin()
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        guard let conveyor = game.puzzle.conveyors.first else { return XCTFail("Level 2 needs a conveyor") }
+        game.robotPosition = [conveyor.center.x, 0, conveyor.center.y]
+        let start = SIMD2<Float>(game.robotPosition.x, game.robotPosition.z)
+
+        game.tick(0.5)
+
+        let movement = SIMD2<Float>(game.robotPosition.x, game.robotPosition.z) - start
+        XCTAssertGreaterThan(simd_dot(movement, conveyor.direction), 0.08)
+    }
+
+    func testSecurityCameraAlertsEnemiesButShadowsBreakDetection() {
+        let game = GameSession(audioEnabled: false)
+        game.levelIndex = 2
+        game.begin()
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        guard let camera = game.puzzle.securityCameras.first, let shadow = game.puzzle.shadowZones.first else {
+            return XCTFail("Level 3 needs camera and shadow geometry")
+        }
+        let heading = game.securityCameraHeading(camera)
+        let forward = SIMD2<Float>(-sin(heading), -cos(heading))
+        let seenPoint = camera.position + forward * 1.2
+        game.robotPosition = [seenPoint.x, 0, seenPoint.y]
+
+        game.tick(0.001)
+
+        XCTAssertTrue(game.isSecurityAlerted)
+        game.robotPosition = [shadow.center.x, 0, shadow.center.y]
+        XCTAssertTrue(game.isInShadow)
+        game.tick(5.1)
+        XCTAssertFalse(game.isSecurityAlerted)
+    }
+
+    func testEnergyDrainsWhileDrivingAndRecoversWhileStopped() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        let fullEnergy = game.energy
+
+        game.setDrive(forward: 1, steering: 0)
+        game.tick(0.75)
+        game.stopDrive()
+        let drivenEnergy = game.energy
+
+        XCTAssertLessThan(drivenEnergy, fullEnergy)
+        game.tick(1)
+        XCTAssertGreaterThan(game.energy, drivenEnergy)
+
+        let recoveredEnergy = game.energy
+        game.setDrive(forward: 0, steering: 1)
+        game.tick(0.5)
+        game.stopDrive()
+        XCTAssertLessThan(game.energy, recoveredEnergy, "Pivoting the powered treads should also consume energy")
+    }
+
+    func testPerformanceUpgradesSpendPersistentPointsAndIncreaseCapabilities() {
+        let suiteName = "ROBTrainingUpgrades.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(5_000, forKey: "robUpgradePoints")
+        let game = GameSession(audioEnabled: false, progressStore: defaults)
+
+        game.purchaseUpgrade(.speedBoost)
+        game.purchaseUpgrade(.energyCapacity)
+        game.purchaseUpgrade(.weaponPower)
+
+        XCTAssertEqual(game.speedUpgradeLevel, 1)
+        XCTAssertEqual(game.energyUpgradeLevel, 1)
+        XCTAssertEqual(game.weaponUpgradeLevel, 1)
+        XCTAssertEqual(game.maxEnergy, 125)
+        XCTAssertGreaterThan(game.driveSpeedMultiplier, 1)
+        XCTAssertEqual(game.weaponDamageBonus, 1)
+        let restored = GameSession(audioEnabled: false, progressStore: defaults)
+        XCTAssertEqual(restored.speedUpgradeLevel, 1)
+        XCTAssertEqual(restored.energyUpgradeLevel, 1)
+        XCTAssertEqual(restored.weaponUpgradeLevel, 1)
+        XCTAssertEqual(restored.upgradePoints, game.upgradePoints)
     }
 
     func testStopDriveImmediatelyClearsAStuckTurn() {
@@ -621,6 +739,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNotNil(robot.findEntity(named: "Left Arm Assembly"))
         XCTAssertNotNil(robot.findEntity(named: "Right Arm Assembly"))
         XCTAssertNotNil(robot.findEntity(named: "Right Shoulder Gatling"))
+        XCTAssertNotNil(robot.findEntity(named: "Flipper Zero Hacker"))
         XCTAssertNotNil(robot.findEntity(named: "Gatling Lock Indicator"))
         XCTAssertNotNil(robot.findEntity(named: "Shoulder Laser Beam"))
         XCTAssertNotNil(robot.findEntity(named: "Left Tri-Wheel Tread"))

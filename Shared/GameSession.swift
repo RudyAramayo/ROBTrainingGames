@@ -161,6 +161,22 @@ struct PuzzleBarrier: Sendable {
     let size: SIMD2<Float>
 }
 
+struct PuzzleConveyor: Identifiable, Sendable {
+    let id: Int
+    let center: SIMD2<Float>
+    let size: SIMD2<Float>
+    let direction: SIMD2<Float>
+    let speed: Float
+}
+
+struct PuzzleSecurityCamera: Identifiable, Sendable {
+    let id: Int
+    let position: SIMD2<Float>
+    let heading: Float
+    let sweep: Float
+    let range: Float
+}
+
 struct PuzzleGeometry: Sendable {
     let arenaHalfExtent: Float
     let key: SIMD2<Float>?
@@ -168,14 +184,48 @@ struct PuzzleGeometry: Sendable {
     let barriers: [PuzzleBarrier]
     let cells: [SIMD2<Float>]
     let dock: SIMD2<Float>
+    let hackTerminal: SIMD2<Float>?
+    let conveyors: [PuzzleConveyor]
+    let securityCameras: [PuzzleSecurityCamera]
+    let shadowZones: [PuzzleBarrier]
+}
+
+enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
+    case speedBoost
+    case energyCapacity
+    case weaponPower
+
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .speedBoost: "Speed Boost"
+        case .energyCapacity: "Energy Capacity"
+        case .weaponPower: "Weapon Power"
+        }
+    }
+    var summary: String {
+        switch self {
+        case .speedBoost: "Raises tread speed by 18% per upgrade."
+        case .energyCapacity: "Adds 25 energy and improves passive charging."
+        case .weaponPower: "Adds one shield point of damage to every hit."
+        }
+    }
+    var maximumLevel: Int { 3 }
+    func cost(for level: Int) -> Int {
+        switch self {
+        case .speedBoost: 700 + level * 650
+        case .energyCapacity: 550 + level * 500
+        case .weaponPower: 900 + level * 800
+        }
+    }
 }
 
 @MainActor @Observable
 final class GameSession {
+    static let gameplayRulesetVersion = "2026.08.29"
     static let robotCollisionRadius: Float = 0.62
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
-    private static let doorSensorClearance: Float = 0.16
     let maxHealth = 100
     let levels = [
         ROBLevel(id: 1, name: "Calibration Deck", lesson: "Arrow controls mix forward speed and steering into two tread demands.", cellCount: 3, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 900, requiresKey: false, challenge: "Learn smooth turns, evade three active enemies, collect three cells, and reach the dock."),
@@ -204,7 +254,9 @@ final class GameSession {
     ]
     var levelIndex = 0
     var score = 0
+    private(set) var upgradePoints = 0
     private(set) var health = 100
+    private(set) var energy = 100.0
     var collectedCells = 0
     var enemies: [TrainingEnemy] = []
     var enemyBolts: [TrainingEnemyBolt] = []
@@ -220,6 +272,9 @@ final class GameSession {
     var rightWheelAngle: Float = 0
     var hasKey = false
     var doorOpen = true
+    private(set) var isHackingDoor = false
+    private(set) var hackingProgress = 0.0
+    private(set) var securityAlertRemaining = 0.0
     var collectedCellIndices: Set<Int> = []
     var saberAnimation = 0.0
     var saberStyle: SaberAttackStyle?
@@ -244,8 +299,12 @@ final class GameSession {
     private(set) var robotFinish: ROBFinish = .graphite
     private(set) var rangedWeapon: ROBRangedWeapon = .shoulderGatling
     private(set) var meleeWeapon: ROBMeleeWeapon = .dualSabers
+    private(set) var speedUpgradeLevel = 0
+    private(set) var energyUpgradeLevel = 0
+    private(set) var weaponUpgradeLevel = 0
     private var nextBoltID = 0
     private var wasAtDock = false
+    private var wasEnergyDepleted = false
     private var damageInvulnerabilityRemaining = 0.0
     private let audioEnabled: Bool
     private let progressStore: UserDefaults?
@@ -254,6 +313,26 @@ final class GameSession {
     var lockedEnemy: TrainingEnemy? { enemies.first(where: { $0.id == lockedEnemyID && $0.isActive }) }
     var activeBoss: TrainingEnemy? { enemies.first(where: { $0.isBoss && $0.isActive }) }
     var healthFraction: Double { Double(health) / Double(maxHealth) }
+    var maxEnergy: Double { 100 + Double(energyUpgradeLevel * 25) }
+    var energyFraction: Double { energy / maxEnergy }
+    var driveSpeedMultiplier: Double { 1 + Double(speedUpgradeLevel) * 0.18 }
+    var weaponDamageBonus: Int { weaponUpgradeLevel }
+    var isSecurityAlerted: Bool { securityAlertRemaining > 0 }
+    var isInShadow: Bool {
+        let point = SIMD3<Float>(robotPosition.x, 0, robotPosition.z)
+        return puzzle.shadowZones.contains { Self.intersects(point, barrier: $0, radius: 0) }
+    }
+    var isNearHackTerminal: Bool {
+        guard let terminal = puzzle.hackTerminal else { return false }
+        return simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), terminal) <= Self.robotCollisionRadius + 0.48
+    }
+    var canStartDoorHack: Bool { isRunning && level.requiresKey && hasKey && !doorOpen && !isHackingDoor && isNearHackTerminal }
+    var doorHackDescription: String {
+        if doorOpen { return "Door hacked" }
+        if isHackingDoor { return "Hacking \(Int(hackingProgress * 100))%" }
+        if !hasKey { return "Find access key" }
+        return isNearHackTerminal ? "Hack door" : "Reach orange hack panel"
+    }
     var laserLockDescription: String { lockedEnemy.map { "LOCK: \($0.displayName.uppercased())" } ?? "SCANNING" }
     var laserLockHeading: Float? {
         guard let target = lockedEnemy else { return nil }
@@ -272,12 +351,49 @@ final class GameSession {
             let savedMelee = ROBMeleeWeapon(rawValue: store.string(forKey: "robMeleeWeapon") ?? "") ?? .dualSabers
             rangedWeapon = savedRanged.requiredCompletedLevel <= highestCompletedLevel ? savedRanged : .shoulderGatling
             meleeWeapon = savedMelee.requiredCompletedLevel <= highestCompletedLevel ? savedMelee : .dualSabers
+            upgradePoints = max(0, store.integer(forKey: "robUpgradePoints"))
+            speedUpgradeLevel = min(ROBUpgrade.speedBoost.maximumLevel, max(0, store.integer(forKey: "robSpeedUpgradeLevel")))
+            energyUpgradeLevel = min(ROBUpgrade.energyCapacity.maximumLevel, max(0, store.integer(forKey: "robEnergyUpgradeLevel")))
+            weaponUpgradeLevel = min(ROBUpgrade.weaponPower.maximumLevel, max(0, store.integer(forKey: "robWeaponUpgradeLevel")))
         }
         configureLevel()
     }
 
     func isUnlocked(_ weapon: ROBRangedWeapon) -> Bool { highestCompletedLevel >= weapon.requiredCompletedLevel }
     func isUnlocked(_ weapon: ROBMeleeWeapon) -> Bool { highestCompletedLevel >= weapon.requiredCompletedLevel }
+    func upgradeLevel(_ upgrade: ROBUpgrade) -> Int {
+        switch upgrade {
+        case .speedBoost: speedUpgradeLevel
+        case .energyCapacity: energyUpgradeLevel
+        case .weaponPower: weaponUpgradeLevel
+        }
+    }
+    func upgradeCost(_ upgrade: ROBUpgrade) -> Int? {
+        let level = upgradeLevel(upgrade)
+        return level < upgrade.maximumLevel ? upgrade.cost(for: level) : nil
+    }
+    func purchaseUpgrade(_ upgrade: ROBUpgrade) {
+        let level = upgradeLevel(upgrade)
+        guard level < upgrade.maximumLevel else { message = "\(upgrade.displayName) is already fully upgraded."; return }
+        let cost = upgrade.cost(for: level)
+        guard upgradePoints >= cost else { message = "\(cost - upgradePoints) more mission points needed for \(upgrade.displayName)."; return }
+        upgradePoints -= cost
+        switch upgrade {
+        case .speedBoost:
+            speedUpgradeLevel += 1
+            progressStore?.set(speedUpgradeLevel, forKey: "robSpeedUpgradeLevel")
+        case .energyCapacity:
+            energyUpgradeLevel += 1
+            energy = min(maxEnergy, energy + 25)
+            progressStore?.set(energyUpgradeLevel, forKey: "robEnergyUpgradeLevel")
+        case .weaponPower:
+            weaponUpgradeLevel += 1
+            progressStore?.set(weaponUpgradeLevel, forKey: "robWeaponUpgradeLevel")
+        }
+        progressStore?.set(upgradePoints, forKey: "robUpgradePoints")
+        message = "\(upgrade.displayName) upgraded to Level \(level + 1)."
+        report(message)
+    }
     func selectFinish(_ finish: ROBFinish) {
         robotFinish = finish
         progressStore?.set(finish.rawValue, forKey: "robRobotFinish")
@@ -308,11 +424,23 @@ final class GameSession {
         let cells = (0..<level.cellCount).map { index in
             SIMD2<Float>(columns[index % columns.count], -margin + Float(index / columns.count) * 2.0)
         }
+        let environment = environmentalGeometry(for: level, margin: margin)
         guard level.requiresKey else {
             let zigzag = (0..<min(5, max(2, level.id / 3 + 1))).map { index in
                 PuzzleBarrier(center: [index.isMultiple(of: 2) ? -1.35 : 1.35, 1.8 - Float(index) * zigzagSpacing], size: [half * 1.05, 0.24])
             }
-            return PuzzleGeometry(arenaHalfExtent: half, key: nil, door: nil, barriers: zigzag, cells: cells, dock: [margin, -margin])
+            return PuzzleGeometry(
+                arenaHalfExtent: half,
+                key: nil,
+                door: nil,
+                barriers: zigzag,
+                cells: cells,
+                dock: [margin, -margin],
+                hackTerminal: nil,
+                conveyors: environment.conveyors,
+                securityCameras: environment.cameras,
+                shadowZones: environment.shadows
+            )
         }
         let horizontal = ![2, 6, 8, 12, 14].contains(level.id)
         if horizontal {
@@ -324,7 +452,18 @@ final class GameSession {
                 PuzzleBarrier(center: [(right + half) / 2, door.center.y], size: [half - right, 0.24]),
                 PuzzleBarrier(center: [level.id.isMultiple(of: 2) ? -2.1 : 2.1, -2.2], size: [0.24, 2.7]),
             ]
-            return PuzzleGeometry(arenaHalfExtent: half, key: [level.id.isMultiple(of: 3) ? margin : -margin, margin], door: door, barriers: walls, cells: cells, dock: [margin, -margin])
+            return PuzzleGeometry(
+                arenaHalfExtent: half,
+                key: [level.id.isMultiple(of: 3) ? margin : -margin, margin],
+                door: door,
+                barriers: walls,
+                cells: cells,
+                dock: [margin, -margin],
+                hackTerminal: [door.center.x, door.center.y + 0.85],
+                conveyors: environment.conveyors,
+                securityCameras: environment.cameras,
+                shadowZones: environment.shadows
+            )
         }
         let door = PuzzleBarrier(center: [0.45, -0.45], size: [0.24, doorwayWidth])
         let near = door.center.y - door.size.y / 2
@@ -340,10 +479,57 @@ final class GameSession {
             let horizontalProgress = (cell.x + margin) / (margin * 2)
             return SIMD2<Float>(cellMinimumX + (margin - cellMinimumX) * horizontalProgress, cell.y)
         }
-        return PuzzleGeometry(arenaHalfExtent: half, key: key, door: door, barriers: walls, cells: adjustedCells, dock: [margin, -margin])
+        return PuzzleGeometry(
+            arenaHalfExtent: half,
+            key: key,
+            door: door,
+            barriers: walls,
+            cells: adjustedCells,
+            dock: [margin, -margin],
+            hackTerminal: [door.center.x - 0.85, door.center.y],
+            conveyors: environment.conveyors,
+            securityCameras: environment.cameras,
+            shadowZones: environment.shadows
+        )
+    }
+
+    private static func environmentalGeometry(
+        for level: ROBLevel,
+        margin: Float
+    ) -> (conveyors: [PuzzleConveyor], cameras: [PuzzleSecurityCamera], shadows: [PuzzleBarrier]) {
+        let conveyorDirection: SIMD2<Float> = level.id.isMultiple(of: 2) ? [1, 0] : [0, -1]
+        let conveyors = level.id >= 2 ? [
+            PuzzleConveyor(
+                id: 0,
+                center: [level.id.isMultiple(of: 2) ? -1.75 : 1.75, level.id.isMultiple(of: 3) ? -1.25 : 1.45],
+                size: conveyorDirection.x == 0 ? [1.15, 2.35] : [2.35, 1.15],
+                direction: conveyorDirection,
+                speed: min(0.62, 0.26 + Float(level.id) * 0.022)
+            ),
+        ] : []
+
+        guard level.id >= 3 else { return (conveyors, [], []) }
+        let firstPosition = SIMD2<Float>(level.id.isMultiple(of: 2) ? -margin + 0.75 : margin - 0.75, -0.9)
+        let firstTarget = SIMD2<Float>(0, 0.6)
+        let firstHeading = atan2(-(firstTarget.x - firstPosition.x), -(firstTarget.y - firstPosition.y))
+        var cameras = [PuzzleSecurityCamera(id: 0, position: firstPosition, heading: firstHeading, sweep: 0.7, range: 5.7)]
+        var shadows = [PuzzleBarrier(center: [-firstPosition.x * 0.36, 2.65], size: [2.1, 1.25])]
+        if level.id >= 8 {
+            let secondPosition = SIMD2<Float>(-firstPosition.x, -2.8)
+            let secondHeading = atan2(-(-0.35 - secondPosition.x), -(0.5 - secondPosition.y))
+            cameras.append(PuzzleSecurityCamera(id: 1, position: secondPosition, heading: secondHeading, sweep: 0.55, range: 5.3))
+            shadows.append(PuzzleBarrier(center: [firstPosition.x * 0.28, -1.65], size: [1.8, 1.1]))
+        }
+        return (conveyors, cameras, shadows)
     }
 
     private func report(_ situation: String) { lastSituation = situation; situationCount += 1 }
+    private func awardMissionPoints(_ points: Int) {
+        guard points > 0 else { return }
+        score += points
+        upgradePoints += points
+        progressStore?.set(upgradePoints, forKey: "robUpgradePoints")
+    }
     private func play(_ name: String) { if audioEnabled { SoundPlayer.shared.play(name) } }
     private func playEnemyAttack(_ kind: TrainingEnemyKind) { if audioEnabled { SoundPlayer.shared.playEnemyAttack(kind) } }
     private func playSpider(_ cue: SpiderSoundCue) { if audioEnabled { SoundPlayer.shared.playSpider(cue) } }
@@ -368,9 +554,11 @@ final class GameSession {
     }
     private func configureLevel() {
         elapsed = 0; collectedCells = 0
-        hasKey = false; doorOpen = !level.requiresKey; collectedCellIndices = []; saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
+        hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingProgress = 0; securityAlertRemaining = 0
+        collectedCellIndices = []; saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
         laserDistance = nil; laserCharge = 0; laserShotCharge = 0; laserShotWeapon = rangedWeapon; laserShotOrigin = .zero; isChargingLaser = false; lockedEnemyID = nil
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
+        energy = maxEnergy; wasEnergyDepleted = false
         let layout = puzzle
         let startingX: Float
         if let door = layout.door, door.size.x < door.size.y {
@@ -435,11 +623,13 @@ final class GameSession {
         guard isRunning else { return }
         elapsed += delta
         damageInvulnerabilityRemaining = max(0, damageInvulnerabilityRemaining - delta)
-        let targetLeft = max(-1, min(1, forwardDemand - steeringDemand * 0.72))
-        let targetRight = max(-1, min(1, forwardDemand + steeringDemand * 0.72))
+        securityAlertRemaining = max(0, securityAlertRemaining - delta)
+        let hasDriveEnergy = energy > 0.05
+        let targetLeft = hasDriveEnergy ? max(-1, min(1, forwardDemand - steeringDemand * 0.72)) : 0
+        let targetRight = hasDriveEnergy ? max(-1, min(1, forwardDemand + steeringDemand * 0.72)) : 0
         let smoothing = min(1, delta * 8)
         leftTread += (targetLeft - leftTread) * smoothing; rightTread += (targetRight - rightTread) * smoothing
-        let linear = Float((leftTread + rightTread) * 0.5) * Float(delta) * 0.85
+        let linear = Float((leftTread + rightTread) * 0.5) * Float(delta) * 0.85 * Float(driveSpeedMultiplier)
         leftWheelAngle -= Float(leftTread) * Float(delta) * 4.8; rightWheelAngle -= Float(rightTread) * Float(delta) * 4.8
         robotHeading += Float(rightTread - leftTread) * Float(delta) * 1.05
         let oldPosition = robotPosition
@@ -459,10 +649,26 @@ final class GameSession {
             robotPosition = resolvedPosition
             let blockedByDoor = !doorOpen && puzzle.door.map { Self.intersects(proposedPosition, barrier: $0, radius: Self.robotCollisionRadius) } == true
             message = blockedByDoor
-                ? (hasKey ? "Align ROB with the doorway to unlock it." : "Route blocked. Find the key before entering the doorway.")
+                ? (hasKey ? "Use the orange hack panel beside the door." : "Route blocked. Find the access key before hacking the doorway.")
                 : "Wall collision prevented. Turn ROB or follow the wall around."
         }
+        let driveLoad = (abs(leftTread) + abs(rightTread)) * 0.5
+        if hasDriveEnergy && driveLoad > 0.01 {
+            energy = max(0, energy - delta * (4.4 + driveLoad * 2.2))
+        } else if !isHackingDoor {
+            energy = min(maxEnergy, energy + delta * (3.2 + Double(energyUpgradeLevel) * 0.8))
+        }
+        if energy <= 0.05, !wasEnergyDepleted {
+            wasEnergyDepleted = true
+            message = "Drive battery empty. Hold position briefly while ROB recharges."
+            report(message)
+        } else if energy > maxEnergy * 0.12 {
+            wasEnergyDepleted = false
+        }
+        applyConveyor(delta)
         resolveSpatialObjectives()
+        updateDoorHack(delta)
+        updateSecurityCameras()
         if saberAnimation > 0 {
             let animationSpeed = switch saberStyle {
             case .spin: 1.25
@@ -476,6 +682,60 @@ final class GameSession {
         updateLaserProjectile(delta)
         updateEnemies(delta)
         updateLaserLock()
+    }
+
+    private func applyConveyor(_ delta: TimeInterval) {
+        let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
+        guard let conveyor = puzzle.conveyors.first(where: {
+            abs(point.x - $0.center.x) <= $0.size.x / 2 && abs(point.y - $0.center.y) <= $0.size.y / 2
+        }) else { return }
+        let end = robotPosition + SIMD3<Float>(conveyor.direction.x, 0, conveyor.direction.y) * conveyor.speed * Float(delta)
+        if isRobotMoveClear(from: robotPosition, to: end) { robotPosition = end }
+    }
+
+    func securityCameraHeading(_ camera: PuzzleSecurityCamera) -> Float {
+        camera.heading + sin(Float(elapsed) * 0.72 + Float(camera.id) * 1.7) * camera.sweep
+    }
+
+    private func updateSecurityCameras() {
+        guard !isInShadow else { return }
+        let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
+        let detected = puzzle.securityCameras.contains { camera in
+            let offset = point - camera.position
+            let distance = simd_length(offset)
+            guard distance > 0.001, distance <= camera.range else { return false }
+            let heading = securityCameraHeading(camera)
+            let forward = SIMD2<Float>(-sin(heading), -cos(heading))
+            guard simd_dot(offset / distance, forward) >= cos(.pi / 5) else { return false }
+            return !projectileBlockers.contains {
+                Self.segmentHitFraction(from: camera.position, to: point, barrier: $0, padding: 0.015) != nil
+            }
+        }
+        if detected {
+            let wasAlerted = isSecurityAlerted
+            securityAlertRemaining = 5
+            if !wasAlerted {
+                message = "Security camera spotted ROB! Enemy robots are converging. Break line of sight in a shadow zone."
+                report(message)
+            }
+        }
+    }
+
+    private func updateDoorHack(_ delta: TimeInterval) {
+        guard isHackingDoor else { return }
+        guard isNearHackTerminal else {
+            isHackingDoor = false; hackingProgress = 0
+            message = "Hack interrupted. Move back beside the orange panel."
+            report(message)
+            return
+        }
+        hackingProgress = min(1, hackingProgress + delta / 2.2)
+        guard hackingProgress >= 1 else { return }
+        isHackingDoor = false; doorOpen = true
+        awardMissionPoints(300)
+        message = "Flipper Zero hack complete. Security lock bypassed and door open."
+        report(message)
+        play("pickup")
     }
     private static func intersects(_ position: SIMD3<Float>, barrier: PuzzleBarrier, radius: Float = 0.32) -> Bool {
         abs(position.x - barrier.center.x) < barrier.size.x / 2 + radius && abs(position.z - barrier.center.y) < barrier.size.y / 2 + radius
@@ -655,8 +915,8 @@ final class GameSession {
             let distance = simd_length(toRobot), phase = Float(elapsed) * (enemy.kind == .spider ? 0.62 : 0.34) + Float(index) * 2.17
             var target = enemy.origin + SIMD3<Float>(cos(phase) * (enemy.kind == .spider ? 0.65 : 0.5), 0, sin(phase) * (enemy.kind == .spider ? 0.65 : 0.5))
             var speed: Float = enemy.kind == .spider ? 0.16 : 0.12
-            if enemy.kind == .spider && distance < 6.4 {
-                target = robotPosition; speed = 0.34 + Float(levelIndex) * 0.018
+            if enemy.kind == .spider && (distance < 6.4 || isSecurityAlerted) {
+                target = robotPosition; speed = 0.34 + Float(levelIndex) * 0.018 + (isSecurityAlerted ? 0.12 : 0)
                 if elapsed >= enemy.nextSkitterSound {
                     enemy.nextSkitterSound = elapsed + 2.1 + Double(index % 3) * 0.42
                     playSpider(.skitter)
@@ -667,12 +927,13 @@ final class GameSession {
                 }
                 if enemy.lungeRemaining > 0 { enemy.lungeRemaining = max(0, enemy.lungeRemaining - delta); speed = 0.9 + Float(levelIndex) * 0.02 }
             } else if enemy.kind == .fax {
-                if distance > 2.8 { target = robotPosition }
+                if distance > 2.8 || isSecurityAlerted { target = robotPosition }
                 else if distance < 1.65, distance > 0.001 { target = enemy.position - simd_normalize(toRobot) }
                 else if distance > 0.001 { let tangent = SIMD3<Float>(-toRobot.z, 0, toRobot.x) / distance; target = enemy.position + tangent * (index.isMultiple(of: 2) ? 0.6 : -0.6) }
-                speed = 0.24 + Float(levelIndex) * 0.015
-                if elapsed >= enemy.nextAttack && distance < 7.5 {
-                    enemy.nextAttack = elapsed + max(1.85, 3.65 - Double(levelIndex) * 0.09); enemyAttackCount += 1; fireEnemyBolt(from: enemy)
+                speed = 0.24 + Float(levelIndex) * 0.015 + (isSecurityAlerted ? 0.1 : 0)
+                if elapsed >= enemy.nextAttack && distance < (isSecurityAlerted ? 9.2 : 7.5) {
+                    let alertDelay = isSecurityAlerted ? 0.65 : 0
+                    enemy.nextAttack = elapsed + max(1.35, 3.65 - Double(levelIndex) * 0.09 - alertDelay); enemyAttackCount += 1; fireEnemyBolt(from: enemy)
                     playEnemyAttack(.fax); message = "Dalek-style sentry robot: “Exterminate!” Incoming laser — keep moving."; report(message)
                 }
             }
@@ -721,11 +982,6 @@ final class GameSession {
     private func resolveSpatialObjectives() {
         let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
         if let key = puzzle.key, !hasKey, simd_distance(point, key) < 0.48 { collectKey() }
-        if let door = puzzle.door,
-           !doorOpen,
-           Self.distance(from: point, to: door) <= Self.robotCollisionRadius + Self.doorSensorClearance {
-            openDoor()
-        }
         for (index, cell) in puzzle.cells.enumerated() where !collectedCellIndices.contains(index) && simd_distance(point, cell) < 0.45 {
             collectedCellIndices.insert(index); collectCell()
         }
@@ -743,7 +999,7 @@ final class GameSession {
     private var dockRequirements: String {
         var requirements: [String] = []
         if level.requiresKey && !hasKey { requirements.append("find the key") }
-        else if level.requiresKey && !doorOpen { requirements.append("open the door") }
+        else if level.requiresKey && !doorOpen { requirements.append("hack the security door") }
         let cellsLeft = level.cellCount - collectedCells
         if cellsLeft > 0 { requirements.append("collect \(cellsLeft) more energy \(cellsLeft == 1 ? "cell" : "cells")") }
         if remainingEnemies > 0 { requirements.append("disable \(remainingEnemies) more \(remainingEnemies == 1 ? "target" : "targets")") }
@@ -759,11 +1015,14 @@ final class GameSession {
     }
     private func damageEnemy(at index: Int, weapon: String, amount: Int = 1) {
         guard enemies.indices.contains(index), enemies[index].isActive else { return }
-        enemies[index].shields -= amount; score += 50 * amount
+        let appliedDamage = amount + weaponDamageBonus
+        enemies[index].shields -= appliedDamage
+        awardMissionPoints(50 * appliedDamage)
         if enemies[index].kind == .spider { playSpider(enemies[index].shields <= 0 ? .shutdown : .impact) }
         if enemies[index].shields <= 0 {
             let kind = enemies[index].kind, name = enemies[index].displayName, wasBoss = enemies[index].isBoss
-            enemies[index].isActive = false; score += wasBoss ? 1_000 : 300
+            enemies[index].isActive = false
+            awardMissionPoints(wasBoss ? 1_000 : 300)
             if kind == .fax { playEnemyAttack(kind) }
             message = "\(name) disabled by \(weapon). \(remainingEnemies) targets remain."
         } else {
@@ -849,9 +1108,31 @@ final class GameSession {
         }
         play("laser")
     }
-    func collectCell() { guard isRunning, collectedCells < level.cellCount else { return }; collectedCells += 1; score += 150; message = "Energy cell \(collectedCells) of \(level.cellCount)."; report(message); play("pickup") }
-    func collectKey() { guard isRunning, level.requiresKey, !hasKey else { return }; hasKey = true; score += 250; message = "Key secured. Bring it to the locked door."; report(message); play("pickup") }
-    func openDoor() { guard isRunning, level.requiresKey, !doorOpen else { return }; guard hasKey else { message = "The door is locked. Find the key first."; return }; doorOpen = true; score += 300; message = "Key accepted. Door open."; report(message); play("pickup") }
+    func collectCell() {
+        guard isRunning, collectedCells < level.cellCount else { return }
+        collectedCells += 1
+        energy = min(maxEnergy, energy + 32)
+        awardMissionPoints(150)
+        message = "Energy cell \(collectedCells) of \(level.cellCount). Battery recharged."
+        report(message); play("pickup")
+    }
+    func collectKey() {
+        guard isRunning, level.requiresKey, !hasKey else { return }
+        hasKey = true
+        awardMissionPoints(250)
+        message = "Access key secured. Reach the orange panel and start the Flipper Zero hack."
+        report(message); play("pickup")
+    }
+    func startDoorHack() {
+        guard isRunning, level.requiresKey, !doorOpen, !isHackingDoor else { return }
+        guard hasKey else { message = "The security lock needs its access key before ROB can hack it."; report(message); return }
+        guard isNearHackTerminal else { message = "Move ROB beside the orange hack panel first."; report(message); return }
+        isHackingDoor = true; hackingProgress = 0
+        stopDrive()
+        message = "Flipper Zero connected. ROB is running the door hack automatically…"
+        report(message)
+    }
+    func openDoor() { startDoorHack() }
     @discardableResult
     func enemyContact(_ attack: String = "Enemy contact", damage: Int = 5) -> Bool {
         guard isRunning, damageInvulnerabilityRemaining <= 0 else { return false }
@@ -875,7 +1156,7 @@ final class GameSession {
     func nextLevel() {
         guard canFinish else { message = "Finish every objective before leaving the level."; return }
         let completedLevel = level.id
-        score += max(0, level.timeBonus - Int(elapsed) * 10)
+        awardMissionPoints(max(0, level.timeBonus - Int(elapsed) * 10))
         let earnedNewProgress = completedLevel > highestCompletedLevel
         highestCompletedLevel = max(highestCompletedLevel, completedLevel)
         progressStore?.set(highestCompletedLevel, forKey: "robHighestCompletedLevel")

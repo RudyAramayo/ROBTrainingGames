@@ -87,6 +87,9 @@ import UIKit
             cylinder("Torso Speaker", radius: 0.078, height: 0.032, position: [x, 0.8, -0.305], color: UIColor(white: 0.025, alpha: 1), faceForward: true, parent: torso)
         }
         part("Depth Camera", [0.2, 0.1, 0.065], [0, 0.59, -0.3], .gray, parent: torso)
+        let flipper = Entity(); flipper.name = "Flipper Zero Hacker"; torso.addChild(flipper)
+        part("Flipper Zero Orange Case", [0.13, 0.2, 0.045], [0.3, 0.7, -0.315], .systemOrange, parent: flipper)
+        part("Flipper Zero Screen", [0.082, 0.07, 0.012], [0.3, 0.73, -0.344], UIColor(red: 0.12, green: 0.42, blue: 0.2, alpha: 1), parent: flipper)
         for side: Float in [-1, 1] {
             let armColor: UIColor = componentMode ? (side < 0 ? .systemGreen : .systemBlue) : .gray
             let prefix = side < 0 ? "Left" : "Right"
@@ -311,6 +314,40 @@ import UIKit
         ] { let wall = ModelEntity(mesh: .generateBox(size: wallSize, cornerRadius: 0.03), materials: [SimpleMaterial(color: wallColor, isMetallic: !arPresentation)]); wall.position = position; room.addChild(wall) }
         for barrier in puzzle.barriers { let block = ModelEntity(mesh: .generateBox(size: [barrier.size.x, 0.75, barrier.size.y], cornerRadius: 0.03), materials: [SimpleMaterial(color: barrierColor, isMetallic: !arPresentation)]); block.position = [barrier.center.x, 0.375, barrier.center.y]; room.addChild(block) }
         if let door = puzzle.door { let entity = ModelEntity(mesh: .generateBox(size: [door.size.x, 0.9, door.size.y], cornerRadius: 0.025), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); entity.name = "Puzzle Door"; entity.position = [door.center.x, 0.45, door.center.y]; room.addChild(entity) }
+        if let terminal = puzzle.hackTerminal {
+            let root = Entity(); root.name = "Hack Terminal"; root.position = [terminal.x, 0, terminal.y]; room.addChild(root)
+            let post = ModelEntity(mesh: .generateBox(size: [0.18, 0.62, 0.18], cornerRadius: 0.025), materials: [SimpleMaterial(color: .darkGray, isMetallic: true)]); post.position.y = 0.31; root.addChild(post)
+            let panel = ModelEntity(mesh: .generateBox(size: [0.34, 0.32, 0.12], cornerRadius: 0.035), materials: [SimpleMaterial(color: .systemOrange, isMetallic: true)]); panel.name = "Hack Terminal Panel"; panel.position = [0, 0.65, 0]; root.addChild(panel)
+            let button = ModelEntity(mesh: .generateSphere(radius: 0.055), materials: [UnlitMaterial(color: .systemGreen)]); button.name = "Hack Terminal Button"; button.position = [0, 0.66, -0.075]; root.addChild(button)
+        }
+        for shadow in puzzle.shadowZones {
+            let zone = ModelEntity(mesh: .generateBox(size: [shadow.size.x, 0.018, shadow.size.y], cornerRadius: 0.08), materials: [SimpleMaterial(color: UIColor(white: 0.015, alpha: arPresentation ? 0.68 : 0.88), isMetallic: false)])
+            zone.name = "Shadow Zone"; zone.position = [shadow.center.x, 0.012, shadow.center.y]; room.addChild(zone)
+        }
+        for conveyor in puzzle.conveyors {
+            let zone = Entity(); zone.name = "Conveyor \(conveyor.id)"; zone.position = [conveyor.center.x, 0.018, conveyor.center.y]
+            zone.orientation = simd_quatf(angle: atan2(conveyor.direction.x, -conveyor.direction.y), axis: [0, 1, 0])
+            let base = ModelEntity(mesh: .generateBox(size: [conveyor.size.x, 0.045, conveyor.size.y], cornerRadius: 0.035), materials: [SimpleMaterial(color: .darkGray, isMetallic: true)]); zone.addChild(base)
+            let span = conveyor.direction.x == 0 ? conveyor.size.y : conveyor.size.x
+            for index in -3...3 {
+                let offset = Float(index) * span / 7
+                for side: Float in [-1, 1] {
+                    let stripe = ModelEntity(mesh: .generateBox(size: [0.08, 0.018, min(0.62, conveyor.size.x * 0.38)], cornerRadius: 0.01), materials: [UnlitMaterial(color: index.isMultiple(of: 2) ? .systemYellow : .lightGray)])
+                    stripe.position = [side * 0.18, 0.032, offset]
+                    stripe.orientation = simd_quatf(angle: side * 0.62, axis: [0, 1, 0])
+                    zone.addChild(stripe)
+                }
+            }
+            room.addChild(zone)
+        }
+        for camera in puzzle.securityCameras {
+            let root = Entity(); root.name = "Security Camera \(camera.id)"; root.position = [camera.position.x, 0, camera.position.y]; root.orientation = simd_quatf(angle: camera.heading, axis: [0, 1, 0])
+            let post = ModelEntity(mesh: .generateCylinder(height: 1.25, radius: 0.055), materials: [SimpleMaterial(color: .darkGray, isMetallic: true)]); post.position.y = 0.625; root.addChild(post)
+            let housing = ModelEntity(mesh: .generateBox(size: [0.34, 0.22, 0.46], cornerRadius: 0.04), materials: [SimpleMaterial(color: .lightGray, isMetallic: true)]); housing.position = [0, 1.2, -0.18]; root.addChild(housing)
+            let lens = ModelEntity(mesh: .generateSphere(radius: 0.07), materials: [UnlitMaterial(color: .systemRed)]); lens.name = "Security Camera Lens \(camera.id)"; lens.position = [0, 1.2, -0.43]; root.addChild(lens)
+            let beam = ModelEntity(mesh: .generateBox(size: [1.2, 0.012, camera.range], cornerRadius: 0.08), materials: [SimpleMaterial(color: UIColor.systemRed.withAlphaComponent(arPresentation ? 0.09 : 0.13), isMetallic: false)]); beam.name = "Security Camera Beam \(camera.id)"; beam.position = [0, 0.04, -camera.range / 2]; root.addChild(beam)
+            room.addChild(root)
+        }
         if let key = puzzle.key {
             let entity = makePuzzleKey()
             entity.position = [key.x, 0.04, key.y]
@@ -349,6 +386,21 @@ import UIKit
     static func applyPuzzleState(to room: Entity, session: GameSession) {
         room.findEntity(named: "Puzzle Key")?.isEnabled = !session.hasKey
         room.findEntity(named: "Puzzle Door")?.isEnabled = !session.doorOpen
+        room.findEntity(named: "Hack Terminal")?.isEnabled = !session.doorOpen
+        if let button = room.findEntity(named: "Hack Terminal Button") as? ModelEntity {
+            let color: UIColor = session.isHackingDoor ? .systemYellow : session.canStartDoorHack ? .systemGreen : .systemRed
+            button.model?.materials = [UnlitMaterial(color: color)]
+            button.scale = .init(repeating: session.isHackingDoor ? 0.85 + Float(sin(session.elapsed * 9)) * 0.18 : 1)
+        }
+        for camera in session.puzzle.securityCameras {
+            room.findEntity(named: "Security Camera \(camera.id)")?.orientation = simd_quatf(angle: session.securityCameraHeading(camera), axis: [0, 1, 0])
+            if let lens = room.findEntity(named: "Security Camera Lens \(camera.id)") as? ModelEntity {
+                lens.model?.materials = [UnlitMaterial(color: session.isSecurityAlerted ? .systemRed : .systemYellow)]
+            }
+        }
+        for conveyor in session.puzzle.conveyors {
+            room.findEntity(named: "Conveyor \(conveyor.id)")?.position.y = 0.018 + Float(sin(session.elapsed * 5 + Double(conveyor.id))) * 0.006
+        }
         for index in session.puzzle.cells.indices { room.findEntity(named: "Puzzle Cell \(index)")?.isEnabled = !session.collectedCellIndices.contains(index) }
         if let dock = room.findEntity(named: "Puzzle Dock") as? ModelEntity {
             dock.model?.materials = [SimpleMaterial(color: session.canFinish ? .systemGreen : .systemOrange, isMetallic: false)]

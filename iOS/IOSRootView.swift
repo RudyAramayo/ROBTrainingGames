@@ -395,6 +395,15 @@ struct MobileTankControls: View {
         HStack(alignment: .bottom, spacing: 8) {
             TreadJoystick(title: "LEFT", demand: updateLeft)
             VStack(spacing: 5) {
+                if session.level.requiresKey && !session.doorOpen {
+                    Button { session.startDoorHack() } label: {
+                        Label(session.doorHackDescription, systemImage: "lock.open.trianglebadge.exclamationmark")
+                            .font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(session.canStartDoorHack ? .orange : .gray)
+                    .disabled(!session.canStartDoorHack)
+                }
                 LaserChargeButton(session: session, title: session.rangedWeapon.shortName, compact: true)
                 Button { session.saberAttack() } label: {
                     Label(session.meleeWeapon.shortName, systemImage: session.meleeWeapon == .dualSabers ? "sparkles" : "hammer.fill").font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.75)
@@ -520,6 +529,18 @@ struct ComponentExplorer: View {
                             }
                             ProgressView(value: Double(session.highestCompletedLevel), total: Double(session.levels.count)).tint(.cyan)
                             Text(nextUnlockText).font(.caption).foregroundStyle(.secondary)
+                            Label("\(session.upgradePoints) spendable mission points", systemImage: "star.circle.fill")
+                                .font(.subheadline.bold()).foregroundStyle(.yellow).monospacedDigit()
+                        }
+                        .workshopCard()
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label("Performance Upgrades", systemImage: "gauge.with.dots.needle.67percent").font(.title3.bold())
+                            Text("Points earned from cells, hacks, enemies, and fast finishes stay available between campaigns.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            ForEach(ROBUpgrade.allCases) { upgrade in
+                                UpgradeOption(session: session, upgrade: upgrade)
+                            }
                         }
                         .workshopCard()
 
@@ -934,6 +955,41 @@ private struct LoadoutOption: View {
             .background(selected ? .cyan.opacity(0.18) : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct UpgradeOption: View {
+    @Bindable var session: GameSession
+    let upgrade: ROBUpgrade
+
+    var body: some View {
+        let level = session.upgradeLevel(upgrade)
+        let cost = session.upgradeCost(upgrade)
+        HStack(spacing: 12) {
+            Image(systemName: icon).font(.title2).foregroundStyle(.yellow).frame(width: 34)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text(upgrade.displayName).font(.headline)
+                    Text("L\(level)/\(upgrade.maximumLevel)").font(.caption.bold()).foregroundStyle(.cyan)
+                }
+                Text(upgrade.summary).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 6)
+            Button(cost.map { "Buy \($0)" } ?? "MAX") { session.purchaseUpgrade(upgrade) }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+                .disabled(cost == nil || session.upgradePoints < (cost ?? 0))
+        }
+        .padding(12)
+        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var icon: String {
+        switch upgrade {
+        case .speedBoost: "speedometer"
+        case .energyCapacity: "battery.100percent.bolt"
+        case .weaponPower: "scope"
+        }
     }
 }
 

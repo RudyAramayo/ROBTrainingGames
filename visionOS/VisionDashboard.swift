@@ -21,7 +21,7 @@ struct VisionDashboard: View {
             VStack(spacing: 18) {
                 Image("rob-training-key-art").resizable().scaledToFit().frame(maxHeight: 310).clipShape(RoundedRectangle(cornerRadius: 24))
                 Text("ROB Spatial Workshop").font(.largeTitle.bold()); Text("Place ROB at full scale, evade patrolling spider and sentry robots, complete missions, and reveal the systems inside.").multilineTextAlignment(.center).foregroundStyle(.secondary)
-                HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Label("Score \(session.score)", systemImage: "star.fill"); Label("Targets \(session.remainingEnemies)", systemImage: "scope"); Label(session.hasKey ? "Key secured" : "Find key", systemImage: session.hasKey ? "key.fill" : "key") }.monospacedDigit()
+                HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Label("Score \(session.score)", systemImage: "star.fill"); Label("Upgrade points \(session.upgradePoints)", systemImage: "star.circle.fill"); Label("Targets \(session.remainingEnemies)", systemImage: "scope"); Label(session.hasKey ? "Key secured" : "Find key", systemImage: session.hasKey ? "key.fill" : "key") }.monospacedDigit()
                 CombatHealthBars(session: session).frame(width: 420)
                 Text("Keyboard: WASD or arrows to move · Space for saber combo · hold Q to charge laser").font(.callout.monospaced()).foregroundStyle(.cyan)
                 Text(session.laserLockDescription).font(.headline.monospaced()).foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
@@ -54,6 +54,10 @@ struct ImmersiveROBWorkshop: View {
                     HStack { DriveHoldButton(session: session, title: "↓", forward: -1); Button("Stop") { session.stopDrive() } }
                     Slider(value: Binding(get: { Double(scale) }, set: { scale = Float($0) }), in: 0.3...1.3) { Text("Scale") }.frame(width: 320)
                     HStack { LaserChargeButton(session: session, title: session.rangedWeapon.displayName); Button(session.meleeWeapon.displayName) { session.saberAttack() }.buttonStyle(.borderedProminent).tint(.pink) }
+                    if session.level.requiresKey && !session.doorOpen {
+                        Button(session.doorHackDescription, systemImage: "lock.open.trianglebadge.exclamationmark") { session.startDoorHack() }
+                            .buttonStyle(.borderedProminent).tint(.orange).disabled(!session.canStartDoorHack)
+                    }
                     VisionLoadoutMenu(session: session, compact: true)
                     Text(session.laserLockDescription).font(.caption.bold().monospaced()).foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
                     CombatHealthBars(session: session, compact: true).frame(width: 360)
@@ -105,6 +109,21 @@ private struct VisionLoadoutMenu: View {
                         )
                     }
                     .disabled(!session.isUnlocked(weapon))
+                }
+            }
+            Section("Performance Upgrades · \(session.upgradePoints) points") {
+                ForEach(ROBUpgrade.allCases) { upgrade in
+                    let level = session.upgradeLevel(upgrade)
+                    let cost = session.upgradeCost(upgrade)
+                    Button {
+                        session.purchaseUpgrade(upgrade)
+                    } label: {
+                        Label(
+                            cost.map { "\(upgrade.displayName) L\(level) · \($0) points" } ?? "\(upgrade.displayName) · MAX",
+                            systemImage: upgrade == .speedBoost ? "speedometer" : upgrade == .energyCapacity ? "battery.100percent.bolt" : "scope"
+                        )
+                    }
+                    .disabled(cost == nil || session.upgradePoints < (cost ?? 0))
                 }
             }
         } label: {
