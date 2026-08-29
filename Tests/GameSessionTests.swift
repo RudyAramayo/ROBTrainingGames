@@ -666,8 +666,12 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.weaponUpgradeLevel, 1)
         XCTAssertEqual(game.targetingComputerUpgradeLevel, 1)
         XCTAssertTrue(game.hasIndependentTwinTargeting)
-        XCTAssertEqual(game.maxEnergy, 125)
-        XCTAssertEqual(game.driveSpeedMultiplier, 1.35, accuracy: 0.0001)
+        XCTAssertEqual(GameSession.baseDriveSpeed, 1.2, accuracy: 0.0001)
+        XCTAssertEqual(game.maxEnergy, 160)
+        XCTAssertEqual(game.energy, 160)
+        XCTAssertEqual(game.driveSpeedMultiplier, 1.6, accuracy: 0.0001)
+        XCTAssertEqual(game.energyPickupAmount, 90)
+        XCTAssertEqual(game.passiveEnergyRecharge, 9)
         XCTAssertEqual(game.weaponDamageBonus, 1)
         let restored = GameSession(audioEnabled: false, progressStore: defaults)
         XCTAssertEqual(restored.speedUpgradeLevel, 1)
@@ -675,6 +679,8 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(restored.weaponUpgradeLevel, 1)
         XCTAssertEqual(restored.targetingComputerUpgradeLevel, 1)
         XCTAssertTrue(restored.hasIndependentTwinTargeting)
+        XCTAssertEqual(restored.maxEnergy, 160)
+        XCTAssertEqual(restored.driveSpeedMultiplier, 1.6, accuracy: 0.0001)
         XCTAssertEqual(restored.upgradePoints, game.upgradePoints)
     }
 

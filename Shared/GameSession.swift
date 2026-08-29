@@ -278,8 +278,8 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
     }
     var summary: String {
         switch self {
-        case .speedBoost: "Raises tread speed by 35% per upgrade."
-        case .energyCapacity: "Adds 25 energy and improves passive charging."
+        case .speedBoost: "Raises tread speed by 60% per upgrade."
+        case .energyCapacity: "Adds 60 energy and dramatically improves cells and passive charging."
         case .weaponPower: "Adds one shield point of damage to every hit."
         case .targetingComputer: "Unlocks independent target locks for the two Twin Blaster barrels."
         }
@@ -297,8 +297,9 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.05"
+    static let gameplayRulesetVersion = "2026.09.06"
     static let robotCollisionRadius: Float = 0.62
+    static let baseDriveSpeed: Float = 1.2
     static let securityCameraHalfAngle: Float = .pi / 5
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
@@ -399,9 +400,11 @@ final class GameSession {
     var activeBoss: TrainingEnemy? { enemies.first(where: { $0.isBoss && $0.isActive }) }
     var healthFraction: Double { Double(health) / Double(maxHealth) }
     var shieldFraction: Double { Double(shields) / Double(maxShields) }
-    var maxEnergy: Double { 100 + Double(energyUpgradeLevel * 25) }
+    var maxEnergy: Double { 100 + Double(energyUpgradeLevel * 60) }
     var energyFraction: Double { energy / maxEnergy }
-    var driveSpeedMultiplier: Double { 1 + Double(speedUpgradeLevel) * 0.35 }
+    var driveSpeedMultiplier: Double { 1 + Double(speedUpgradeLevel) * 0.6 }
+    var energyPickupAmount: Double { 70 + Double(energyUpgradeLevel * 20) }
+    var passiveEnergyRecharge: Double { 6 + Double(energyUpgradeLevel * 3) }
     var weaponDamageBonus: Int { weaponUpgradeLevel }
     var hasIndependentTwinTargeting: Bool { targetingComputerUpgradeLevel > 0 }
     var isSecurityAlerted: Bool { securityAlertRemaining > 0 }
@@ -487,7 +490,7 @@ final class GameSession {
             progressStore?.set(speedUpgradeLevel, forKey: "robSpeedUpgradeLevel")
         case .energyCapacity:
             energyUpgradeLevel += 1
-            energy = min(maxEnergy, energy + 25)
+            energy = min(maxEnergy, energy + 60)
             progressStore?.set(energyUpgradeLevel, forKey: "robEnergyUpgradeLevel")
         case .weaponPower:
             weaponUpgradeLevel += 1
@@ -802,9 +805,10 @@ final class GameSession {
         let targetRight = hasDriveEnergy ? max(-1, min(1, forwardDemand + steeringDemand * 0.72)) : 0
         let smoothing = min(1, delta * 8)
         leftTread += (targetLeft - leftTread) * smoothing; rightTread += (targetRight - rightTread) * smoothing
-        let linear = Float((leftTread + rightTread) * 0.5) * Float(delta) * 0.85 * Float(driveSpeedMultiplier)
-        leftWheelAngle -= Float(leftTread) * Float(delta) * 4.8; rightWheelAngle -= Float(rightTread) * Float(delta) * 4.8
-        robotHeading += Float(rightTread - leftTread) * Float(delta) * 1.05
+        let speedMultiplier = Float(driveSpeedMultiplier)
+        let linear = Float((leftTread + rightTread) * 0.5) * Float(delta) * Self.baseDriveSpeed * speedMultiplier
+        leftWheelAngle -= Float(leftTread) * Float(delta) * 6.75 * speedMultiplier; rightWheelAngle -= Float(rightTread) * Float(delta) * 6.75 * speedMultiplier
+        robotHeading += Float(rightTread - leftTread) * Float(delta) * 1.48 * speedMultiplier
         let oldPosition = robotPosition
         let proposedPosition = SIMD3<Float>(
             robotPosition.x - sin(robotHeading) * linear,
@@ -834,7 +838,7 @@ final class GameSession {
         if hasDriveEnergy && driveLoad > 0.01 {
             energy = max(0, energy - delta * (4.4 + driveLoad * 2.2))
         } else if !isHackingDoor {
-            energy = min(maxEnergy, energy + delta * (3.2 + Double(energyUpgradeLevel) * 0.8))
+            energy = min(maxEnergy, energy + delta * passiveEnergyRecharge)
         }
         if energy <= 0.05, !wasEnergyDepleted {
             wasEnergyDepleted = true
@@ -1498,9 +1502,9 @@ final class GameSession {
     func collectCell() {
         guard isRunning, collectedCells < level.cellCount else { return }
         collectedCells += 1
-        energy = min(maxEnergy, energy + 32)
+        energy = min(maxEnergy, energy + energyPickupAmount)
         awardMissionPoints(150)
-        message = "Energy cell \(collectedCells) of \(level.cellCount). Battery recharged."
+        message = "Energy cell \(collectedCells) of \(level.cellCount). Battery boosted by up to \(Int(energyPickupAmount))."
         report(message); play("pickup")
     }
     @discardableResult
