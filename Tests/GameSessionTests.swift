@@ -811,7 +811,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(game.message.contains("dual-saber"))
     }
 
-    func testWallBlocksSaberAnimationAndDamage() {
+    func testWallOccludesTargetWithoutCancelingSaberAnimation() {
         let game = GameSession(audioEnabled: false)
         game.begin()
         guard let wall = game.puzzle.barriers.first, let targetIndex = game.enemies.indices.first else { return XCTFail("Missing wall or target") }
@@ -825,9 +825,77 @@ final class GameSessionTests: XCTestCase {
         game.saberAttack()
 
         XCTAssertEqual(game.enemies[targetIndex].shields, shields)
-        XCTAssertEqual(game.saberAnimation, 0)
-        XCTAssertNil(game.saberStyle)
-        XCTAssertTrue(game.message.localizedCaseInsensitiveContains("blocked by the wall"))
+        XCTAssertEqual(game.saberAnimation, 1)
+        XCTAssertEqual(game.saberStyle, .leftSweep)
+        XCTAssertTrue(game.message.localizedCaseInsensitiveContains("missed"))
+        XCTAssertFalse(game.message.localizedCaseInsensitiveContains("blocked by the wall"))
+    }
+
+    func testNearbyWallDoesNotCancelSpinAttackAgainstRobotsOnTheSameSide() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        guard let wall = game.puzzle.barriers.first, let targetIndex = game.enemies.indices.first else { return XCTFail("Missing wall or target") }
+        for index in game.enemies.indices where index != targetIndex { game.enemies[index].isActive = false }
+        let z = wall.center.y + wall.size.y / 2 + GameSession.robotCollisionRadius + 0.03
+        game.robotPosition = [wall.center.x, 0, z]
+        game.robotHeading = .pi / 2
+        game.enemies[targetIndex].position = [wall.center.x - 1, 0, z]
+        game.enemies[targetIndex].shields = 10
+        let shields = game.enemies[targetIndex].shields
+
+        game.saberAttack()
+        game.saberAttack()
+        game.saberAttack()
+
+        XCTAssertEqual(game.saberStyle, .spin)
+        XCTAssertEqual(game.enemies[targetIndex].shields, shields - 3)
+        XCTAssertTrue(game.message.localizedCaseInsensitiveContains("spin attack"))
+    }
+
+    func testROBCannotDriveThroughAnotherRobotEvenWithALargeFrameStep() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        guard let targetIndex = game.enemies.indices.first else { return XCTFail("Missing target") }
+        for index in game.enemies.indices where index != targetIndex { game.enemies[index].isActive = false }
+        let start = game.robotPosition
+        game.enemies[targetIndex].position = [start.x, 0, start.z - 1.35]
+        game.enemies[targetIndex].nextAttack = .infinity
+        let requiredSeparation = GameSession.robotCollisionRadius + game.enemies[targetIndex].collisionRadius
+
+        game.setDrive(forward: 1, steering: 0)
+        game.tick(2)
+        game.stopDrive()
+
+        let separation = simd_distance(
+            SIMD2<Float>(game.robotPosition.x, game.robotPosition.z),
+            SIMD2<Float>(game.enemies[targetIndex].position.x, game.enemies[targetIndex].position.z)
+        )
+        XCTAssertGreaterThanOrEqual(separation, requiredSeparation - 0.002)
+        XCTAssertGreaterThan(game.robotPosition.z, game.enemies[targetIndex].position.z)
+    }
+
+    func testEnemiesKeepTheirScaledBodyVolumesSeparated() {
+        let game = GameSession(audioEnabled: false)
+        game.levelIndex = 14
+        game.begin()
+        guard game.enemies.count >= 3, game.enemies[0].isBoss, game.enemies[2].kind == .spider else { return XCTFail("Missing boss pair") }
+        for index in game.enemies.indices where index != 0 && index != 2 { game.enemies[index].isActive = false }
+        let start = game.robotPosition
+        game.enemies[0].position = [start.x, 0, start.z - 1.4]
+        game.enemies[0].nextAttack = .infinity
+        game.enemies[2].position = [start.x, 0, start.z - 2.35]
+        game.enemies[2].nextAttack = .infinity
+        game.enemies[2].lungeRemaining = 0.72
+        let requiredSeparation = game.enemies[0].collisionRadius + game.enemies[2].collisionRadius
+
+        for _ in 0..<60 {
+            game.tick(1.0 / 60.0)
+            let separation = simd_distance(
+                SIMD2<Float>(game.enemies[0].position.x, game.enemies[0].position.z),
+                SIMD2<Float>(game.enemies[2].position.x, game.enemies[2].position.z)
+            )
+            XCTAssertGreaterThanOrEqual(separation, requiredSeparation - 0.002)
+        }
     }
 
     func testSaberBladesStayRetractedUntilAValidAttack() {

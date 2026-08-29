@@ -69,6 +69,7 @@ struct TrainingEnemy: Identifiable, Sendable {
     var contactDamage: Int { isMiniBoss ? 4 : isBoss ? 10 : (kind == .spider ? 6 : 5) }
     var projectileDamage: Int { isMiniBoss ? 3 : isBoss ? 10 : 4 }
     var combatScale: Float { isMiniBoss ? 1.15 : isBoss ? 1.35 : 1 }
+    var collisionRadius: Float { (kind == .spider ? 0.36 : 0.42) * combatScale }
     var defeatReward: Int { isMiniBoss ? 500 : isBoss ? 1_000 : 300 }
 }
 
@@ -297,7 +298,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.07"
+    static let gameplayRulesetVersion = "2026.09.08"
     static let robotCollisionRadius: Float = 0.62
     static let baseDriveSpeed: Float = 1.2
     static let securityCameraHalfAngle: Float = .pi / 5
@@ -856,9 +857,20 @@ final class GameSession {
                     padding: Self.robotCollisionRadius
                 ) != nil
             } == true
+            let blockedByRobot = enemies.contains { enemy in
+                guard enemy.isActive else { return false }
+                return Self.segmentHitFraction(
+                    from: SIMD2<Float>(oldPosition.x, oldPosition.z),
+                    to: SIMD2<Float>(proposedPosition.x, proposedPosition.z),
+                    center: SIMD2<Float>(enemy.position.x, enemy.position.z),
+                    radius: Self.robotCollisionRadius + enemy.collisionRadius
+                ) != nil
+            }
             let slidAlongWall = simd_distance(oldPosition, resolvedPosition) > 0.000_1
             message = blockedByDoor
                 ? (hasKey ? "Use the orange hack panel beside the door." : "Route blocked. Find the access key before hacking the doorway.")
+                : blockedByRobot
+                    ? "Robot contact — solid chassis separation is holding. Turn or reverse to disengage."
                 : slidAlongWall
                     ? "Wall assist active — ROB is sliding along the open edge. Steer away when clear."
                     : "Wall contact — reverse or pivot away; ROB will release instead of staying trapped."
@@ -1075,11 +1087,14 @@ final class GameSession {
     private var robotMovementBlockers: [PuzzleBarrier] {
         puzzle.barriers + ((!doorOpen && puzzle.door != nil) ? [puzzle.door!] : [])
     }
-    func isRobotPositionClear(_ position: SIMD3<Float>) -> Bool {
+    private func isRobotWallPositionClear(_ position: SIMD3<Float>) -> Bool {
         let wallInset: Float = 0.09 + Self.robotCollisionRadius
         let movementLimit = puzzle.arenaHalfExtent - wallInset
         guard abs(position.x) <= movementLimit, abs(position.z) <= movementLimit else { return false }
         return !robotMovementBlockers.contains { Self.intersects(position, barrier: $0, radius: Self.robotCollisionRadius) }
+    }
+    func isRobotPositionClear(_ position: SIMD3<Float>) -> Bool {
+        isRobotWallPositionClear(position)
     }
     private func resolveRobotMovement(from start: SIMD3<Float>, to end: SIMD3<Float>) -> SIMD3<Float> {
         if isRobotMoveClear(from: start, to: end) { return end }
@@ -1111,16 +1126,24 @@ final class GameSession {
         return clearFraction > 0.001 ? start + (end - start) * clearFraction : start
     }
     private func isRobotMoveClear(from start: SIMD3<Float>, to end: SIMD3<Float>) -> Bool {
-        guard isRobotPositionClear(end) else { return false }
+        guard isRobotWallPositionClear(end) else { return false }
         let start2D = SIMD2<Float>(start.x, start.z)
         let end2D = SIMD2<Float>(end.x, end.z)
-        return !robotMovementBlockers.contains { blocker in
+        guard !robotMovementBlockers.contains(where: { blocker in
             guard Self.segmentHitFraction(from: start2D, to: end2D, barrier: blocker, padding: Self.robotCollisionRadius) != nil else { return false }
             return !Self.motionStaysOutsideContactFace(
                 from: start2D,
                 to: end2D,
                 barrier: blocker,
                 padding: Self.robotCollisionRadius
+            )
+        }) else { return false }
+        return enemies.allSatisfy { enemy in
+            !enemy.isActive || Self.circleMotionIsClear(
+                from: start2D,
+                to: end2D,
+                center: SIMD2<Float>(enemy.position.x, enemy.position.z),
+                radius: Self.robotCollisionRadius + enemy.collisionRadius
             )
         }
     }
@@ -1138,6 +1161,23 @@ final class GameSession {
         if abs(start.y - minimum.y) <= tolerance, end.y <= minimum.y + tolerance { return true }
         if abs(start.y - maximum.y) <= tolerance, end.y >= maximum.y - tolerance { return true }
         return false
+    }
+    private static func circleMotionIsClear(
+        from start: SIMD2<Float>,
+        to end: SIMD2<Float>,
+        center: SIMD2<Float>,
+        radius: Float
+    ) -> Bool {
+        let tolerance: Float = 0.000_5
+        let startOffset = start - center
+        let startDistance = simd_length(startOffset)
+        let endDistance = simd_distance(end, center)
+        if startDistance <= radius + tolerance {
+            let movement = end - start
+            return endDistance >= startDistance - tolerance && simd_dot(movement, startOffset) >= -tolerance
+        }
+        guard let impact = segmentHitFraction(from: start, to: end, center: center, radius: radius) else { return true }
+        return impact >= 1 - tolerance
     }
     private var projectileBlockers: [PuzzleBarrier] {
         let half = puzzle.arenaHalfExtent
@@ -1174,30 +1214,11 @@ final class GameSession {
         }
         return entry
     }
-    private static func distance(from point: SIMD2<Float>, to barrier: PuzzleBarrier) -> Float {
-        let minimum = barrier.center - barrier.size / 2
-        let maximum = barrier.center + barrier.size / 2
-        let offset = SIMD2<Float>(
-            max(max(minimum.x - point.x, 0), point.x - maximum.x),
-            max(max(minimum.y - point.y, 0), point.y - maximum.y)
-        )
-        return simd_length(offset)
-    }
     private func meleePathIsClear(to target: SIMD2<Float>, padding: Float) -> Bool {
         let origin = SIMD2<Float>(robotPosition.x, robotPosition.z)
         return !projectileBlockers.contains { blocker in
             Self.segmentHitFraction(from: origin, to: target, barrier: blocker, padding: padding) != nil
         }
-    }
-    private func meleeAnimationIsClear(style: SaberAttackStyle) -> Bool {
-        let origin = SIMD2<Float>(robotPosition.x, robotPosition.z)
-        if style == .spin {
-            return !projectileBlockers.contains { Self.distance(from: origin, to: $0) <= 2.15 }
-        }
-        let forward = SIMD2<Float>(-sin(robotHeading), -cos(robotHeading))
-        let reach: Float = style == .hammerSmash ? 2.05 : 1.55
-        let padding: Float = style == .hammerSmash ? 0.38 : 0.5
-        return meleePathIsClear(to: origin + forward * reach, padding: padding)
     }
     private static func segmentHitFraction(
         from start: SIMD2<Float>,
@@ -1287,16 +1308,65 @@ final class GameSession {
         }
         laserProjectiles = survivors
     }
+    private func isEnemyMoveClear(from start: SIMD3<Float>, to end: SIMD3<Float>, enemy: TrainingEnemy) -> Bool {
+        let radius = enemy.collisionRadius
+        let movementLimit = puzzle.arenaHalfExtent - 0.09 - radius
+        guard abs(end.x) <= movementLimit, abs(end.z) <= movementLimit else { return false }
+        let start2D = SIMD2<Float>(start.x, start.z)
+        let end2D = SIMD2<Float>(end.x, end.z)
+        guard !robotMovementBlockers.contains(where: { blocker in
+            guard Self.segmentHitFraction(from: start2D, to: end2D, barrier: blocker, padding: radius) != nil else { return false }
+            return !Self.motionStaysOutsideContactFace(from: start2D, to: end2D, barrier: blocker, padding: radius)
+        }) else { return false }
+        guard Self.circleMotionIsClear(
+            from: start2D,
+            to: end2D,
+            center: SIMD2<Float>(robotPosition.x, robotPosition.z),
+            radius: radius + Self.robotCollisionRadius
+        ) else { return false }
+        return enemies.allSatisfy { other in
+            !other.isActive || other.id == enemy.id || Self.circleMotionIsClear(
+                from: start2D,
+                to: end2D,
+                center: SIMD2<Float>(other.position.x, other.position.z),
+                radius: radius + other.collisionRadius
+            )
+        }
+    }
+    private func resolveEnemyMovement(from start: SIMD3<Float>, to end: SIMD3<Float>, enemy: TrainingEnemy) -> SIMD3<Float> {
+        if isEnemyMoveClear(from: start, to: end, enemy: enemy) { return end }
+        let delta = end - start
+        let axisOrder = abs(delta.x) >= abs(delta.z) ? [0, 2] : [2, 0]
+        var resolved = start
+        for axis in axisOrder {
+            var target = resolved
+            target[axis] = end[axis]
+            if isEnemyMoveClear(from: resolved, to: target, enemy: enemy) {
+                resolved = target
+                continue
+            }
+            var clearFraction: Float = 0
+            var blockedFraction: Float = 1
+            for _ in 0..<10 {
+                let fraction = (clearFraction + blockedFraction) * 0.5
+                let candidate = resolved + (target - resolved) * fraction
+                if isEnemyMoveClear(from: resolved, to: candidate, enemy: enemy) {
+                    clearFraction = fraction
+                } else {
+                    blockedFraction = fraction
+                }
+            }
+            if clearFraction > 0.001 { resolved += (target - resolved) * clearFraction }
+        }
+        return resolved
+    }
     private func moveEnemy(_ enemy: inout TrainingEnemy, toward target: SIMD3<Float>, speed: Float, delta: TimeInterval) {
         var direction = target - enemy.position; direction.y = 0
         let distance = simd_length(direction); guard distance > 0.001 else { return }
         direction /= distance
-        let step = min(distance, speed * Float(delta)), blockers = puzzle.barriers + ((!doorOpen && puzzle.door != nil) ? [puzzle.door!] : [])
-        var proposedX = enemy.position; proposedX.x += direction.x * step
-        var proposedZ = enemy.position; proposedZ.z += direction.z * step
-        let movementLimit = puzzle.arenaHalfExtent - 0.48
-        if abs(proposedX.x) < movementLimit && !blockers.contains(where: { Self.intersects(proposedX, barrier: $0, radius: 0.27) }) { enemy.position.x = proposedX.x }
-        if abs(proposedZ.z) < movementLimit && !blockers.contains(where: { Self.intersects(proposedZ, barrier: $0, radius: 0.27) }) { enemy.position.z = proposedZ.z }
+        let step = min(distance, speed * Float(delta))
+        let start = enemy.position
+        enemy.position = resolveEnemyMovement(from: start, to: start + direction * step, enemy: enemy)
     }
     private func updateEnemies(_ delta: TimeInterval) {
         for index in enemies.indices where enemies[index].isActive {
@@ -1329,8 +1399,8 @@ final class GameSession {
             }
             let facing = robotPosition - enemy.position; enemy.heading = atan2(-facing.x, -facing.z)
             moveEnemy(&enemy, toward: target, speed: speed, delta: delta); enemies[index] = enemy
-            let contactRadius: Float = (enemy.kind == .spider ? 0.5 : 0.44) * enemy.combatScale
-            if simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(enemy.position.x, enemy.position.z)) < contactRadius {
+            let contactRadius = Self.robotCollisionRadius + enemy.collisionRadius + 0.035
+            if simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(enemy.position.x, enemy.position.z)) <= contactRadius {
                 if enemy.kind == .spider { playSpider(.impact) } else { playEnemyAttack(.fax) }
                 if enemyContact(enemy.kind == .spider ? "\(enemy.displayName) lunge" : "\(enemy.displayName) collision", damage: enemy.contactDamage) { return }
             }
@@ -1504,11 +1574,6 @@ final class GameSession {
     func saberAttack() {
         guard isRunning else { return }
         if meleeWeapon == .powerHammer {
-            guard meleeAnimationIsClear(style: .hammerSmash) else {
-                saberAnimation = 0; saberStyle = nil; saberComboCount = 0
-                message = "Power hammer blocked by the wall. Back up before swinging."; report(message)
-                return
-            }
             saberComboCount = 0; lastSaberAttackTime = elapsed; saberAnimation = 1; saberStyle = .hammerSmash
             let forward = SIMD2<Float>(-sin(robotHeading), -cos(robotHeading))
             let hitIndices = enemies.indices.filter { index in
@@ -1529,11 +1594,6 @@ final class GameSession {
         let nextComboCount = elapsed - lastSaberAttackTime <= 1.15 ? saberComboCount + 1 : 1
         let spin = nextComboCount >= 3
         let nextStyle: SaberAttackStyle = spin ? .spin : (nextComboCount == 1 ? .leftSweep : .rightSweep)
-        guard meleeAnimationIsClear(style: nextStyle) else {
-            saberAnimation = 0; saberStyle = nil; saberComboCount = 0
-            message = "Saber swing blocked by the wall. Back up before attacking."; report(message)
-            return
-        }
         saberComboCount = nextComboCount
         lastSaberAttackTime = elapsed; saberAnimation = 1
         saberStyle = nextStyle
