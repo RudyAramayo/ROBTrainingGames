@@ -34,6 +34,7 @@ final class GameSessionTests: XCTestCase {
         game.doorOpen = true
         for index in game.enemies.indices { game.enemies[index].isActive = false }
         game.nextLevel()
+        if game.isUpgradeIntermission { game.continueAfterUpgradeIntermission() }
     }
 
     func testCalibrationMatchesBrowserCampaign() {
@@ -47,7 +48,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertGreaterThan(game.puzzle.arenaHalfExtent, 5)
     }
 
-    func testLevelOneNeedsNoKeyAndAdvancesWhenObjectivesReachTheDock() {
+    func testLevelOneDockOpensUpgradeIntermissionBeforeAdvancing() {
         let game = GameSession(audioEnabled: false)
         game.begin()
 
@@ -60,7 +61,18 @@ final class GameSessionTests: XCTestCase {
         game.robotPosition = [game.puzzle.dock.x, 0, game.puzzle.dock.y]
         game.tick(1.0 / 30.0)
 
+        XCTAssertEqual(game.level.id, 1)
+        XCTAssertTrue(game.isUpgradeIntermission)
+        XCTAssertFalse(game.isRunning)
+        XCTAssertEqual(game.upgradePoints, game.level.timeBonus)
+
+        game.purchaseUpgrade(.speedBoost)
+        XCTAssertEqual(game.speedUpgradeLevel, 1)
+        XCTAssertEqual(game.upgradePoints, game.level.timeBonus - ROBUpgrade.speedBoost.cost(for: 0))
+
+        game.continueAfterUpgradeIntermission()
         XCTAssertEqual(game.level.id, 2)
+        XCTAssertFalse(game.isUpgradeIntermission)
         XCTAssertTrue(game.isRunning)
     }
 
@@ -506,6 +518,32 @@ final class GameSessionTests: XCTestCase {
         XCTAssertGreaterThan(simd_dot(movement, conveyor.direction), 0.08)
     }
 
+    func testConveyorArrowsAnimateAndWrapAlongTheTravelDirection() {
+        XCTAssertEqual(
+            RobotFactory.conveyorArrowOffset(baseOffset: 0, elapsed: 1, speed: 0.5, span: 2, direction: 1),
+            0.5,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            RobotFactory.conveyorArrowOffset(baseOffset: 0, elapsed: 1, speed: 0.5, span: 2, direction: -1),
+            -0.5,
+            accuracy: 0.001
+        )
+
+        let game = GameSession(audioEnabled: false)
+        game.levelIndex = 1
+        game.begin()
+        let room = RobotFactory.makeTrainingRoom(level: game.levelIndex, puzzle: game.puzzle)
+        guard let arrow = room.findEntity(named: "Conveyor Arrow 0 0 0") else {
+            return XCTFail("Missing animated conveyor arrow")
+        }
+        let initialOffset = arrow.position.z
+        game.elapsed = 1
+        RobotFactory.applyPuzzleState(to: room, session: game)
+
+        XCTAssertNotEqual(arrow.position.z, initialOffset, accuracy: 0.001)
+    }
+
     func testSecurityCameraAlertsEnemiesButShadowsBreakDetection() {
         let game = GameSession(audioEnabled: false)
         game.levelIndex = 2
@@ -762,6 +800,20 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.saberStyle, .spin)
         XCTAssertEqual(game.enemies[index].shields, shields - 1)
         XCTAssertTrue(game.message.contains("Spin attack"))
+    }
+
+    func testBattleHitsAddToThePersistentUpgradePool() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        guard let targetIndex = game.enemies.indices.first else { return XCTFail("Missing training target") }
+        for index in game.enemies.indices where index != targetIndex { game.enemies[index].isActive = false }
+        game.enemies[targetIndex].position = game.robotPosition + SIMD3<Float>(0, 0, -1.7)
+        let pointsBeforeHit = game.upgradePoints
+
+        game.fireLaser()
+        for _ in 0..<90 where !game.laserProjectiles.isEmpty { game.tick(1.0 / 60.0) }
+
+        XCTAssertGreaterThanOrEqual(game.upgradePoints - pointsBeforeHit, 50)
     }
 
     func testShoulderLaserLocksAndChargedShotDealsMoreDamage() {

@@ -235,48 +235,90 @@ private struct VisionControlDeck: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Text("HAND + CONTROLLER DRIVE DECK").font(.headline)
-            Text("Pinch each tread pad and drag up or down. Two hands can command the treads independently.")
-                .font(.caption)
-                .foregroundStyle(.cyan)
-            VisionHandDriveControls(session: session)
-            HStack {
-                LaserChargeButton(session: session, title: session.rangedWeapon.displayName, compact: true)
-                Button(session.meleeWeapon.displayName, systemImage: "bolt.fill") { session.saberAttack() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.pink)
-                if session.level.requiresKey && !session.doorOpen {
-                    Button(session.doorHackDescription, systemImage: "lock.open.trianglebadge.exclamationmark") {
-                        session.startDoorHack()
+            if session.isUpgradeIntermission {
+                VisionUpgradeIntermission(session: session)
+            } else {
+                Text("HAND + CONTROLLER DRIVE DECK").font(.headline)
+                Text("Pinch each tread pad and drag up or down. Two hands can command the treads independently.")
+                    .font(.caption)
+                    .foregroundStyle(.cyan)
+                VisionHandDriveControls(session: session)
+                HStack {
+                    LaserChargeButton(session: session, title: session.rangedWeapon.displayName, compact: true)
+                    Button(session.meleeWeapon.displayName, systemImage: "bolt.fill") { session.saberAttack() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.pink)
+                    if session.level.requiresKey && !session.doorOpen {
+                        Button(session.doorHackDescription, systemImage: "lock.open.trianglebadge.exclamationmark") {
+                            session.startDoorHack()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                        .disabled(!session.canStartDoorHack)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.orange)
-                    .disabled(!session.canStartDoorHack)
+                    VisionLoadoutMenu(session: session, compact: true)
                 }
-                VisionLoadoutMenu(session: session, compact: true)
+                HStack {
+                    Button(session.isRunning ? "Pause" : session.isPaused ? "Resume" : "Start Mission", systemImage: session.isRunning ? "pause.fill" : "play.fill") {
+                        if session.isRunning { _ = session.pause() }
+                        else if session.isPaused { _ = session.resume() }
+                        else { session.begin() }
+                    }
+                    Button("Reset", systemImage: "arrow.counterclockwise") { session.reset() }
+                    if session.canFinish {
+                        Button(session.levelIndex == session.levels.count - 1 ? "Finish Campaign" : "Complete Level") { session.nextLevel() }
+                    }
+                    Slider(value: $arenaScale, in: scaleRange) { Text("Arena size") }
+                        .frame(width: 180)
+                }
+                Label(controller.modeDescription, systemImage: controller.isConnected ? "gamecontroller.fill" : "hand.point.up.left.fill")
+                    .font(.caption.bold())
+                    .foregroundStyle(controller.spatialControllerCount >= 2 ? .green : .secondary)
+                Text(placementHelp).font(.caption2).foregroundStyle(.secondary)
+                CombatHealthBars(session: session, compact: true).frame(width: 390)
             }
-            HStack {
-                Button(session.isRunning ? "Pause" : session.isPaused ? "Resume" : "Start Mission", systemImage: session.isRunning ? "pause.fill" : "play.fill") {
-                    if session.isRunning { _ = session.pause() }
-                    else if session.isPaused { _ = session.resume() }
-                    else { session.begin() }
-                }
-                Button("Reset", systemImage: "arrow.counterclockwise") { session.reset() }
-                if session.canFinish {
-                    Button(session.levelIndex == session.levels.count - 1 ? "Finish Campaign" : "Next Level") { session.nextLevel() }
-                }
-                Slider(value: $arenaScale, in: scaleRange) { Text("Arena size") }
-                    .frame(width: 180)
-            }
-            Label(controller.modeDescription, systemImage: controller.isConnected ? "gamecontroller.fill" : "hand.point.up.left.fill")
-                .font(.caption.bold())
-                .foregroundStyle(controller.spatialControllerCount >= 2 ? .green : .secondary)
-            Text(placementHelp).font(.caption2).foregroundStyle(.secondary)
-            CombatHealthBars(session: session, compact: true).frame(width: 390)
         }
         .padding(14)
         .glassBackgroundEffect()
         .onDisappear { session.stopDrive() }
+    }
+}
+
+private struct VisionUpgradeIntermission: View {
+    @Bindable var session: GameSession
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Label("LEVEL \(session.level.id) CLEARED · UPGRADE BAY", systemImage: "flag.checkered.circle.fill")
+                .font(.title3.bold())
+                .foregroundStyle(.green)
+            Label("\(session.upgradePoints) battle points", systemImage: "star.circle.fill")
+                .font(.headline.monospacedDigit())
+                .foregroundStyle(.yellow)
+            HStack(spacing: 8) {
+                ForEach(ROBUpgrade.allCases) { upgrade in
+                    let level = session.upgradeLevel(upgrade)
+                    let cost = session.upgradeCost(upgrade)
+                    Button {
+                        session.purchaseUpgrade(upgrade)
+                    } label: {
+                        VStack(spacing: 3) {
+                            Text(upgrade.displayName).font(.caption.bold())
+                            Text(cost.map { "L\(level) · \($0)" } ?? "MAX")
+                                .font(.caption2.monospacedDigit())
+                        }
+                    }
+                    .disabled(cost == nil || session.upgradePoints < (cost ?? 0))
+                }
+            }
+            Text(session.message).font(.caption).foregroundStyle(.cyan).lineLimit(2)
+            Button("Deploy to Level \(session.level.id + 1)", systemImage: "play.fill") {
+                session.continueAfterUpgradeIntermission()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.cyan)
+        }
+        .onAppear { session.stopDrive() }
     }
 }
 

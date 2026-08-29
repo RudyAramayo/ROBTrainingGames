@@ -407,8 +407,9 @@ import UIKit
             let span = conveyor.direction.x == 0 ? conveyor.size.y : conveyor.size.x
             for index in -3...3 {
                 let offset = Float(index) * span / 7
-                for side: Float in [-1, 1] {
+                for (sideIndex, side) in [Float(-1), 1].enumerated() {
                     let stripe = ModelEntity(mesh: .generateBox(size: [0.08, 0.018, min(0.62, conveyor.size.x * 0.38)], cornerRadius: 0.01), materials: [UnlitMaterial(color: index.isMultiple(of: 2) ? .systemYellow : .lightGray)])
+                    stripe.name = "Conveyor Arrow \(conveyor.id) \(index) \(sideIndex)"
                     stripe.position = [side * 0.18, 0.032, offset]
                     stripe.orientation = simd_quatf(angle: side * 0.62, axis: [0, 1, 0])
                     zone.addChild(stripe)
@@ -473,6 +474,21 @@ import UIKit
         return root
     }
 
+    static func conveyorArrowOffset(
+        baseOffset: Float,
+        elapsed: TimeInterval,
+        speed: Float,
+        span: Float,
+        direction: Float
+    ) -> Float {
+        guard span > 0 else { return baseOffset }
+        let halfSpan = span / 2
+        var wrapped = (baseOffset + Float(elapsed) * speed * direction + halfSpan)
+            .truncatingRemainder(dividingBy: span)
+        if wrapped < 0 { wrapped += span }
+        return wrapped - halfSpan
+    }
+
     static func applyPuzzleState(to room: Entity, session: GameSession) {
         room.findEntity(named: "Puzzle Key")?.isEnabled = !session.hasKey
         room.findEntity(named: "Puzzle Door")?.isEnabled = !session.doorOpen
@@ -489,7 +505,24 @@ import UIKit
             }
         }
         for conveyor in session.puzzle.conveyors {
-            room.findEntity(named: "Conveyor \(conveyor.id)")?.position.y = 0.018 + Float(sin(session.elapsed * 5 + Double(conveyor.id))) * 0.006
+            guard let zone = room.findEntity(named: "Conveyor \(conveyor.id)") else { continue }
+            let span = conveyor.direction.x == 0 ? conveyor.size.y : conveyor.size.x
+            let worldDirection = SIMD3<Float>(conveyor.direction.x, 0, conveyor.direction.y)
+            let localDirection = zone.orientation.inverse.act(worldDirection)
+            let travelDirection: Float = localDirection.z < 0 ? -1 : 1
+            for index in -3...3 {
+                let baseOffset = Float(index) * span / 7
+                let offset = conveyorArrowOffset(
+                    baseOffset: baseOffset,
+                    elapsed: session.elapsed,
+                    speed: conveyor.speed,
+                    span: span,
+                    direction: travelDirection
+                )
+                for sideIndex in 0...1 {
+                    zone.findEntity(named: "Conveyor Arrow \(conveyor.id) \(index) \(sideIndex)")?.position.z = offset
+                }
+            }
         }
         for index in session.puzzle.cells.indices { room.findEntity(named: "Puzzle Cell \(index)")?.isEnabled = !session.collectedCellIndices.contains(index) }
         for index in session.puzzle.shieldPickups.indices { room.findEntity(named: "Shield Pickup \(index)")?.isEnabled = !session.collectedShieldPickupIndices.contains(index) }

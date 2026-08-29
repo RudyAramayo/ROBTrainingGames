@@ -297,8 +297,9 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.04"
+    static let gameplayRulesetVersion = "2026.09.05"
     static let robotCollisionRadius: Float = 0.62
+    static let securityCameraHalfAngle: Float = .pi / 5
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
     let maxHealth = 100
@@ -371,6 +372,7 @@ final class GameSession {
     var message = "ROB systems ready."
     var isRunning = false
     private(set) var isPaused = false
+    private(set) var isUpgradeIntermission = false
     var musicEnabled = true
     var lastSituation = "ROB systems ready."
     var situationCount = 0
@@ -717,6 +719,7 @@ final class GameSession {
         }
     }
     private func configureLevel() {
+        isUpgradeIntermission = false
         elapsed = 0; collectedCells = 0
         hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingProgress = 0; securityAlertRemaining = 0
         collectedCellIndices = []; collectedShieldPickupIndices = []; collectedRepairPickupIndices = []
@@ -736,6 +739,10 @@ final class GameSession {
         updateLaserLock()
     }
     func begin() {
+        if isUpgradeIntermission {
+            continueAfterUpgradeIntermission()
+            return
+        }
         enemyAttackCount = 0
         health = maxHealth
         shields = maxShields
@@ -868,20 +875,71 @@ final class GameSession {
         camera.heading + sin(Float(elapsed) * 0.72 + Float(camera.id) * 1.7) * camera.sweep
     }
 
+    static func securityCameraSightDistance(
+        camera: PuzzleSecurityCamera,
+        heading: Float,
+        angleOffset: Float = 0,
+        blockers: [PuzzleBarrier]
+    ) -> Float {
+        let rayHeading = heading + angleOffset
+        let end = camera.position + SIMD2<Float>(-sin(rayHeading), -cos(rayHeading)) * camera.range
+        let nearestFraction = blockers.compactMap {
+            segmentHitFraction(from: camera.position, to: end, barrier: $0, padding: 0.015)
+        }.min() ?? 1
+        return camera.range * nearestFraction
+    }
+
+    static func securityCameraVisionDistances(
+        camera: PuzzleSecurityCamera,
+        heading: Float,
+        blockers: [PuzzleBarrier],
+        rayCount: Int = 25
+    ) -> [Float] {
+        let count = max(2, rayCount)
+        return (0..<count).map { index in
+            let angleOffset = -securityCameraHalfAngle
+                + securityCameraHalfAngle * 2 * Float(index) / Float(count - 1)
+            return securityCameraSightDistance(
+                camera: camera,
+                heading: heading,
+                angleOffset: angleOffset,
+                blockers: blockers
+            )
+        }
+    }
+
+    func securityCameraVisionDistances(
+        for camera: PuzzleSecurityCamera,
+        rayCount: Int = 25
+    ) -> [Float] {
+        Self.securityCameraVisionDistances(
+            camera: camera,
+            heading: securityCameraHeading(camera),
+            blockers: projectileBlockers,
+            rayCount: rayCount
+        )
+    }
+
+    func securityCameraCanSee(_ point: SIMD2<Float>, camera: PuzzleSecurityCamera) -> Bool {
+        let offset = point - camera.position
+        let distance = simd_length(offset)
+        guard distance > 0.001, distance <= camera.range else { return false }
+        let heading = securityCameraHeading(camera)
+        let forward = SIMD2<Float>(-sin(heading), -cos(heading))
+        guard simd_dot(offset / distance, forward) >= cos(Self.securityCameraHalfAngle) else { return false }
+        let targetHeading = atan2(-offset.x, -offset.y)
+        return distance <= Self.securityCameraSightDistance(
+            camera: camera,
+            heading: heading,
+            angleOffset: targetHeading - heading,
+            blockers: projectileBlockers
+        ) + 0.001
+    }
+
     private func updateSecurityCameras() {
         guard !isInShadow else { return }
         let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
-        let detectingCamera = puzzle.securityCameras.first { camera in
-            let offset = point - camera.position
-            let distance = simd_length(offset)
-            guard distance > 0.001, distance <= camera.range else { return false }
-            let heading = securityCameraHeading(camera)
-            let forward = SIMD2<Float>(-sin(heading), -cos(heading))
-            guard simd_dot(offset / distance, forward) >= cos(.pi / 5) else { return false }
-            return !projectileBlockers.contains {
-                Self.segmentHitFraction(from: camera.position, to: point, barrier: $0, padding: 0.015) != nil
-            }
-        }
+        let detectingCamera = puzzle.securityCameras.first { securityCameraCanSee(point, camera: $0) }
         if let detectingCamera {
             let wasAlerted = isSecurityAlerted
             securityAlertRemaining = 5
@@ -1498,6 +1556,10 @@ final class GameSession {
         return true
     }
     func nextLevel() {
+        guard !isUpgradeIntermission else {
+            message = "Choose upgrades, then deploy to the next level."
+            return
+        }
         guard canFinish else { message = "Finish every objective before leaving the level."; return }
         let completedLevel = level.id
         awardMissionPoints(max(0, level.timeBonus - Int(elapsed) * 10))
@@ -1516,18 +1578,38 @@ final class GameSession {
             reward = nil
         }
         if levelIndex < levels.count - 1 {
-            levelIndex += 1
-            if audioEnabled { TechnoMusicEngine.shared.setLevel(levelIndex) }
-            enemyAttackCount = 0; health = maxHealth; shields = maxShields; damageInvulnerabilityRemaining = 0; configureLevel(); isPaused = false; isRunning = true
-            message = [reward, level.challenge].compactMap { $0 }.joined(separator: " ")
-            report("ROB advanced to \(level.name). \(message)")
+            stopDrive()
+            isPaused = false
+            isRunning = false
+            isUpgradeIntermission = true
+            if audioEnabled { TechnoMusicEngine.shared.stop() }
+            message = [reward, "Level \(completedLevel) cleared. Spend battle points before deploying to Level \(completedLevel + 1)."]
+                .compactMap { $0 }
+                .joined(separator: " ")
+            report(message)
         } else {
-            isPaused = false; isRunning = false
+            isPaused = false; isRunning = false; isUpgradeIntermission = false
             if audioEnabled { TechnoMusicEngine.shared.stop() }
             message = [reward, "Fifteen-level campaign complete!"].compactMap { $0 }.joined(separator: " ")
             report(message)
         }
         play("level-complete")
     }
-    func reset() { levelIndex = 0; score = 0; health = maxHealth; shields = maxShields; damageInvulnerabilityRemaining = 0; enemyAttackCount = 0; configureLevel(); isPaused = false; isRunning = false; if audioEnabled { TechnoMusicEngine.shared.stop() }; message = "ROB systems ready." }
+    func continueAfterUpgradeIntermission() {
+        guard isUpgradeIntermission, levelIndex < levels.count - 1 else { return }
+        levelIndex += 1
+        if audioEnabled { TechnoMusicEngine.shared.setLevel(levelIndex) }
+        enemyAttackCount = 0
+        health = maxHealth
+        shields = maxShields
+        damageInvulnerabilityRemaining = 0
+        configureLevel()
+        isPaused = false
+        isRunning = true
+        if audioEnabled && musicEnabled { TechnoMusicEngine.shared.start(level: levelIndex) }
+        message = "Level \(level.id): \(level.challenge)"
+        report("ROB deployed to \(level.name). \(level.challenge)")
+        play("mission-start")
+    }
+    func reset() { levelIndex = 0; score = 0; health = maxHealth; shields = maxShields; damageInvulnerabilityRemaining = 0; enemyAttackCount = 0; configureLevel(); isPaused = false; isRunning = false; isUpgradeIntermission = false; if audioEnabled { TechnoMusicEngine.shared.stop() }; message = "ROB systems ready." }
 }

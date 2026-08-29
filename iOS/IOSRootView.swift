@@ -32,8 +32,10 @@ struct IOSRootView: View {
     }
 
     private func launchMission() {
-        if session.isPaused { session.resume() }
-        else if !session.isRunning { session.begin() }
+        if !session.isUpgradeIntermission {
+            if session.isPaused { session.resume() }
+            else if !session.isRunning { session.begin() }
+        }
         fullScreenExperience = .mission
     }
 
@@ -43,8 +45,10 @@ struct IOSRootView: View {
     }
 
     private func launchARLab() {
-        if session.isPaused { session.resume() }
-        else if !session.isRunning { session.begin() }
+        if !session.isUpgradeIntermission {
+            if session.isPaused { session.resume() }
+            else if !session.isRunning { session.begin() }
+        }
         fullScreenExperience = .arLab
     }
 
@@ -281,6 +285,15 @@ struct MissionView: View {
                 }
                 .padding(.bottom, compactPhoneLayout ? 54 : 0)
             }
+            .overlay {
+                if session.isUpgradeIntermission {
+                    ZStack {
+                        Color.black.opacity(0.72).ignoresSafeArea()
+                        MissionUpgradeIntermission(session: session)
+                            .padding(compactPhoneLayout ? 12 : 28)
+                    }
+                }
+            }
             .navigationTitle(compactPhoneLayout ? "" : session.level.name).navigationBarTitleDisplayMode(.inline)
             .toolbar(compactPhoneLayout ? .hidden : .visible, for: .navigationBar)
             .robGameKeyboardControls(session: session)
@@ -291,7 +304,7 @@ struct MissionView: View {
                 }
                 ToolbarItemGroup(placement: .topBarLeading) {
                     Button(action: onExit) { Label("Menu", systemImage: "xmark.circle.fill") }
-                    if session.canFinish { Button(session.levelIndex == session.levels.count - 1 ? "Finish" : "Next Level") { session.nextLevel() } }
+                    if session.canFinish && !session.isUpgradeIntermission { Button(session.levelIndex == session.levels.count - 1 ? "Finish" : "Complete Level") { session.nextLevel() } }
                 }
             }
             .onReceive(timer) { _ in session.tick(1.0 / 30.0); highScore = max(highScore, session.score) }
@@ -299,13 +312,55 @@ struct MissionView: View {
     }
 
     private var missionActionTitle: String {
-        session.isRunning ? "Reset" : session.isPaused ? "Resume" : "Start"
+        session.isUpgradeIntermission ? "Deploy Level \(session.level.id + 1)" : session.isRunning ? "Reset" : session.isPaused ? "Resume" : "Start"
     }
 
     private func performMissionAction() {
-        if session.isRunning { session.reset() }
+        if session.isUpgradeIntermission { session.continueAfterUpgradeIntermission() }
+        else if session.isRunning { session.reset() }
         else if session.isPaused { session.resume() }
         else { session.begin() }
+    }
+}
+
+struct MissionUpgradeIntermission: View {
+    @Bindable var session: GameSession
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Label("LEVEL \(session.level.id) CLEARED", systemImage: "flag.checkered.circle.fill")
+                    .font(.title2.bold())
+                    .foregroundStyle(.green)
+                Text("Upgrade Bay")
+                    .font(.largeTitle.bold())
+                Text("Battle hits, disabled enemies, collected cells, hacks, and the time bonus all feed the same persistent upgrade pool.")
+                    .foregroundStyle(.secondary)
+                Label("\(session.upgradePoints) battle points available", systemImage: "star.circle.fill")
+                    .font(.headline.monospacedDigit())
+                    .foregroundStyle(.yellow)
+                ForEach(ROBUpgrade.allCases) { upgrade in
+                    UpgradeOption(session: session, upgrade: upgrade)
+                }
+                Text(session.message)
+                    .font(.callout.bold())
+                    .foregroundStyle(.cyan)
+                Button {
+                    session.continueAfterUpgradeIntermission()
+                } label: {
+                    Label("Deploy to Level \(session.level.id + 1)", systemImage: "play.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.cyan)
+                .controlSize(.large)
+            }
+            .padding(22)
+        }
+        .frame(maxWidth: 620, maxHeight: 690)
+        .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 28))
+        .overlay(RoundedRectangle(cornerRadius: 28).stroke(.cyan.opacity(0.45), lineWidth: 1))
+        .onAppear { session.stopDrive() }
     }
 }
 

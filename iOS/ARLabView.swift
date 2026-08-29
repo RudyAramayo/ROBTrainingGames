@@ -48,6 +48,15 @@ struct ARLabView: View {
                 )
             }
         }
+        .overlay {
+            if session.isUpgradeIntermission {
+                ZStack {
+                    Color.black.opacity(0.72).ignoresSafeArea()
+                    MissionUpgradeIntermission(session: session)
+                        .padding(verticalSizeClass == .compact ? 12 : 28)
+                }
+            }
+        }
         .overlay(alignment: .top) {
             HStack {
                 Button(action: onExit) {
@@ -105,8 +114,8 @@ struct ARLabView: View {
 
             Spacer(minLength: 8)
 
-            if session.canFinish {
-                Button(session.levelIndex == session.levels.count - 1 ? "Finish Campaign" : "Enter Next Level") {
+            if session.canFinish && !session.isUpgradeIntermission {
+                Button(session.levelIndex == session.levels.count - 1 ? "Finish Campaign" : "Complete Level") {
                     session.nextLevel()
                 }
                 .buttonStyle(.borderedProminent)
@@ -129,6 +138,7 @@ struct ARLabView: View {
     }
 
     private func startOrResumeMission() {
+        guard !session.isUpgradeIntermission else { return }
         if session.isPaused { session.resume() }
         else if !session.isRunning { session.begin() }
     }
