@@ -508,6 +508,26 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(game.message.localizedCaseInsensitiveContains("wall"))
     }
 
+    func testEnemyLaserCannotTunnelThroughAWallIntoROB() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        guard let wall = game.puzzle.barriers.first else { return XCTFail("Level needs an interior wall") }
+
+        if wall.size.x > wall.size.y {
+            game.robotPosition = [wall.center.x, 0, wall.center.y - 1]
+            game.enemyBolts = [TrainingEnemyBolt(id: 900, position: [wall.center.x, 0.55, wall.center.y + 1], velocity: [0, 0, -6], damage: 10, sourceName: "Boss laser", isBoss: true)]
+        } else {
+            game.robotPosition = [wall.center.x - 1, 0, wall.center.y]
+            game.enemyBolts = [TrainingEnemyBolt(id: 900, position: [wall.center.x + 1, 0.55, wall.center.y], velocity: [-6, 0, 0], damage: 10, sourceName: "Boss laser", isBoss: true)]
+        }
+
+        game.tick(0.5)
+
+        XCTAssertEqual(game.health, game.maxHealth)
+        XCTAssertTrue(game.enemyBolts.isEmpty)
+    }
+
     func testROBGeometryContainsSwingingArmsAndShoulderGatling() {
         let game = GameSession(audioEnabled: false)
         let robot = RobotFactory.makeROB()

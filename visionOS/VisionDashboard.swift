@@ -9,7 +9,14 @@ struct VisionDashboard: View {
     @State private var immersive = false
     var body: some View {
         NavigationSplitView {
-            List { Section("Campaign") { ForEach(session.levels) { level in Label("\(level.id). \(level.name)", systemImage: level.id - 1 <= session.levelIndex ? "checkmark.circle.fill" : "circle") } }; Section("Explore ROB") { ForEach(session.components) { component in Button(component.name) { session.selectedComponent = component } } } }.navigationTitle("ROB Training")
+            List {
+                Section("Campaign") { ForEach(session.levels) { level in Label("\(level.id). \(level.name)", systemImage: level.id - 1 <= session.levelIndex ? "checkmark.circle.fill" : "circle") } }
+                Section("ROB Loadout") {
+                    Label("\(session.highestCompletedLevel)/\(session.levels.count) levels complete", systemImage: "wrench.and.screwdriver.fill")
+                    VisionLoadoutMenu(session: session)
+                }
+                Section("Explore ROB") { ForEach(session.components) { component in Button(component.name) { session.selectedComponent = component } } }
+            }.navigationTitle("ROB Training")
         } detail: {
             VStack(spacing: 18) {
                 Image("rob-training-key-art").resizable().scaledToFit().frame(maxHeight: 310).clipShape(RoundedRectangle(cornerRadius: 24))
@@ -47,6 +54,7 @@ struct ImmersiveROBWorkshop: View {
                     HStack { DriveHoldButton(session: session, title: "↓", forward: -1); Button("Stop") { session.stopDrive() } }
                     Slider(value: Binding(get: { Double(scale) }, set: { scale = Float($0) }), in: 0.3...1.3) { Text("Scale") }.frame(width: 320)
                     HStack { LaserChargeButton(session: session, title: session.rangedWeapon.displayName); Button(session.meleeWeapon.displayName) { session.saberAttack() }.buttonStyle(.borderedProminent).tint(.pink) }
+                    VisionLoadoutMenu(session: session, compact: true)
                     Text(session.laserLockDescription).font(.caption.bold().monospaced()).foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
                     CombatHealthBars(session: session, compact: true).frame(width: 360)
                     Button(session.musicEnabled ? "♫ Generated techno" : "Music off") { session.toggleMusic() }
@@ -61,5 +69,49 @@ struct ImmersiveROBWorkshop: View {
         }
         .robGameKeyboardControls(session: session)
         .onReceive(timer) { _ in session.tick(1.0 / 30.0) }
+    }
+}
+
+private struct VisionLoadoutMenu: View {
+    @Bindable var session: GameSession
+    var compact = false
+
+    var body: some View {
+        Menu {
+            Section("Body Finish") {
+                ForEach(ROBFinish.allCases) { finish in
+                    Button { session.selectFinish(finish) } label: {
+                        Label(finish.displayName, systemImage: session.robotFinish == finish ? "checkmark.circle.fill" : "circle")
+                    }
+                }
+            }
+            Section("Ranged Weapons") {
+                ForEach(ROBRangedWeapon.allCases) { weapon in
+                    Button { session.selectRangedWeapon(weapon) } label: {
+                        Label(
+                            session.isUnlocked(weapon) ? weapon.displayName : "\(weapon.displayName) · Level \(weapon.requiredCompletedLevel)",
+                            systemImage: session.rangedWeapon == weapon ? "checkmark.circle.fill" : session.isUnlocked(weapon) ? "circle" : "lock.fill"
+                        )
+                    }
+                    .disabled(!session.isUnlocked(weapon))
+                }
+            }
+            Section("Melee Weapons") {
+                ForEach(ROBMeleeWeapon.allCases) { weapon in
+                    Button { session.selectMeleeWeapon(weapon) } label: {
+                        Label(
+                            session.isUnlocked(weapon) ? weapon.displayName : "\(weapon.displayName) · Level \(weapon.requiredCompletedLevel)",
+                            systemImage: session.meleeWeapon == weapon ? "checkmark.circle.fill" : session.isUnlocked(weapon) ? "circle" : "lock.fill"
+                        )
+                    }
+                    .disabled(!session.isUnlocked(weapon))
+                }
+            }
+        } label: {
+            Label(
+                compact ? "Change ROB loadout" : "\(session.robotFinish.displayName) · \(session.rangedWeapon.shortName) · \(session.meleeWeapon.shortName)",
+                systemImage: "paintpalette.fill"
+            )
+        }
     }
 }

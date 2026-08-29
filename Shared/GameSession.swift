@@ -668,15 +668,27 @@ final class GameSession {
         var survivingBolts: [TrainingEnemyBolt] = []
         let blockers = puzzle.barriers + ((!doorOpen && puzzle.door != nil) ? [puzzle.door!] : [])
         for var bolt in enemyBolts {
+            let start = SIMD2<Float>(bolt.position.x, bolt.position.z)
             bolt.position += bolt.velocity * Float(delta)
-            if simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(bolt.position.x, bolt.position.z)) < 0.32 {
+            let end = SIMD2<Float>(bolt.position.x, bolt.position.z)
+            let wallImpact = blockers.compactMap {
+                Self.segmentHitFraction(from: start, to: end, barrier: $0, padding: 0.04)
+            }.min()
+            let robotImpact = Self.segmentHitFraction(
+                from: start,
+                to: end,
+                center: [robotPosition.x, robotPosition.z],
+                radius: 0.32
+            )
+            if let robotImpact, wallImpact.map({ robotImpact < $0 }) ?? true {
                 playEnemyAttack(.fax)
                 enemyBolts = survivingBolts
                 enemyContact(bolt.sourceName, damage: bolt.damage)
                 return
             }
+            if wallImpact != nil { continue }
             let outside = abs(bolt.position.x) > puzzle.arenaHalfExtent || abs(bolt.position.z) > puzzle.arenaHalfExtent
-            if !outside && !blockers.contains(where: { Self.intersects(bolt.position, barrier: $0, radius: 0.04) }) { survivingBolts.append(bolt) }
+            if !outside { survivingBolts.append(bolt) }
         }
         enemyBolts = survivingBolts
     }
