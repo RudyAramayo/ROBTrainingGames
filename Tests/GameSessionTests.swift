@@ -255,15 +255,16 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(game.message.contains("Restarting level 3"))
     }
 
-    func testEveryFifthLevelHasAReinforcedBossThatDealsTenDamage() {
+    func testEveryFifthLevelHasAnEscalatingReinforcedBossThatDealsTenDamage() {
         let game = GameSession(audioEnabled: false)
         XCTAssertNil(game.activeBoss)
+        let expectedBossShields = [4: 30, 9: 45, 14: 60]
         for levelIndex in [4, 9, 14] {
             game.levelIndex = levelIndex
             game.begin()
             guard let boss = game.activeBoss else { return XCTFail("Level \(levelIndex + 1) needs a boss") }
             XCTAssertTrue(boss.isBoss)
-            XCTAssertGreaterThanOrEqual(boss.maxShields, 10)
+            XCTAssertEqual(boss.maxShields, expectedBossShields[levelIndex])
             XCTAssertEqual(boss.shields, boss.maxShields)
             XCTAssertEqual(boss.contactDamage, 10)
             XCTAssertEqual(boss.projectileDamage, 10)
@@ -756,10 +757,16 @@ final class GameSessionTests: XCTestCase {
 
         game.beginLaserCharge()
         game.tick(1.0)
+        let energyBeforeShot = game.energy
         game.releaseLaserCharge()
 
         XCTAssertFalse(game.isChargingLaser)
         XCTAssertGreaterThan(game.laserShotCharge, 0.7)
+        XCTAssertEqual(
+            game.energy,
+            energyBeforeShot - ROBRangedWeapon.shoulderGatling.energyCost(charge: game.laserShotCharge),
+            accuracy: 0.001
+        )
         XCTAssertEqual(game.enemies[targetIndex].shields, shields, "Firing should not damage a target before the projectile arrives")
         XCTAssertNotNil(game.laserDistance)
 
@@ -767,6 +774,15 @@ final class GameSessionTests: XCTestCase {
 
         XCTAssertLessThanOrEqual(game.enemies[targetIndex].shields, shields - 2)
         XCTAssertNil(game.laserDistance)
+    }
+
+    func testEveryRangedWeaponUsesMoreEnergyForChargedShots() {
+        XCTAssertEqual(ROBRangedWeapon.shoulderGatling.energyCost(charge: 0), 4, accuracy: 0.001)
+        XCTAssertEqual(ROBRangedWeapon.shoulderGatling.energyCost(charge: 1), 12, accuracy: 0.001)
+        XCTAssertEqual(ROBRangedWeapon.twinBlasters.energyCost(charge: 0), 5, accuracy: 0.001)
+        XCTAssertEqual(ROBRangedWeapon.twinBlasters.energyCost(charge: 1), 14, accuracy: 0.001)
+        XCTAssertEqual(ROBRangedWeapon.arcCannon.energyCost(charge: 0), 8, accuracy: 0.001)
+        XCTAssertEqual(ROBRangedWeapon.arcCannon.energyCost(charge: 1), 22, accuracy: 0.001)
     }
 
     func testShoulderLaserStopsAtAWallBeforeDamagingAnEnemy() {

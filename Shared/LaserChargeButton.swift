@@ -67,7 +67,7 @@ struct CombatHealthBars: View {
         VStack(spacing: 2) {
             HStack(spacing: 5) {
                 Image(systemName: "bolt.batteryblock.fill")
-                Text("DRIVE ENERGY")
+                Text("SYSTEM ENERGY")
                 Spacer(minLength: 4)
                 Text("\(Int(session.energy))/\(Int(session.maxEnergy))")
             }
@@ -76,7 +76,7 @@ struct CombatHealthBars: View {
             ProgressView(value: session.energy, total: session.maxEnergy)
                 .progressViewStyle(.linear)
                 .tint(session.energyFraction < 0.2 ? .orange : .cyan)
-                .accessibilityLabel("Drive energy")
+                .accessibilityLabel("System energy")
                 .accessibilityValue("\(Int(session.energy)) of \(Int(session.maxEnergy))")
         }
     }

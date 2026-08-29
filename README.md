@@ -4,7 +4,7 @@ A shared educational game for iPhone, iPad, and Apple Vision Pro that matches th
 
 ## Experiences
 
-- **Shared campaign:** fifteen matching missions in expanded arenas with coordinated arrow driving, conveyor terrain, Flipper Zero door hacks, security-camera stealth zones, larger energy-cell routes, non-regenerating ROB shields, shield and repair pickups, persistent performance upgrades, energy management, enemy-contact damage, level restart, scoring, and increasingly difficult route-planning challenges.
+- **Shared campaign:** fifteen matching missions in expanded arenas with coordinated arrow driving, conveyor terrain, Flipper Zero door hacks, security-camera stealth zones, larger energy-cell routes, non-regenerating ROB shields, shield and repair pickups, persistent performance upgrades, shared drive-and-laser energy management, reinforced campaign bosses, enemy-contact damage, level restart, scoring, and increasingly difficult route-planning challenges.
 - **Active combat:** both AMBER arm assemblies alternate wide dual-saber sweeps and trigger a torso spin on the third consecutive attack. A black right-shoulder gatling scans for targets, signals lock in red, and charges larger, deeper laser shots while spider bots and Dalek-style sentry robots coordinate increasingly dense counterattacks.
 - **Matching keyboard controls:** use arrow keys or `WASD` to drive, press `Space` repeatedly for the saber combo, and hold `Q` to charge the shoulder laser on the website, iPad/iPhone with a hardware keyboard, and Vision Pro with a connected keyboard.
 - **Generative soundtrack:** an original procedural techno engine synthesizes its kick, hats, bass sequence, and level-reactive tempo locally at runtime. It does not download music or reuse a copyrighted recording.
@@ -30,6 +30,6 @@ Run the shared campaign tests on an iOS Simulator with `xcodebuild test -scheme 
 
 ## Cross-platform gameplay sync
 
-`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.02`.
+`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.03`.
 
 Before App Store submission, add production icons/screenshots, signing, privacy review, age rating, support URLs, and device testing. Keep lessons synchronized with `Presentation/ROB-Books/ROBOT_GAME_CURRICULUM.md` as the books evolve.

@@ -149,6 +149,14 @@ enum ROBRangedWeapon: String, CaseIterable, Identifiable, Sendable {
         case .arcCannon: 4.6
         }
     }
+    func energyCost(charge: Double) -> Double {
+        let charge = min(1, max(0, charge))
+        return switch self {
+        case .shoulderGatling: 4 + charge * 8
+        case .twinBlasters: 5 + charge * 9
+        case .arcCannon: 8 + charge * 14
+        }
+    }
     func damage(charge: Double) -> Int {
         switch self {
         case .shoulderGatling: 1 + Int(floor(charge * 2.1))
@@ -248,7 +256,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.02"
+    static let gameplayRulesetVersion = "2026.09.03"
     static let robotCollisionRadius: Float = 0.62
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
@@ -642,7 +650,8 @@ final class GameSession {
         return level.enemyKinds.enumerated().map { index, kind in
             let origin = spawns[index % spawns.count]
             let isBoss = level.id.isMultiple(of: 5) && index == 0
-            let shields = isBoss ? max(10, level.enemyShields * 3) : level.enemyShields
+            let bossTier = level.id / 5
+            let shields = isBoss ? 15 + bossTier * 15 : level.enemyShields
             return TrainingEnemy(id: index, kind: kind, isBoss: isBoss, isMiniBoss: false, position: origin, origin: origin, shields: shields, maxShields: shields, nextAttack: 1.6 + Double(index) * 0.65, nextSkitterSound: 0.8 + Double(index) * 0.38)
         }
     }
@@ -761,7 +770,7 @@ final class GameSession {
         }
         if energy <= 0.05, !wasEnergyDepleted {
             wasEnergyDepleted = true
-            message = "Drive battery empty. Hold position briefly while ROB recharges."
+            message = "System energy empty. Hold position briefly while ROB recharges before driving or firing."
             report(message)
         } else if energy > maxEnergy * 0.12 {
             wasEnergyDepleted = false
@@ -1227,6 +1236,12 @@ final class GameSession {
     }
     func beginLaserCharge() {
         guard isRunning, laserDistance == nil, !isChargingLaser else { return }
+        let minimumEnergy = rangedWeapon.energyCost(charge: 0)
+        guard energy >= minimumEnergy else {
+            message = "Not enough system energy for the \(rangedWeapon.displayName). Hold position or collect an energy cell."
+            report(message)
+            return
+        }
         laserCharge = 0; isChargingLaser = true; message = lockedEnemy == nil ? "\(rangedWeapon.displayName) scanning — no target lock yet." : "\(rangedWeapon.displayName) charging on locked target…"
     }
     func releaseLaserCharge() {
@@ -1241,9 +1256,16 @@ final class GameSession {
             message = "\(rangedWeapon.displayName) is still scanning. Turn or move closer until the lock indicator turns red."; report(message); return
         }
         let clampedCharge = min(1, max(0, charge))
+        let energyCost = rangedWeapon.energyCost(charge: clampedCharge)
+        guard energy >= energyCost else {
+            message = "\(rangedWeapon.displayName) needs \(Int(ceil(energyCost))) system energy. Hold position or collect an energy cell."
+            report(message)
+            return
+        }
+        energy -= energyCost
         laserShotCharge = clampedCharge; laserShotHeading = heading; laserShotWeapon = rangedWeapon
         laserShotOrigin = [robotPosition.x, robotPosition.z]; laserDistance = 0.55
-        message = "\(rangedWeapon.displayName) fired."
+        message = "\(rangedWeapon.displayName) fired for \(Int(ceil(energyCost))) energy."
         report(message)
         if audioEnabled { SoundPlayer.shared.playLaser(charge: clampedCharge) }
     }
