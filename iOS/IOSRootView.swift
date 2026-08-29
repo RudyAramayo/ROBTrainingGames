@@ -1015,6 +1015,7 @@ private struct UpgradeOption: View {
         case .speedBoost: "speedometer"
         case .energyCapacity: "battery.100percent.bolt"
         case .weaponPower: "scope"
+        case .targetingComputer: "viewfinder.circle"
         }
     }
 }

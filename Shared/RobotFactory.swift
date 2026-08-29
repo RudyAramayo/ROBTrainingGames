@@ -130,9 +130,11 @@ import UIKit
 
         let twinBlasters = Entity(); twinBlasters.name = "Twin Blasters"; twinBlasters.position = [0, 0.98, -0.04]; torso.addChild(twinBlasters)
         for side: Float in [-1, 1] {
-            part(side < 0 ? "Left Blaster Housing" : "Right Blaster Housing", [0.2, 0.15, 0.28], [side * 0.47, 0, -0.08], .systemBlue, parent: twinBlasters)
+            let prefix = side < 0 ? "Left" : "Right"
+            let mount = Entity(); mount.name = "\(prefix) Blaster Mount"; mount.position = [side * 0.47, 0, 0]; twinBlasters.addChild(mount)
+            part("\(prefix) Blaster Housing", [0.2, 0.15, 0.28], [0, 0, -0.08], .systemBlue, parent: mount)
             for x: Float in [-0.035, 0.035] {
-                cylinder("Blaster Barrel", radius: 0.018, height: 0.46, position: [side * 0.47 + x, 0, -0.34], color: .black, faceForward: true, parent: twinBlasters)
+                cylinder("\(prefix) Blaster Barrel", radius: 0.018, height: 0.46, position: [x, 0, -0.34], color: .black, faceForward: true, parent: mount)
             }
         }
 
@@ -145,6 +147,12 @@ import UIKit
 
         let shot = Entity(); shot.name = "Shoulder Laser Shot"; shot.position = [0.5, 1.08, -0.28]; torso.addChild(shot)
         let beam = ModelEntity(mesh: .generateBox(size: [1, 1, 0.55], cornerRadius: 0.04), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); beam.name = "Shoulder Laser Beam"; beam.isEnabled = false; shot.addChild(beam)
+        for side: Float in [-1, 1] {
+            let prefix = side < 0 ? "Left" : "Right"
+            let twinShot = Entity(); twinShot.name = "\(prefix) Blaster Laser Shot"; twinShot.position = [side * 0.47, 0.98, -0.32]; torso.addChild(twinShot)
+            let twinBeam = ModelEntity(mesh: .generateBox(size: [1, 1, 0.55], cornerRadius: 0.035), materials: [UnlitMaterial(color: .systemBlue)])
+            twinBeam.name = "\(prefix) Blaster Laser Beam"; twinBeam.isEnabled = false; twinShot.addChild(twinBeam)
+        }
 
         part("Sensor Mast", [0.1, 0.48, 0.1], [0, 1.2, 0], .gray, parent: torso)
         let head = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: .black, isMetallic: !arPresentation)]); head.name = "Camera Head"; head.position = [0, 1.52, 0]; head.scale.z = 0.82; torso.addChild(head)
@@ -317,35 +325,52 @@ import UIKit
                 arm.orientation = simd_quatf(angle: sweep, axis: [0, 1, 0]) * simd_quatf(angle: side * arc * 0.5, axis: [0, 0, 1])
             }
         }
-        let relativeHeading = session.laserLockHeading.map { $0 - session.robotHeading - torsoYaw } ?? Float(sin(session.elapsed * 0.85)) * 0.9
-        for name in ["Right Shoulder Gatling", "Twin Blasters", "Arc Cannon"] {
+        let scanningHeading = Float(sin(session.elapsed * 0.85)) * 0.9
+        let relativeHeading = session.laserLockHeading.map { $0 - session.robotHeading - torsoYaw } ?? scanningHeading
+        for name in ["Right Shoulder Gatling", "Arc Cannon"] {
             robot.findEntity(named: name)?.orientation = simd_quatf(angle: relativeHeading, axis: [0, 1, 0])
         }
+        robot.findEntity(named: "Twin Blasters")?.orientation = simd_quatf(angle: 0, axis: [0, 1, 0])
+        robot.findEntity(named: "Left Blaster Mount")?.orientation = simd_quatf(angle: relativeHeading, axis: [0, 1, 0])
+        let secondaryRelativeHeading = session.secondaryLaserLockHeading.map { $0 - session.robotHeading - torsoYaw } ?? relativeHeading
+        robot.findEntity(named: "Right Blaster Mount")?.orientation = simd_quatf(angle: secondaryRelativeHeading, axis: [0, 1, 0])
         if let lamp = robot.findEntity(named: "Gatling Lock Indicator") {
             lamp.isEnabled = session.lockedEnemy != nil
             let pulse = 0.9 + Float(sin(session.elapsed * 9)) * 0.18
             lamp.scale = .init(repeating: pulse)
         }
         robot.findEntity(named: "Gatling Barrel Cluster")?.orientation = simd_quatf(angle: Float(session.elapsed) * 7 + Float(session.laserCharge) * 12, axis: [0, 0, 1])
-        if let shot = robot.findEntity(named: "Shoulder Laser Shot"), let beam = robot.findEntity(named: "Shoulder Laser Beam") {
-            shot.orientation = simd_quatf(angle: session.laserShotHeading - session.robotHeading - torsoYaw, axis: [0, 1, 0])
-            if let distance = session.laserDistance {
-                let charge = Float(session.laserShotCharge), width = 0.035 + charge * 0.13
-                if let beam = beam as? ModelEntity {
-                    let appearanceName = "Projectile Appearance \(session.laserShotWeapon.rawValue)"
-                    if beam.children.first(where: { $0.name == appearanceName }) == nil {
-                        for marker in Array(beam.children) where marker.name.hasPrefix("Projectile Appearance ") { marker.removeFromParent() }
-                        let marker = Entity(); marker.name = appearanceName; beam.addChild(marker)
-                        let color: UIColor = switch session.laserShotWeapon {
-                        case .shoulderGatling: .systemRed
-                        case .twinBlasters: .systemBlue
-                        case .arcCannon: .systemCyan
-                        }
-                        beam.model?.materials = [UnlitMaterial(color: color)]
+        let projectileEntities: [ROBLaserBarrel: (shot: String, beam: String)] = [
+            .center: ("Shoulder Laser Shot", "Shoulder Laser Beam"),
+            .left: ("Left Blaster Laser Shot", "Left Blaster Laser Beam"),
+            .right: ("Right Blaster Laser Shot", "Right Blaster Laser Beam"),
+        ]
+        for names in projectileEntities.values {
+            robot.findEntity(named: names.beam)?.isEnabled = false
+        }
+        for projectile in session.laserProjectiles {
+            guard let names = projectileEntities[projectile.barrel],
+                  let shot = robot.findEntity(named: names.shot),
+                  let beam = robot.findEntity(named: names.beam)
+            else { continue }
+            shot.orientation = simd_quatf(angle: projectile.heading - session.robotHeading - torsoYaw, axis: [0, 1, 0])
+            let charge = Float(projectile.charge), width = 0.035 + charge * 0.13
+            if let beam = beam as? ModelEntity {
+                let appearanceName = "Projectile Appearance \(projectile.weapon.rawValue)"
+                if beam.children.first(where: { $0.name == appearanceName }) == nil {
+                    for marker in Array(beam.children) where marker.name.hasPrefix("Projectile Appearance ") { marker.removeFromParent() }
+                    let marker = Entity(); marker.name = appearanceName; beam.addChild(marker)
+                    let color: UIColor = switch projectile.weapon {
+                    case .shoulderGatling: .systemRed
+                    case .twinBlasters: .systemBlue
+                    case .arcCannon: .systemCyan
                     }
+                    beam.model?.materials = [UnlitMaterial(color: color)]
                 }
-                beam.isEnabled = true; beam.position = [0, 0, -distance]; beam.scale = [width, width, 1 + charge * 2.6]
-            } else { beam.isEnabled = false }
+            }
+            beam.isEnabled = true
+            beam.position = [0, 0, -projectile.distance]
+            beam.scale = [width, width, 1 + charge * 2.6]
         }
     }
 

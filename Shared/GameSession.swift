@@ -81,6 +81,23 @@ struct TrainingEnemyBolt: Identifiable, Sendable {
     let isBoss: Bool
 }
 
+enum ROBLaserBarrel: String, Hashable, Sendable {
+    case center
+    case left
+    case right
+}
+
+struct ROBLaserProjectile: Identifiable, Sendable {
+    var id: ROBLaserBarrel { barrel }
+    let barrel: ROBLaserBarrel
+    let weapon: ROBRangedWeapon
+    let charge: Double
+    let targetID: Int
+    let origin: SIMD2<Float>
+    let heading: Float
+    var distance: Float
+}
+
 enum SaberAttackStyle: Sendable, Equatable {
     case leftSweep
     case rightSweep
@@ -151,7 +168,7 @@ enum ROBRangedWeapon: String, CaseIterable, Identifiable, Sendable {
     var summary: String {
         switch self {
         case .shoulderGatling: "Balanced tracking weapon with a chargeable shoulder shot."
-        case .twinBlasters: "Faster paired projectiles for mobile close-range fights."
+        case .twinBlasters: "Two fast projectiles converge on one lock, or split across two targets with the targeting computer upgrade."
         case .arcCannon: "Heavy charged energy that arcs into a nearby second target."
         }
     }
@@ -248,6 +265,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
     case speedBoost
     case energyCapacity
     case weaponPower
+    case targetingComputer
 
     var id: String { rawValue }
     var displayName: String {
@@ -255,6 +273,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
         case .speedBoost: "Speed Boost"
         case .energyCapacity: "Energy Capacity"
         case .weaponPower: "Weapon Power"
+        case .targetingComputer: "Targeting Computer"
         }
     }
     var summary: String {
@@ -262,21 +281,23 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
         case .speedBoost: "Raises tread speed by 35% per upgrade."
         case .energyCapacity: "Adds 25 energy and improves passive charging."
         case .weaponPower: "Adds one shield point of damage to every hit."
+        case .targetingComputer: "Unlocks independent target locks for the two Twin Blaster barrels."
         }
     }
-    var maximumLevel: Int { 3 }
+    var maximumLevel: Int { self == .targetingComputer ? 1 : 3 }
     func cost(for level: Int) -> Int {
         switch self {
         case .speedBoost: 700 + level * 650
         case .energyCapacity: 550 + level * 500
         case .weaponPower: 900 + level * 800
+        case .targetingComputer: 1_200
         }
     }
 }
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.03"
+    static let gameplayRulesetVersion = "2026.09.04"
     static let robotCollisionRadius: Float = 0.62
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
@@ -340,14 +361,12 @@ final class GameSession {
     var saberStyle: SaberAttackStyle?
     private(set) var saberComboCount = 0
     private var lastSaberAttackTime = -Double.infinity
-    var laserDistance: Float?
+    private(set) var laserProjectiles: [ROBLaserProjectile] = []
     private(set) var laserCharge = 0.0
     private(set) var isChargingLaser = false
     private(set) var laserShotCharge = 0.0
-    private(set) var laserShotHeading: Float = 0
-    private(set) var laserShotWeapon: ROBRangedWeapon = .shoulderGatling
-    private var laserShotOrigin = SIMD2<Float>.zero
     private(set) var lockedEnemyID: Int?
+    private(set) var secondaryLockedEnemyID: Int?
     var selectedComponent: ROBComponent?
     var message = "ROB systems ready."
     var isRunning = false
@@ -363,6 +382,7 @@ final class GameSession {
     private(set) var speedUpgradeLevel = 0
     private(set) var energyUpgradeLevel = 0
     private(set) var weaponUpgradeLevel = 0
+    private(set) var targetingComputerUpgradeLevel = 0
     private var nextBoltID = 0
     private var wasAtDock = false
     private var wasEnergyDepleted = false
@@ -371,7 +391,9 @@ final class GameSession {
     private let progressStore: UserDefaults?
     var level: ROBLevel { levels[levelIndex] }
     var remainingEnemies: Int { enemies.filter(\.isActive).count }
+    var laserDistance: Float? { laserProjectiles.first?.distance }
     var lockedEnemy: TrainingEnemy? { enemies.first(where: { $0.id == lockedEnemyID && $0.isActive }) }
+    var secondaryLockedEnemy: TrainingEnemy? { enemies.first(where: { $0.id == secondaryLockedEnemyID && $0.isActive }) }
     var activeBoss: TrainingEnemy? { enemies.first(where: { $0.isBoss && $0.isActive }) }
     var healthFraction: Double { Double(health) / Double(maxHealth) }
     var shieldFraction: Double { Double(shields) / Double(maxShields) }
@@ -379,6 +401,7 @@ final class GameSession {
     var energyFraction: Double { energy / maxEnergy }
     var driveSpeedMultiplier: Double { 1 + Double(speedUpgradeLevel) * 0.35 }
     var weaponDamageBonus: Int { weaponUpgradeLevel }
+    var hasIndependentTwinTargeting: Bool { targetingComputerUpgradeLevel > 0 }
     var isSecurityAlerted: Bool { securityAlertRemaining > 0 }
     var isInShadow: Bool {
         let point = SIMD3<Float>(robotPosition.x, 0, robotPosition.z)
@@ -395,9 +418,22 @@ final class GameSession {
         if !hasKey { return "Find access key" }
         return isNearHackTerminal ? "Hack door" : "Reach orange hack panel"
     }
-    var laserLockDescription: String { lockedEnemy.map { "LOCK: \($0.displayName.uppercased())" } ?? "SCANNING" }
+    var laserLockDescription: String {
+        guard let primary = lockedEnemy else { return "SCANNING" }
+        guard rangedWeapon == .twinBlasters else { return "LOCK: \(primary.displayName.uppercased())" }
+        if let secondary = secondaryLockedEnemy {
+            return "DUAL LOCK: \(primary.displayName.uppercased()) + \(secondary.displayName.uppercased())"
+        }
+        return hasIndependentTwinTargeting
+            ? "LOCK: \(primary.displayName.uppercased()) · SEEKING SECOND TARGET"
+            : "LOCK: \(primary.displayName.uppercased()) · UPGRADE TARGETING COMPUTER FOR DUAL LOCK"
+    }
     var laserLockHeading: Float? {
         guard let target = lockedEnemy else { return nil }
+        return atan2(-(target.position.x - robotPosition.x), -(target.position.z - robotPosition.z))
+    }
+    var secondaryLaserLockHeading: Float? {
+        guard let target = secondaryLockedEnemy else { return nil }
         return atan2(-(target.position.x - robotPosition.x), -(target.position.z - robotPosition.z))
     }
     var canFinish: Bool { collectedCells == level.cellCount && remainingEnemies == 0 && (!level.requiresKey || doorOpen) }
@@ -418,6 +454,7 @@ final class GameSession {
             speedUpgradeLevel = min(ROBUpgrade.speedBoost.maximumLevel, max(0, store.integer(forKey: "robSpeedUpgradeLevel")))
             energyUpgradeLevel = min(ROBUpgrade.energyCapacity.maximumLevel, max(0, store.integer(forKey: "robEnergyUpgradeLevel")))
             weaponUpgradeLevel = min(ROBUpgrade.weaponPower.maximumLevel, max(0, store.integer(forKey: "robWeaponUpgradeLevel")))
+            targetingComputerUpgradeLevel = min(ROBUpgrade.targetingComputer.maximumLevel, max(0, store.integer(forKey: "robTargetingComputerUpgradeLevel")))
         }
         configureLevel()
     }
@@ -429,6 +466,7 @@ final class GameSession {
         case .speedBoost: speedUpgradeLevel
         case .energyCapacity: energyUpgradeLevel
         case .weaponPower: weaponUpgradeLevel
+        case .targetingComputer: targetingComputerUpgradeLevel
         }
     }
     func upgradeCost(_ upgrade: ROBUpgrade) -> Int? {
@@ -452,6 +490,9 @@ final class GameSession {
         case .weaponPower:
             weaponUpgradeLevel += 1
             progressStore?.set(weaponUpgradeLevel, forKey: "robWeaponUpgradeLevel")
+        case .targetingComputer:
+            targetingComputerUpgradeLevel += 1
+            progressStore?.set(targetingComputerUpgradeLevel, forKey: "robTargetingComputerUpgradeLevel")
         }
         progressStore?.set(upgradePoints, forKey: "robUpgradePoints")
         message = "\(upgrade.displayName) upgraded to Level \(level + 1)."
@@ -680,7 +721,7 @@ final class GameSession {
         hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingProgress = 0; securityAlertRemaining = 0
         collectedCellIndices = []; collectedShieldPickupIndices = []; collectedRepairPickupIndices = []
         saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
-        laserDistance = nil; laserCharge = 0; laserShotCharge = 0; laserShotWeapon = rangedWeapon; laserShotOrigin = .zero; isChargingLaser = false; lockedEnemyID = nil
+        laserProjectiles = []; laserCharge = 0; laserShotCharge = 0; isChargingLaser = false; lockedEnemyID = nil; secondaryLockedEnemyID = nil
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
         energy = maxEnergy; wasEnergyDepleted = false
         let layout = puzzle
@@ -809,7 +850,7 @@ final class GameSession {
             if saberAnimation == 0 { saberStyle = nil }
         }
         if isChargingLaser { laserCharge = min(1, laserCharge + delta / 1.25) }
-        updateLaserProjectile(delta)
+        updateLaserProjectiles(delta)
         updateEnemies(delta)
         updateLaserLock()
     }
@@ -1051,63 +1092,71 @@ final class GameSession {
         if (0...1).contains(second) { return second }
         return nil
     }
-    private func updateLaserProjectile(_ delta: TimeInterval) {
-        guard let distance = laserDistance else { return }
+    private func updateLaserProjectiles(_ delta: TimeInterval) {
+        guard !laserProjectiles.isEmpty else { return }
         let maximumDistance = puzzle.arenaHalfExtent * 2.2
-        let nextDistance = min(maximumDistance, distance + Float(delta) * (laserShotWeapon.projectileSpeed + Float(laserShotCharge) * 3.5))
-        let direction = SIMD2<Float>(-sin(laserShotHeading), -cos(laserShotHeading))
-        let start = laserShotOrigin + direction * distance
-        let end = laserShotOrigin + direction * nextDistance
+        var survivors: [ROBLaserProjectile] = []
 
         enum Impact {
             case barrier
             case enemy(Int)
         }
-        var nearestImpact: (fraction: Float, impact: Impact)?
-        for blocker in projectileBlockers {
-            guard let fraction = Self.segmentHitFraction(from: start, to: end, barrier: blocker, padding: 0.07) else { continue }
-            if nearestImpact.map({ fraction < $0.fraction }) ?? true {
-                nearestImpact = (fraction, .barrier)
-            }
-        }
-        for index in enemies.indices where enemies[index].isActive {
-            let enemy = enemies[index]
-            let radius: Float = (enemy.kind == .spider ? 0.34 : 0.4) * enemy.combatScale
-            guard let fraction = Self.segmentHitFraction(
-                from: start,
-                to: end,
-                center: [enemy.position.x, enemy.position.z],
-                radius: radius
-            ) else { continue }
-            if nearestImpact.map({ fraction < $0.fraction }) ?? true {
-                nearestImpact = (fraction, .enemy(index))
-            }
-        }
 
-        if let nearestImpact {
-            laserDistance = nil
-            switch nearestImpact.impact {
-            case .barrier:
-                message = "\(laserShotWeapon.displayName) struck the wall. Reposition for a clear shot."
-                report(message)
-            case let .enemy(index):
-                let damage = laserShotWeapon.damage(charge: laserShotCharge)
-                let weapon = laserShotWeapon
-                let secondaryTargets = weapon == .arcCannon ? enemies.indices.filter { candidate in
-                    candidate != index && enemies[candidate].isActive && simd_distance(enemies[candidate].position, enemies[index].position) <= 1.45
-                } : []
-                damageEnemy(
-                    at: index,
-                    weapon: laserShotCharge > 0.72 ? "charged \(weapon.displayName.lowercased())" : weapon.displayName.lowercased(),
-                    amount: damage
-                )
-                if let secondary = secondaryTargets.first {
-                    damageEnemy(at: secondary, weapon: "arc cannon chain", amount: max(1, damage / 2))
+        for var projectile in laserProjectiles {
+            let nextDistance = min(
+                maximumDistance,
+                projectile.distance + Float(delta) * (projectile.weapon.projectileSpeed + Float(projectile.charge) * 3.5)
+            )
+            let direction = SIMD2<Float>(-sin(projectile.heading), -cos(projectile.heading))
+            let start = projectile.origin + direction * projectile.distance
+            let end = projectile.origin + direction * nextDistance
+            var nearestImpact: (fraction: Float, impact: Impact)?
+
+            for blocker in projectileBlockers {
+                guard let fraction = Self.segmentHitFraction(from: start, to: end, barrier: blocker, padding: 0.07) else { continue }
+                if nearestImpact.map({ fraction < $0.fraction }) ?? true {
+                    nearestImpact = (fraction, .barrier)
                 }
             }
-        } else {
-            laserDistance = nextDistance >= maximumDistance ? nil : nextDistance
+            for index in enemies.indices where enemies[index].isActive {
+                let enemy = enemies[index]
+                let radius: Float = (enemy.kind == .spider ? 0.34 : 0.4) * enemy.combatScale
+                guard let fraction = Self.segmentHitFraction(
+                    from: start,
+                    to: end,
+                    center: [enemy.position.x, enemy.position.z],
+                    radius: radius
+                ) else { continue }
+                if nearestImpact.map({ fraction < $0.fraction }) ?? true {
+                    nearestImpact = (fraction, .enemy(index))
+                }
+            }
+
+            if let nearestImpact {
+                switch nearestImpact.impact {
+                case .barrier:
+                    message = "\(projectile.weapon.displayName) struck the wall. Reposition for a clear shot."
+                    report(message)
+                case let .enemy(index):
+                    let damage = projectile.weapon.damage(charge: projectile.charge)
+                    let secondaryTargets = projectile.weapon == .arcCannon ? enemies.indices.filter { candidate in
+                        candidate != index && enemies[candidate].isActive && simd_distance(enemies[candidate].position, enemies[index].position) <= 1.45
+                    } : []
+                    damageEnemy(
+                        at: index,
+                        weapon: projectile.charge > 0.72 ? "charged \(projectile.weapon.displayName.lowercased())" : projectile.weapon.displayName.lowercased(),
+                        amount: damage
+                    )
+                    if let secondary = secondaryTargets.first {
+                        damageEnemy(at: secondary, weapon: "arc cannon chain", amount: max(1, damage / 2))
+                    }
+                }
+            } else if nextDistance < maximumDistance {
+                projectile.distance = nextDistance
+                survivors.append(projectile)
+            }
         }
+        laserProjectiles = survivors
     }
     private func moveEnemy(_ enemy: inout TrainingEnemy, toward target: SIMD3<Float>, speed: Float, delta: TimeInterval) {
         var direction = target - enemy.position; direction.y = 0
@@ -1227,11 +1276,15 @@ final class GameSession {
     }
     private func updateLaserLock() {
         let maxRange = puzzle.arenaHalfExtent * 1.75
-        lockedEnemyID = enemies.indices.compactMap { index -> (id: Int, distance: Float)? in
+        let candidates = enemies.indices.compactMap { index -> (id: Int, distance: Float)? in
             guard enemies[index].isActive else { return nil }
             let distance = simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(enemies[index].position.x, enemies[index].position.z))
             return distance <= maxRange ? (enemies[index].id, distance) : nil
-        }.min(by: { $0.distance < $1.distance })?.id
+        }.sorted(by: { $0.distance < $1.distance })
+        lockedEnemyID = candidates.first?.id
+        secondaryLockedEnemyID = rangedWeapon == .twinBlasters && hasIndependentTwinTargeting
+            ? candidates.dropFirst().first?.id
+            : nil
     }
     private func damageEnemy(at index: Int, weapon: String, amount: Int = 1) {
         guard enemies.indices.contains(index), enemies[index].isActive else { return }
@@ -1255,7 +1308,7 @@ final class GameSession {
         fireLaser(charge: 0)
     }
     func beginLaserCharge() {
-        guard isRunning, laserDistance == nil, !isChargingLaser else { return }
+        guard isRunning, laserProjectiles.isEmpty, !isChargingLaser else { return }
         let minimumEnergy = rangedWeapon.energyCost(charge: 0)
         guard energy >= minimumEnergy else {
             message = "Not enough system energy for the \(rangedWeapon.displayName). Hold position or collect an energy cell."
@@ -1270,9 +1323,9 @@ final class GameSession {
         fireLaser(charge: charge)
     }
     private func fireLaser(charge: Double) {
-        guard isRunning, laserDistance == nil else { return }
+        guard isRunning, laserProjectiles.isEmpty else { return }
         updateLaserLock()
-        guard let targetID = lockedEnemyID, enemies.contains(where: { $0.id == targetID && $0.isActive }), let heading = laserLockHeading else {
+        guard let targetID = lockedEnemyID, let primaryTarget = enemies.first(where: { $0.id == targetID && $0.isActive }) else {
             message = "\(rangedWeapon.displayName) is still scanning. Turn or move closer until the lock indicator turns red."; report(message); return
         }
         let clampedCharge = min(1, max(0, charge))
@@ -1283,9 +1336,39 @@ final class GameSession {
             return
         }
         energy -= energyCost
-        laserShotCharge = clampedCharge; laserShotHeading = heading; laserShotWeapon = rangedWeapon
-        laserShotOrigin = [robotPosition.x, robotPosition.z]; laserDistance = 0.55
-        message = "\(rangedWeapon.displayName) fired for \(Int(ceil(energyCost))) energy."
+        let robotOrigin = SIMD2<Float>(robotPosition.x, robotPosition.z)
+        let forward = SIMD2<Float>(-sin(robotHeading), -cos(robotHeading))
+        let right = SIMD2<Float>(cos(robotHeading), -sin(robotHeading))
+        func projectile(barrel: ROBLaserBarrel, lateralOffset: Float, target: TrainingEnemy) -> ROBLaserProjectile {
+            let origin = robotOrigin + forward * 0.28 + right * lateralOffset
+            let heading = atan2(-(target.position.x - origin.x), -(target.position.z - origin.y))
+            return ROBLaserProjectile(
+                barrel: barrel,
+                weapon: rangedWeapon,
+                charge: clampedCharge,
+                targetID: target.id,
+                origin: origin,
+                heading: heading,
+                distance: 0.55
+            )
+        }
+        if rangedWeapon == .twinBlasters {
+            let secondaryTarget = secondaryLockedEnemy ?? primaryTarget
+            laserProjectiles = [
+                projectile(barrel: .left, lateralOffset: -0.47, target: primaryTarget),
+                projectile(barrel: .right, lateralOffset: 0.47, target: secondaryTarget),
+            ]
+        } else {
+            laserProjectiles = [projectile(barrel: .center, lateralOffset: 0, target: primaryTarget)]
+        }
+        laserShotCharge = clampedCharge
+        if rangedWeapon == .twinBlasters, let secondary = secondaryLockedEnemy {
+            message = "Twin Blasters fired two independent beams at \(primaryTarget.displayName) and \(secondary.displayName) for \(Int(ceil(energyCost))) energy."
+        } else if rangedWeapon == .twinBlasters {
+            message = "Twin Blasters fired both beams at \(primaryTarget.displayName) for \(Int(ceil(energyCost))) energy."
+        } else {
+            message = "\(rangedWeapon.displayName) fired for \(Int(ceil(energyCost))) energy."
+        }
         report(message)
         if audioEnabled { SoundPlayer.shared.playLaser(charge: clampedCharge) }
     }

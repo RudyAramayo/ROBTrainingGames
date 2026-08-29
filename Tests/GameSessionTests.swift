@@ -598,10 +598,13 @@ final class GameSessionTests: XCTestCase {
         game.purchaseUpgrade(.speedBoost)
         game.purchaseUpgrade(.energyCapacity)
         game.purchaseUpgrade(.weaponPower)
+        game.purchaseUpgrade(.targetingComputer)
 
         XCTAssertEqual(game.speedUpgradeLevel, 1)
         XCTAssertEqual(game.energyUpgradeLevel, 1)
         XCTAssertEqual(game.weaponUpgradeLevel, 1)
+        XCTAssertEqual(game.targetingComputerUpgradeLevel, 1)
+        XCTAssertTrue(game.hasIndependentTwinTargeting)
         XCTAssertEqual(game.maxEnergy, 125)
         XCTAssertEqual(game.driveSpeedMultiplier, 1.35, accuracy: 0.0001)
         XCTAssertEqual(game.weaponDamageBonus, 1)
@@ -609,6 +612,8 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(restored.speedUpgradeLevel, 1)
         XCTAssertEqual(restored.energyUpgradeLevel, 1)
         XCTAssertEqual(restored.weaponUpgradeLevel, 1)
+        XCTAssertEqual(restored.targetingComputerUpgradeLevel, 1)
+        XCTAssertTrue(restored.hasIndependentTwinTargeting)
         XCTAssertEqual(restored.upgradePoints, game.upgradePoints)
     }
 
@@ -797,6 +802,57 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(ROBRangedWeapon.arcCannon.energyCost(charge: 1), 22, accuracy: 0.001)
     }
 
+    func testTwinBlastersAlwaysLaunchTwoProjectilesAtThePrimaryLockBeforeTargetingUpgrade() {
+        let game = GameSession(audioEnabled: false)
+        for _ in 0..<5 { completeCurrentLevel(game) }
+        game.selectRangedWeapon(.twinBlasters)
+        game.begin()
+        guard game.enemies.count >= 2 else { return XCTFail("Missing training targets") }
+        for index in game.enemies.indices where index > 1 { game.enemies[index].isActive = false }
+        game.enemies[0].position = game.robotPosition + SIMD3<Float>(-0.45, 0, -1.7)
+        game.enemies[1].position = game.robotPosition + SIMD3<Float>(0.45, 0, -1.9)
+
+        game.fireLaser()
+
+        XCTAssertEqual(game.laserProjectiles.count, 2)
+        XCTAssertEqual(Set(game.laserProjectiles.map(\.barrel)), [.left, .right])
+        XCTAssertEqual(Set(game.laserProjectiles.map(\.targetID)).count, 1)
+        XCTAssertNil(game.secondaryLockedEnemy)
+        XCTAssertTrue(game.laserLockDescription.localizedCaseInsensitiveContains("upgrade targeting computer"))
+    }
+
+    func testTargetingComputerLetsTwinBlastersDamageTwoIndependentTargets() {
+        let game = GameSession(audioEnabled: false)
+        for _ in 0..<5 { completeCurrentLevel(game) }
+        game.purchaseUpgrade(.targetingComputer)
+        game.selectRangedWeapon(.twinBlasters)
+        game.begin()
+        guard game.enemies.count >= 2 else { return XCTFail("Missing training targets") }
+        for index in game.enemies.indices where index > 1 { game.enemies[index].isActive = false }
+        game.enemies[0].position = game.robotPosition + SIMD3<Float>(-0.45, 0, -1.7)
+        game.enemies[1].position = game.robotPosition + SIMD3<Float>(0.45, 0, -1.9)
+        let firstShields = game.enemies[0].shields
+        let secondShields = game.enemies[1].shields
+
+        game.fireLaser()
+
+        XCTAssertEqual(game.laserProjectiles.count, 2)
+        XCTAssertEqual(Set(game.laserProjectiles.map(\.targetID)).count, 2)
+        XCTAssertNotNil(game.secondaryLockedEnemy)
+        XCTAssertNotEqual(game.laserProjectiles[0].heading, game.laserProjectiles[1].heading)
+        XCTAssertTrue(game.laserLockDescription.localizedCaseInsensitiveContains("dual lock"))
+        let robot = RobotFactory.makeROB()
+        RobotFactory.applyWeapons(to: robot, session: game)
+        XCTAssertTrue(robot.findEntity(named: "Left Blaster Laser Beam")?.isEnabled == true)
+        XCTAssertTrue(robot.findEntity(named: "Right Blaster Laser Beam")?.isEnabled == true)
+
+        for _ in 0..<90 where !game.laserProjectiles.isEmpty { game.tick(1.0 / 60.0) }
+
+        XCTAssertLessThan(game.enemies[0].shields, firstShields)
+        XCTAssertLessThan(game.enemies[1].shields, secondShields)
+        XCTAssertTrue(game.laserProjectiles.isEmpty)
+    }
+
     func testShoulderLaserStopsAtAWallBeforeDamagingAnEnemy() {
         let game = GameSession(audioEnabled: false)
         game.begin()
@@ -847,6 +903,10 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNotNil(robot.findEntity(named: "Flipper Zero Hacker"))
         XCTAssertNotNil(robot.findEntity(named: "Gatling Lock Indicator"))
         XCTAssertNotNil(robot.findEntity(named: "Shoulder Laser Beam"))
+        XCTAssertNotNil(robot.findEntity(named: "Left Blaster Laser Beam"))
+        XCTAssertNotNil(robot.findEntity(named: "Right Blaster Laser Beam"))
+        XCTAssertNotNil(robot.findEntity(named: "Left Blaster Mount"))
+        XCTAssertNotNil(robot.findEntity(named: "Right Blaster Mount"))
         XCTAssertNil(robot.findEntity(named: "Head Camera"))
         XCTAssertNotNil(robot.findEntity(named: "Face Smiley Left Eye"))
         XCTAssertNotNil(robot.findEntity(named: "Face Smiley Right Eye"))
