@@ -198,7 +198,7 @@ import UIKit
             for y: Float in [0.18, 0.38, 0.58] { for x: Float in [-0.22, 0, 0.22] { let light = ModelEntity(mesh: .generateSphere(radius: 0.055), materials: [SimpleMaterial(color: .systemBlue, isMetallic: true)]); light.position = [x, y, -0.31]; root.addChild(light) } }
         }
         if enemy.isBoss {
-            root.scale = .init(repeating: 1.35)
+            root.scale = .init(repeating: enemy.combatScale)
             let core = ModelEntity(mesh: .generateSphere(radius: 0.13), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)])
             core.name = "Boss Core"
             core.position = [0, enemy.kind == .spider ? 0.55 : 1.18, 0]
@@ -213,7 +213,10 @@ import UIKit
 
     static func applyCombatState(to layer: Entity, session: GameSession) {
         for enemy in session.enemies {
-            guard let entity = layer.findEntity(named: "Training Enemy \(enemy.id)") else { continue }
+            let name = "Training Enemy \(enemy.id)"
+            let entity: Entity
+            if let existing = layer.findEntity(named: name) { entity = existing }
+            else { let created = makeEnemy(enemy); layer.addChild(created); entity = created }
             entity.isEnabled = enemy.isActive
             entity.position = enemy.position + SIMD3<Float>(0, enemy.kind == .spider ? Float(sin(session.elapsed * 10 + Double(enemy.id))) * 0.025 : Float(sin(session.elapsed * 2.4 + Double(enemy.id))) * 0.015, 0)
             entity.orientation = simd_quatf(angle: enemy.heading, axis: [0, 1, 0])

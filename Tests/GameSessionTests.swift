@@ -483,6 +483,7 @@ final class GameSessionTests: XCTestCase {
         game.levelIndex = 2
         game.begin()
         for index in game.enemies.indices { game.enemies[index].isActive = false }
+        let combatLayer = RobotFactory.makeCombatLayer(session: game)
         guard let camera = game.puzzle.securityCameras.first, let shadow = game.puzzle.shadowZones.first else {
             return XCTFail("Level 3 needs camera and shadow geometry")
         }
@@ -494,10 +495,20 @@ final class GameSessionTests: XCTestCase {
         game.tick(0.001)
 
         XCTAssertTrue(game.isSecurityAlerted)
+        let miniBosses = game.enemies.filter(\.isMiniBoss)
+        XCTAssertEqual(miniBosses.count, 1)
+        XCTAssertEqual(miniBosses[0].shields, 3)
+        XCTAssertEqual(miniBosses[0].contactDamage, 4)
+        XCTAssertEqual(miniBosses[0].combatScale, 1.15)
+        RobotFactory.applyCombatState(to: combatLayer, session: game)
+        XCTAssertNotNil(combatLayer.findEntity(named: "Training Enemy \(miniBosses[0].id)"))
         game.robotPosition = [shadow.center.x, 0, shadow.center.y]
         XCTAssertTrue(game.isInShadow)
         game.tick(5.1)
         XCTAssertFalse(game.isSecurityAlerted)
+        game.robotPosition = [seenPoint.x, 0, seenPoint.y]
+        game.tick(0.001)
+        XCTAssertEqual(game.enemies.filter(\.isMiniBoss).count, 1)
     }
 
     func testEnergyDrainsWhileDrivingAndRecoversWhileStopped() {

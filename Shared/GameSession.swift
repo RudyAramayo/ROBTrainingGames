@@ -34,6 +34,7 @@ struct TrainingEnemy: Identifiable, Sendable {
     let id: Int
     let kind: TrainingEnemyKind
     let isBoss: Bool
+    let isMiniBoss: Bool
     var position: SIMD3<Float>
     let origin: SIMD3<Float>
     var heading: Float = 0
@@ -44,9 +45,11 @@ struct TrainingEnemy: Identifiable, Sendable {
     var nextSkitterSound: TimeInterval = 0
     var lungeRemaining = 0.0
 
-    var displayName: String { isBoss ? "Boss \(kind.displayName)" : kind.displayName }
-    var contactDamage: Int { isBoss ? 10 : (kind == .spider ? 6 : 5) }
-    var projectileDamage: Int { isBoss ? 10 : 4 }
+    var displayName: String { isMiniBoss ? "Mini Boss \(kind.displayName)" : isBoss ? "Boss \(kind.displayName)" : kind.displayName }
+    var contactDamage: Int { isMiniBoss ? 4 : isBoss ? 10 : (kind == .spider ? 6 : 5) }
+    var projectileDamage: Int { isMiniBoss ? 3 : isBoss ? 10 : 4 }
+    var combatScale: Float { isMiniBoss ? 1.15 : isBoss ? 1.35 : 1 }
+    var defeatReward: Int { isMiniBoss ? 500 : isBoss ? 1_000 : 300 }
 }
 
 struct TrainingEnemyBolt: Identifiable, Sendable {
@@ -243,7 +246,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.08.31"
+    static let gameplayRulesetVersion = "2026.09.01"
     static let robotCollisionRadius: Float = 0.62
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
@@ -577,7 +580,7 @@ final class GameSession {
             let origin = spawns[index % spawns.count]
             let isBoss = level.id.isMultiple(of: 5) && index == 0
             let shields = isBoss ? max(10, level.enemyShields * 3) : level.enemyShields
-            return TrainingEnemy(id: index, kind: kind, isBoss: isBoss, position: origin, origin: origin, shields: shields, maxShields: shields, nextAttack: 1.6 + Double(index) * 0.65, nextSkitterSound: 0.8 + Double(index) * 0.38)
+            return TrainingEnemy(id: index, kind: kind, isBoss: isBoss, isMiniBoss: false, position: origin, origin: origin, shields: shields, maxShields: shields, nextAttack: 1.6 + Double(index) * 0.65, nextSkitterSound: 0.8 + Double(index) * 0.38)
         }
     }
     private func configureLevel() {
@@ -733,7 +736,7 @@ final class GameSession {
     private func updateSecurityCameras() {
         guard !isInShadow else { return }
         let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
-        let detected = puzzle.securityCameras.contains { camera in
+        let detectingCamera = puzzle.securityCameras.first { camera in
             let offset = point - camera.position
             let distance = simd_length(offset)
             guard distance > 0.001, distance <= camera.range else { return false }
@@ -744,14 +747,46 @@ final class GameSession {
                 Self.segmentHitFraction(from: camera.position, to: point, barrier: $0, padding: 0.015) != nil
             }
         }
-        if detected {
+        if let detectingCamera {
             let wasAlerted = isSecurityAlerted
             securityAlertRemaining = 5
             if !wasAlerted {
-                message = "Security camera spotted ROB! Enemy robots are converging. Break line of sight in a shadow zone."
+                if !enemies.contains(where: { $0.isMiniBoss }) {
+                    releaseSecurityMiniBoss(from: detectingCamera)
+                } else {
+                    message = "Security camera spotted ROB again! Break line of sight in a shadow zone."
+                }
                 report(message)
             }
         }
+    }
+
+    private func releaseSecurityMiniBoss(from camera: PuzzleSecurityCamera?) {
+        guard let camera else { return }
+        let margin = puzzle.arenaHalfExtent - 0.85
+        let preferred = SIMD3<Float>(-camera.position.x * 0.78, 0, -camera.position.y * 0.78)
+        let candidates: [SIMD3<Float>] = [
+            preferred, [-margin, 0, -margin], [margin, 0, -margin], [-margin, 0, margin * 0.2], [margin, 0, margin * 0.2],
+        ]
+        let blockers = puzzle.barriers + ((!doorOpen && puzzle.door != nil) ? [puzzle.door!] : [])
+        let origin = candidates.first(where: { candidate in
+            simd_distance(SIMD2<Float>(candidate.x, candidate.z), SIMD2<Float>(robotPosition.x, robotPosition.z)) > 2.4
+                && !blockers.contains(where: { Self.intersects(candidate, barrier: $0, radius: 0.34) })
+        }) ?? preferred
+        let id = (enemies.map(\.id).max() ?? -1) + 1
+        enemies.append(TrainingEnemy(
+            id: id,
+            kind: .spider,
+            isBoss: true,
+            isMiniBoss: true,
+            position: origin,
+            origin: origin,
+            shields: 3,
+            maxShields: 3,
+            nextAttack: elapsed + 1.8,
+            nextSkitterSound: elapsed + 0.5
+        ))
+        message = "Security camera caught ROB! A three-shield mini boss has been released — disable it or escape into shadow."
     }
 
     private func updateDoorHack(_ delta: TimeInterval) {
@@ -943,7 +978,7 @@ final class GameSession {
         }
         for index in enemies.indices where enemies[index].isActive {
             let enemy = enemies[index]
-            let radius: Float = (enemy.kind == .spider ? 0.34 : 0.4) * (enemy.isBoss ? 1.35 : 1)
+            let radius: Float = (enemy.kind == .spider ? 0.34 : 0.4) * enemy.combatScale
             guard let fraction = Self.segmentHitFraction(
                 from: start,
                 to: end,
@@ -1022,7 +1057,7 @@ final class GameSession {
             }
             let facing = robotPosition - enemy.position; enemy.heading = atan2(-facing.x, -facing.z)
             moveEnemy(&enemy, toward: target, speed: speed, delta: delta); enemies[index] = enemy
-            let contactRadius: Float = (enemy.kind == .spider ? 0.5 : 0.44) * (enemy.isBoss ? 1.35 : 1)
+            let contactRadius: Float = (enemy.kind == .spider ? 0.5 : 0.44) * enemy.combatScale
             if simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(enemy.position.x, enemy.position.z)) < contactRadius {
                 if enemy.kind == .spider { playSpider(.impact) } else { playEnemyAttack(.fax) }
                 if enemyContact(enemy.kind == .spider ? "\(enemy.displayName) lunge" : "\(enemy.displayName) collision", damage: enemy.contactDamage) { return }
@@ -1103,9 +1138,9 @@ final class GameSession {
         awardMissionPoints(50 * appliedDamage)
         if enemies[index].kind == .spider { playSpider(enemies[index].shields <= 0 ? .shutdown : .impact) }
         if enemies[index].shields <= 0 {
-            let kind = enemies[index].kind, name = enemies[index].displayName, wasBoss = enemies[index].isBoss
+            let kind = enemies[index].kind, name = enemies[index].displayName, reward = enemies[index].defeatReward
             enemies[index].isActive = false
-            awardMissionPoints(wasBoss ? 1_000 : 300)
+            awardMissionPoints(reward)
             if kind == .fax { playEnemyAttack(kind) }
             message = "\(name) disabled by \(weapon). \(remainingEnemies) targets remain."
         } else {
