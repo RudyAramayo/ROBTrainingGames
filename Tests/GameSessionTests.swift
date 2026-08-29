@@ -300,8 +300,8 @@ final class GameSessionTests: XCTestCase {
 
         let wallSafeLimit = game.puzzle.arenaHalfExtent - 0.09 - GameSession.robotCollisionRadius
         XCTAssertLessThanOrEqual(abs(game.robotPosition.z), wallSafeLimit + 0.001)
-        XCTAssertEqual(game.robotPosition.z, startingPosition.z, accuracy: 0.001)
-        XCTAssertTrue(game.message.localizedCaseInsensitiveContains("wall collision"))
+        XCTAssertGreaterThan(game.robotPosition.z, startingPosition.z, "ROB should approach the wall smoothly before stopping")
+        XCTAssertTrue(game.message.localizedCaseInsensitiveContains("wall"))
     }
 
     func testSweptChassisCollisionCannotTunnelThroughAnInteriorWall() {
@@ -318,7 +318,31 @@ final class GameSessionTests: XCTestCase {
         game.stopDrive()
 
         XCTAssertGreaterThanOrEqual(game.robotPosition.z, wall.center.y + wall.size.y / 2 + GameSession.robotCollisionRadius)
-        XCTAssertEqual(game.robotPosition.z, safeZ, accuracy: 0.001)
+        XCTAssertLessThan(game.robotPosition.z, safeZ, "ROB should use the available clearance instead of freezing before the wall")
+    }
+
+    func testROBReversesAndSlidesAwayFromExactWallContact() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        guard let wall = game.puzzle.barriers.first else { return XCTFail("Level needs an interior wall") }
+        let contactZ = wall.center.y + wall.size.y / 2 + GameSession.robotCollisionRadius
+
+        game.robotPosition = [wall.center.x, 0, contactZ]
+        game.robotHeading = 0
+        XCTAssertTrue(game.isRobotPositionClear(game.robotPosition))
+        game.setDrive(forward: -1, steering: 0)
+        game.tick(0.35)
+        game.stopDrive()
+        XCTAssertGreaterThan(game.robotPosition.z, contactZ + 0.1, "Reverse should release ROB from an exact wall contact")
+
+        game.robotPosition = [wall.center.x, 0, contactZ]
+        game.robotHeading = .pi / 4
+        game.setDrive(forward: 1, steering: 0)
+        game.tick(0.35)
+        game.stopDrive()
+        XCTAssertGreaterThan(abs(game.robotPosition.x - wall.center.x), 0.1, "Angled input should slide ROB along the wall")
+        XCTAssertGreaterThanOrEqual(game.robotPosition.z, contactZ - 0.001, "Wall assist must not move ROB through the wall")
     }
 
     func testChassisCanUnlockAndPassThroughEveryLevelDoorway() {

@@ -222,7 +222,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.08.29"
+    static let gameplayRulesetVersion = "2026.08.30"
     static let robotCollisionRadius: Float = 0.62
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
@@ -638,19 +638,24 @@ final class GameSession {
             robotPosition.y,
             robotPosition.z - cos(robotHeading) * linear
         )
-        if isRobotMoveClear(from: oldPosition, to: proposedPosition) {
-            robotPosition = proposedPosition
-        } else {
-            var resolvedPosition = oldPosition
-            let xOnly = SIMD3<Float>(proposedPosition.x, oldPosition.y, oldPosition.z)
-            if isRobotMoveClear(from: oldPosition, to: xOnly) { resolvedPosition = xOnly }
-            let zOnly = SIMD3<Float>(resolvedPosition.x, oldPosition.y, proposedPosition.z)
-            if isRobotMoveClear(from: resolvedPosition, to: zOnly) { resolvedPosition = zOnly }
-            robotPosition = resolvedPosition
-            let blockedByDoor = !doorOpen && puzzle.door.map { Self.intersects(proposedPosition, barrier: $0, radius: Self.robotCollisionRadius) } == true
+        let resolvedPosition = resolveRobotMovement(from: oldPosition, to: proposedPosition)
+        robotPosition = resolvedPosition
+        let movementWasLimited = simd_distance(resolvedPosition, proposedPosition) > 0.000_1
+        if movementWasLimited {
+            let blockedByDoor = !doorOpen && puzzle.door.map {
+                Self.segmentHitFraction(
+                    from: SIMD2<Float>(oldPosition.x, oldPosition.z),
+                    to: SIMD2<Float>(proposedPosition.x, proposedPosition.z),
+                    barrier: $0,
+                    padding: Self.robotCollisionRadius
+                ) != nil
+            } == true
+            let slidAlongWall = simd_distance(oldPosition, resolvedPosition) > 0.000_1
             message = blockedByDoor
                 ? (hasKey ? "Use the orange hack panel beside the door." : "Route blocked. Find the access key before hacking the doorway.")
-                : "Wall collision prevented. Turn ROB or follow the wall around."
+                : slidAlongWall
+                    ? "Wall assist active — ROB is sliding along the open edge. Steer away when clear."
+                    : "Wall contact — reverse or pivot away; ROB will release instead of staying trapped."
         }
         let driveLoad = (abs(leftTread) + abs(rightTread)) * 0.5
         if hasDriveEnergy && driveLoad > 0.01 {
@@ -749,13 +754,63 @@ final class GameSession {
         guard abs(position.x) <= movementLimit, abs(position.z) <= movementLimit else { return false }
         return !robotMovementBlockers.contains { Self.intersects(position, barrier: $0, radius: Self.robotCollisionRadius) }
     }
+    private func resolveRobotMovement(from start: SIMD3<Float>, to end: SIMD3<Float>) -> SIMD3<Float> {
+        if isRobotMoveClear(from: start, to: end) { return end }
+        let delta = end - start
+        let axisOrder = abs(delta.x) >= abs(delta.z) ? [0, 2] : [2, 0]
+        var resolved = start
+
+        for axis in axisOrder {
+            var axisTarget = resolved
+            axisTarget[axis] = end[axis]
+            resolved = furthestClearRobotPosition(from: resolved, to: axisTarget)
+        }
+        return resolved
+    }
+    private func furthestClearRobotPosition(from start: SIMD3<Float>, to end: SIMD3<Float>) -> SIMD3<Float> {
+        if isRobotMoveClear(from: start, to: end) { return end }
+        guard simd_distance_squared(start, end) > 0.000_000_1 else { return start }
+        var clearFraction: Float = 0
+        var blockedFraction: Float = 1
+        for _ in 0..<10 {
+            let candidateFraction = (clearFraction + blockedFraction) * 0.5
+            let candidate = start + (end - start) * candidateFraction
+            if isRobotMoveClear(from: start, to: candidate) {
+                clearFraction = candidateFraction
+            } else {
+                blockedFraction = candidateFraction
+            }
+        }
+        return clearFraction > 0.001 ? start + (end - start) * clearFraction : start
+    }
     private func isRobotMoveClear(from start: SIMD3<Float>, to end: SIMD3<Float>) -> Bool {
         guard isRobotPositionClear(end) else { return false }
         let start2D = SIMD2<Float>(start.x, start.z)
         let end2D = SIMD2<Float>(end.x, end.z)
         return !robotMovementBlockers.contains { blocker in
-            Self.segmentHitFraction(from: start2D, to: end2D, barrier: blocker, padding: Self.robotCollisionRadius) != nil
+            guard Self.segmentHitFraction(from: start2D, to: end2D, barrier: blocker, padding: Self.robotCollisionRadius) != nil else { return false }
+            return !Self.motionStaysOutsideContactFace(
+                from: start2D,
+                to: end2D,
+                barrier: blocker,
+                padding: Self.robotCollisionRadius
+            )
         }
+    }
+    private static func motionStaysOutsideContactFace(
+        from start: SIMD2<Float>,
+        to end: SIMD2<Float>,
+        barrier: PuzzleBarrier,
+        padding: Float
+    ) -> Bool {
+        let minimum = barrier.center - barrier.size / 2 - SIMD2<Float>(repeating: padding)
+        let maximum = barrier.center + barrier.size / 2 + SIMD2<Float>(repeating: padding)
+        let tolerance: Float = 0.000_5
+        if abs(start.x - minimum.x) <= tolerance, end.x <= minimum.x + tolerance { return true }
+        if abs(start.x - maximum.x) <= tolerance, end.x >= maximum.x - tolerance { return true }
+        if abs(start.y - minimum.y) <= tolerance, end.y <= minimum.y + tolerance { return true }
+        if abs(start.y - maximum.y) <= tolerance, end.y >= maximum.y - tolerance { return true }
+        return false
     }
     private var projectileBlockers: [PuzzleBarrier] {
         let half = puzzle.arenaHalfExtent
