@@ -297,10 +297,13 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.06"
+    static let gameplayRulesetVersion = "2026.09.07"
     static let robotCollisionRadius: Float = 0.62
     static let baseDriveSpeed: Float = 1.2
     static let securityCameraHalfAngle: Float = .pi / 5
+    static let securityCameraHackRange: Float = 1.55
+    static let flipperHackDuration = 2.2
+    static let flipperHackReward = 300
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
     let maxHealth = 100
@@ -354,8 +357,10 @@ final class GameSession {
     var hasKey = false
     var doorOpen = true
     private(set) var isHackingDoor = false
+    private(set) var hackingCameraID: Int?
     private(set) var hackingProgress = 0.0
     private(set) var securityAlertRemaining = 0.0
+    private(set) var disabledSecurityCameraIDs: Set<Int> = []
     var collectedCellIndices: Set<Int> = []
     var collectedShieldPickupIndices: Set<Int> = []
     var collectedRepairPickupIndices: Set<Int> = []
@@ -416,12 +421,36 @@ final class GameSession {
         guard let terminal = puzzle.hackTerminal else { return false }
         return simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), terminal) <= Self.robotCollisionRadius + 0.48
     }
-    var canStartDoorHack: Bool { isRunning && level.requiresKey && hasKey && !doorOpen && !isHackingDoor && isNearHackTerminal }
+    var canStartDoorHack: Bool { isRunning && level.requiresKey && hasKey && !doorOpen && !isHackingDoor && !isHackingCamera && isNearHackTerminal }
+    var isHackingCamera: Bool { hackingCameraID != nil }
+    var nearbyHackableCamera: PuzzleSecurityCamera? {
+        let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
+        return puzzle.securityCameras
+            .filter { !disabledSecurityCameraIDs.contains($0.id) }
+            .map { ($0, simd_distance(point, $0.position)) }
+            .filter { $0.1 <= Self.securityCameraHackRange }
+            .min { $0.1 < $1.1 }?.0
+    }
+    var canStartCameraHack: Bool { isRunning && !isHackingDoor && !isHackingCamera && nearbyHackableCamera != nil }
+    var canStartFlipperHack: Bool { canStartDoorHack || canStartCameraHack }
+    var hasFlipperHackTargets: Bool {
+        isHackingDoor || isHackingCamera || (!doorOpen && level.requiresKey)
+            || puzzle.securityCameras.contains { !disabledSecurityCameraIDs.contains($0.id) }
+    }
     var doorHackDescription: String {
         if doorOpen { return "Door hacked" }
         if isHackingDoor { return "Hacking \(Int(hackingProgress * 100))%" }
         if !hasKey { return "Find access key" }
         return isNearHackTerminal ? "Hack door" : "Reach orange hack panel"
+    }
+    var flipperHackDescription: String {
+        if isHackingCamera { return "Hacking camera \(Int(hackingProgress * 100))%" }
+        if isHackingDoor { return "Hacking door \(Int(hackingProgress * 100))%" }
+        if canStartDoorHack { return "Hack door" }
+        if canStartCameraHack { return "Hack camera" }
+        if !doorOpen && level.requiresKey && isNearHackTerminal { return doorHackDescription }
+        if puzzle.securityCameras.contains(where: { !disabledSecurityCameraIDs.contains($0.id) }) { return "Reach security camera" }
+        return doorHackDescription
     }
     var laserLockDescription: String {
         guard let primary = lockedEnemy else { return "SCANNING" }
@@ -724,7 +753,7 @@ final class GameSession {
     private func configureLevel() {
         isUpgradeIntermission = false
         elapsed = 0; collectedCells = 0
-        hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingProgress = 0; securityAlertRemaining = 0
+        hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingCameraID = nil; hackingProgress = 0; securityAlertRemaining = 0; disabledSecurityCameraIDs = []
         collectedCellIndices = []; collectedShieldPickupIndices = []; collectedRepairPickupIndices = []
         saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
         laserProjectiles = []; laserCharge = 0; laserShotCharge = 0; isChargingLaser = false; lockedEnemyID = nil; secondaryLockedEnemyID = nil
@@ -837,7 +866,7 @@ final class GameSession {
         let driveLoad = (abs(leftTread) + abs(rightTread)) * 0.5
         if hasDriveEnergy && driveLoad > 0.01 {
             energy = max(0, energy - delta * (4.4 + driveLoad * 2.2))
-        } else if !isHackingDoor {
+        } else if !isHackingDoor && !isHackingCamera {
             energy = min(maxEnergy, energy + delta * passiveEnergyRecharge)
         }
         if energy <= 0.05, !wasEnergyDepleted {
@@ -850,6 +879,7 @@ final class GameSession {
         applyConveyor(delta)
         resolveSpatialObjectives()
         updateDoorHack(delta)
+        updateCameraHack(delta)
         updateSecurityCameras()
         if saberAnimation > 0 {
             let animationSpeed = switch saberStyle {
@@ -876,7 +906,8 @@ final class GameSession {
     }
 
     func securityCameraHeading(_ camera: PuzzleSecurityCamera) -> Float {
-        camera.heading + sin(Float(elapsed) * 0.72 + Float(camera.id) * 1.7) * camera.sweep
+        if disabledSecurityCameraIDs.contains(camera.id) { return camera.heading }
+        return camera.heading + sin(Float(elapsed) * 0.72 + Float(camera.id) * 1.7) * camera.sweep
     }
 
     static func securityCameraSightDistance(
@@ -916,7 +947,8 @@ final class GameSession {
         for camera: PuzzleSecurityCamera,
         rayCount: Int = 49
     ) -> [Float] {
-        Self.securityCameraVisionDistances(
+        if disabledSecurityCameraIDs.contains(camera.id) { return Array(repeating: 0, count: max(2, rayCount)) }
+        return Self.securityCameraVisionDistances(
             camera: camera,
             heading: securityCameraHeading(camera),
             blockers: projectileBlockers,
@@ -945,7 +977,8 @@ final class GameSession {
     }
 
     func securityCameraCanSee(_ point: SIMD2<Float>, camera: PuzzleSecurityCamera) -> Bool {
-        Self.securityCameraCanSee(
+        guard !disabledSecurityCameraIDs.contains(camera.id) else { return false }
+        return Self.securityCameraCanSee(
             point,
             camera: camera,
             heading: securityCameraHeading(camera),
@@ -956,7 +989,9 @@ final class GameSession {
     private func updateSecurityCameras() {
         guard !isInShadow else { return }
         let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
-        let detectingCamera = puzzle.securityCameras.first { securityCameraCanSee(point, camera: $0) }
+        let detectingCamera = puzzle.securityCameras.first {
+            !disabledSecurityCameraIDs.contains($0.id) && securityCameraCanSee(point, camera: $0)
+        }
         if let detectingCamera {
             let wasAlerted = isSecurityAlerted
             securityAlertRemaining = 5
@@ -1007,11 +1042,30 @@ final class GameSession {
             report(message)
             return
         }
-        hackingProgress = min(1, hackingProgress + delta / 2.2)
+        hackingProgress = min(1, hackingProgress + delta / Self.flipperHackDuration)
         guard hackingProgress >= 1 else { return }
         isHackingDoor = false; doorOpen = true
-        awardMissionPoints(300)
+        awardMissionPoints(Self.flipperHackReward)
         message = "Flipper Zero hack complete. Security lock bypassed and door open."
+        report(message)
+        play("pickup")
+    }
+    private func updateCameraHack(_ delta: TimeInterval) {
+        guard let cameraID = hackingCameraID,
+              let camera = puzzle.securityCameras.first(where: { $0.id == cameraID }) else { return }
+        let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
+        guard simd_distance(point, camera.position) <= Self.securityCameraHackRange else {
+            hackingCameraID = nil; hackingProgress = 0
+            message = "Camera hack interrupted. Move back within Flipper Zero range."
+            report(message)
+            return
+        }
+        hackingProgress = min(1, hackingProgress + delta / Self.flipperHackDuration)
+        guard hackingProgress >= 1 else { return }
+        disabledSecurityCameraIDs.insert(cameraID)
+        hackingCameraID = nil; hackingProgress = 0; securityAlertRemaining = 0
+        awardMissionPoints(Self.flipperHackReward)
+        message = "Flipper Zero camera hack complete. Camera \(cameraID + 1) sensor and alarm disabled."
         report(message)
         play("pickup")
     }
@@ -1535,13 +1589,24 @@ final class GameSession {
         report(message); play("pickup")
     }
     func startDoorHack() {
-        guard isRunning, level.requiresKey, !doorOpen, !isHackingDoor else { return }
+        guard isRunning, level.requiresKey, !doorOpen, !isHackingDoor, !isHackingCamera else { return }
         guard hasKey else { message = "The security lock needs its access key before ROB can hack it."; report(message); return }
         guard isNearHackTerminal else { message = "Move ROB beside the orange hack panel first."; report(message); return }
         isHackingDoor = true; hackingProgress = 0
         stopDrive()
         message = "Flipper Zero connected. ROB is running the door hack automatically…"
         report(message)
+    }
+    func startCameraHack() {
+        guard canStartCameraHack, let camera = nearbyHackableCamera else { return }
+        hackingCameraID = camera.id; hackingProgress = 0
+        stopDrive()
+        message = "Flipper Zero connected to camera \(camera.id + 1). Hold position while ROB disables its sensor and alarm…"
+        report(message)
+    }
+    func startFlipperHack() {
+        if canStartDoorHack { startDoorHack() }
+        else { startCameraHack() }
     }
     func openDoor() { startDoorHack() }
     @discardableResult

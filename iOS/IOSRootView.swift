@@ -450,14 +450,14 @@ struct MobileTankControls: View {
         HStack(alignment: .bottom, spacing: 8) {
             TreadJoystick(title: "LEFT", demand: updateLeft)
             VStack(spacing: 5) {
-                if session.level.requiresKey && !session.doorOpen {
-                    Button { session.startDoorHack() } label: {
-                        Label(session.doorHackDescription, systemImage: "lock.open.trianglebadge.exclamationmark")
+                if session.hasFlipperHackTargets {
+                    Button { session.startFlipperHack() } label: {
+                        Label(session.flipperHackDescription, systemImage: "dot.radiowaves.left.and.right")
                             .font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(session.canStartDoorHack ? .orange : .gray)
-                    .disabled(!session.canStartDoorHack)
+                    .tint(session.isHackingCamera || session.isHackingDoor ? .yellow : session.canStartCameraHack ? .cyan : session.canStartDoorHack ? .orange : .gray)
+                    .disabled(!session.canStartFlipperHack)
                 }
                 LaserChargeButton(session: session, title: session.rangedWeapon.shortName, compact: true)
                 Button { session.saberAttack() } label: {

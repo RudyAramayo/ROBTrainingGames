@@ -577,6 +577,40 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.enemies.filter(\.isMiniBoss).count, 1)
     }
 
+    func testFlipperZeroHacksNearbyCameraAndDisablesItsSensorAndVisionCone() {
+        let game = GameSession(audioEnabled: false)
+        game.levelIndex = 2
+        game.begin()
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        guard let camera = game.puzzle.securityCameras.first else {
+            return XCTFail("Level 3 needs a hackable security camera")
+        }
+        let pointsBeforeHack = game.upgradePoints
+        game.robotPosition = [camera.position.x, 0, camera.position.y]
+
+        XCTAssertTrue(game.hasFlipperHackTargets)
+        XCTAssertTrue(game.canStartCameraHack)
+        XCTAssertEqual(game.flipperHackDescription, "Hack camera")
+        game.startFlipperHack()
+        XCTAssertEqual(game.hackingCameraID, camera.id)
+        game.tick(1.1)
+        XCTAssertEqual(game.hackingProgress, 0.5, accuracy: 0.02)
+
+        game.tick(1.2)
+
+        XCTAssertNil(game.hackingCameraID)
+        XCTAssertTrue(game.disabledSecurityCameraIDs.contains(camera.id))
+        XCTAssertEqual(game.upgradePoints, pointsBeforeHack + GameSession.flipperHackReward)
+        XCTAssertEqual(game.securityCameraHeading(camera), camera.heading, accuracy: 0.0001)
+        XCTAssertTrue(game.securityCameraVisionDistances(for: camera, rayCount: 5).allSatisfy { $0 == 0 })
+        let forward = SIMD2<Float>(-sin(camera.heading), -cos(camera.heading))
+        XCTAssertFalse(game.securityCameraCanSee(camera.position + forward, camera: camera))
+
+        let room = RobotFactory.makeTrainingRoom(level: game.levelIndex, puzzle: game.puzzle)
+        RobotFactory.applyPuzzleState(to: room, session: game)
+        XCTAssertFalse(room.findEntity(named: "Security Camera Beam \(camera.id)")?.isEnabled ?? true)
+    }
+
     func testSecurityCameraDetectionAndRedVisionFanStopAtWalls() {
         let camera = PuzzleSecurityCamera(id: 0, position: [0, 2], heading: 0, sweep: 0, range: 8)
         let wall = PuzzleBarrier(center: [0, 0], size: [8, 0.2])

@@ -547,16 +547,24 @@ import UIKit
             button.scale = .init(repeating: session.isHackingDoor ? 0.85 + Float(sin(session.elapsed * 9)) * 0.18 : 1)
         }
         for camera in session.puzzle.securityCameras {
+            let isDisabled = session.disabledSecurityCameraIDs.contains(camera.id)
             room.findEntity(named: "Security Camera \(camera.id)")?.orientation = simd_quatf(angle: session.securityCameraHeading(camera), axis: [0, 1, 0])
-            if let beam = room.findEntity(named: "Security Camera Beam \(camera.id)") as? ModelEntity,
-               let visionMesh = securityCameraVisionMesh(
-                   camera: camera,
-                   distances: session.securityCameraVisionDistances(for: camera, rayCount: securityCameraVisionRayCount)
-               ) {
-                beam.model?.mesh = visionMesh
+            if let beam = room.findEntity(named: "Security Camera Beam \(camera.id)") as? ModelEntity {
+                beam.isEnabled = !isDisabled
+                if !isDisabled,
+                   let visionMesh = securityCameraVisionMesh(
+                       camera: camera,
+                       distances: session.securityCameraVisionDistances(for: camera, rayCount: securityCameraVisionRayCount)
+                   ) {
+                    beam.model?.mesh = visionMesh
+                }
             }
             if let lens = room.findEntity(named: "Security Camera Lens \(camera.id)") as? ModelEntity {
-                lens.model?.materials = [UnlitMaterial(color: session.isSecurityAlerted ? .systemRed : .systemYellow)]
+                let color: UIColor = isDisabled ? .systemGreen
+                    : session.hackingCameraID == camera.id ? .systemYellow
+                    : session.isSecurityAlerted ? .systemRed : .systemYellow
+                lens.model?.materials = [UnlitMaterial(color: color)]
+                lens.scale = .init(repeating: session.hackingCameraID == camera.id ? 0.85 + Float(sin(session.elapsed * 9)) * 0.18 : 1)
             }
         }
         for conveyor in session.puzzle.conveyors {

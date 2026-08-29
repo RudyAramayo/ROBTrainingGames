@@ -248,13 +248,13 @@ private struct VisionControlDeck: View {
                     Button(session.meleeWeapon.displayName, systemImage: "bolt.fill") { session.saberAttack() }
                         .buttonStyle(.borderedProminent)
                         .tint(.pink)
-                    if session.level.requiresKey && !session.doorOpen {
-                        Button(session.doorHackDescription, systemImage: "lock.open.trianglebadge.exclamationmark") {
-                            session.startDoorHack()
+                    if session.hasFlipperHackTargets {
+                        Button(session.flipperHackDescription, systemImage: "dot.radiowaves.left.and.right") {
+                            session.startFlipperHack()
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(.orange)
-                        .disabled(!session.canStartDoorHack)
+                        .tint(session.isHackingCamera || session.isHackingDoor ? .yellow : session.canStartCameraHack ? .cyan : session.canStartDoorHack ? .orange : .gray)
+                        .disabled(!session.canStartFlipperHack)
                     }
                     VisionLoadoutMenu(session: session, compact: true)
                 }

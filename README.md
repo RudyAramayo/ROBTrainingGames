@@ -4,7 +4,7 @@ A shared educational game for iPhone, iPad, and Apple Vision Pro that matches th
 
 ## Experiences
 
-- **Shared campaign:** fifteen matching missions in expanded arenas with coordinated arrow driving, animated directional conveyor chevrons, Flipper Zero door hacks, security-camera stealth zones, larger energy-cell routes, non-regenerating ROB shields, shield and repair pickups, battle-funded upgrade bays between levels, shared drive-and-laser energy management, reinforced campaign bosses, enemy-contact damage, level restart, scoring, and increasingly difficult route-planning challenges.
+- **Shared campaign:** fifteen matching missions in expanded arenas with coordinated arrow driving, animated directional conveyor chevrons, Flipper Zero door and security-camera hacks, security-camera stealth zones, larger energy-cell routes, non-regenerating ROB shields, shield and repair pickups, battle-funded upgrade bays between levels, shared drive-and-laser energy management, reinforced campaign bosses, enemy-contact damage, level restart, scoring, and increasingly difficult route-planning challenges.
 - **Active combat:** both AMBER arm assemblies alternate wide dual-saber sweeps and trigger a torso spin on the third consecutive attack. Ranged loadouts fire collision-tested projectiles; Twin Blasters launch two visible beams and gain independent two-target locks after the Targeting Computer upgrade, while spider bots and Dalek-style sentry robots coordinate increasingly dense counterattacks.
 - **Matching keyboard controls:** use arrow keys or `WASD` to drive, press `Space` repeatedly for the saber combo, and hold `Q` to charge the shoulder laser on the website, iPad/iPhone with a hardware keyboard, and Vision Pro with a connected keyboard.
 - **Vision Pro tabletop controls:** place the complete scaled arena in a movable volumetric window, pinch and drag independent left/right tread pads with either hand, use both sticks plus action buttons on a gamepad, or drive each tread with its matching member of a paired spatial-controller set.
@@ -31,6 +31,6 @@ Run the shared campaign tests on an iOS Simulator with `xcodebuild test -scheme 
 
 ## Cross-platform gameplay sync
 
-`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.06`.
+`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.07`.
 
 Before App Store submission, add production icons/screenshots, signing, privacy review, age rating, support URLs, and device testing. Keep lessons synchronized with `Presentation/ROB-Books/ROBOT_GAME_CURRICULUM.md` as the books evolve.
