@@ -42,6 +42,7 @@ ROB Training includes:
 • Dual-saber combos and a chargeable shoulder laser
 • Original procedural techno music and robot effects
 • A RealityKit AR lab for placing ROB in your room
+• Encrypted AutoNet local deathmatches for up to four nearby pilots, with arena voting and game or AR views
 • A component explorer covering ROB's drive base, power, Cerebro, sensors, AMBER arms, and safety layer
 • Optional on-device ROB Voice using Apple speech recognition and Apple Intelligence when available
 
@@ -73,6 +74,7 @@ ROB Training Vision includes:
 • Wide saber swings, a fully extended spin attack, and chargeable laser shots
 • Original generated techno music and procedural robot sound effects
 • Keyboard and spatial control panels
+• Encrypted AutoNet local deathmatches for up to four nearby iPhone, iPad, and Vision Pro pilots
 • Optional on-device ROB Voice using Apple speech recognition and Apple Intelligence when available
 
 The experience is a simulation and never connects to or controls the physical robot. Voice recognition and ROB's model responses stay on device.
@@ -81,4 +83,4 @@ Explore the real ROB project at https://www.orbitusrobotics.com.
 
 ## Review notes
 
-No account or network connection is required. Start the app, choose Start in the mission toolbar, and use the matching left and right tread joysticks to drive. Trigger three consecutive Saber attacks to see the fully extended spin. Hold Laser until the target indicator is red, then release to fire. The AR Lab uses the camera only after the reviewer opens that tab and accepts the system camera permission. ROB Voice is optional and requests microphone and speech-recognition permission only after the reviewer taps Talk to ROB.
+No account or internet connection is required. Start the app, choose Start in the mission toolbar, and use the matching left and right tread joysticks to drive. Trigger three consecutive Saber attacks to see the fully extended spin. Hold Laser until the target indicator is red, then release to fire. The optional Battle tab requests local-network access so nearby copies of ROB Training can discover one another; traffic is limited to the local Multipeer Connectivity session and uses required encryption. The AR Lab uses the camera only after the reviewer opens that tab and accepts the system camera permission. ROB Voice is optional and requests microphone and speech-recognition permission only after the reviewer taps Talk to ROB.

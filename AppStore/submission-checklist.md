@@ -57,6 +57,7 @@ Automated launch checks do not establish full gameplay quality. Complete the fol
 - [ ] Complete all 15 missions, including cells, keys, locked doors, Mission Control docking, progression, scoring, retry, and completion states.
 - [ ] Verify music and sound-effect controls, interruption recovery, mute behavior, and audio mixing.
 - [ ] Test AR Lab permission handling, surface placement, scale, movement, and return to the standard app.
+- [ ] On two to four physical devices, allow local-network access and confirm AutoNet discovery, the four-player cap, every-player arena voting, game-controller input, movement/projectile synchronization, scoring, respawning, next-arena voting, disconnect handling, and both standard and AR battle views.
 - [ ] Test ROB Voice opt-in, microphone and speech permission paths, denial handling, supported-device behavior, and offline behavior.
 - [ ] Repeat the complete control and layout pass on a physical iPad in every supported orientation.
 
@@ -69,6 +70,7 @@ Automated launch checks do not establish full gameplay quality. Complete the fol
 - [ ] Verify motion remains comfortable during pursuit, spin attacks, projectiles, damage feedback, and mission transitions.
 - [ ] Test microphone and speech permissions, ROB Voice opt-in, denial handling, and offline behavior in visionOS.
 - [ ] Complete a sustained play session on Apple Vision Pro hardware when hardware is available.
+- [ ] Join an iPhone/iPad AutoNet battle from Vision Pro and verify the shared vote, arena, robots, projectiles, scoreboard, controller input, and next-round flow.
 
 ## Website regression gate
 
@@ -83,7 +85,7 @@ Automated launch checks do not establish full gameplay quality. Complete the fol
 
 ## Privacy and leaderboard boundary
 
-Version 1.0 of the native iOS and visionOS apps stores scores locally and does not contain the website’s CloudKit leaderboard integration. The current native **Data Not Collected** declaration matches those builds.
+Version 1.0 of the native iOS and visionOS apps stores scores locally and does not contain the website’s CloudKit leaderboard integration. AutoNet battle packets remain inside the nearby encrypted Multipeer Connectivity session and are not collected by Orbitus Robotics. The current native **Data Not Collected** declaration matches those builds.
 
 - [ ] If CloudKit sync, accounts, analytics, telemetry, advertising, or any other data transfer is added to either native app, reassess and update App Privacy before submission.
 - [ ] Do not claim native cross-device or public leaderboard sync in the store listing unless that feature is present in the selected build and has passed review.

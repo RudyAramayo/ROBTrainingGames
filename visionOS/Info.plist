@@ -24,6 +24,12 @@
 	<string>public.app-category.education</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Talk with ROB during simulated spatial robotics missions.</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Find nearby ROB Training simulators for local multiplayer robot battles.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_rob-battle._tcp</string>
+    </array>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>ROB listens to your questions and converts them to text for an on-device conversation.</string>
     <key>UIApplicationSceneManifest</key>

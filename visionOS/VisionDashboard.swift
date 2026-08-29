@@ -5,6 +5,7 @@ struct VisionDashboard: View {
     @Bindable var session: GameSession
     @Bindable var voice: RobotVoice
     @Bindable var controller: VisionGameControllerInput
+    @Bindable var battle: ROBBattleCoordinator
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
     @Environment(\.openWindow) private var openWindow
@@ -29,6 +30,10 @@ struct VisionDashboard: View {
                     ForEach(session.components) { component in
                         Button(component.name) { session.selectedComponent = component }
                     }
+                }
+                Section("Nearby Battle") {
+                    Label(battle.networkPlayerDescription, systemImage: "dot.radiowaves.left.and.right")
+                    Text("AutoNet · up to 4 pilots")
                 }
             }
             .navigationTitle("ROB Training")
@@ -78,6 +83,10 @@ struct VisionDashboard: View {
                     Button(session.musicEnabled ? "Generated techno on" : "Music off", systemImage: session.musicEnabled ? "music.note" : "speaker.slash") {
                         session.toggleMusic()
                     }
+                    Button("Open AutoNet Battle", systemImage: "person.3.fill") {
+                        battle.startDiscovery()
+                        openWindow(id: "ROBDeathmatch")
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 Text("Tabletop placement: grab the volume's window bar, move it onto a table, then rotate or resize the volume until the whole arena is comfortable to view.")
@@ -96,7 +105,7 @@ struct VisionDashboard: View {
             .padding(28)
         }
         .robGameKeyboardControls(session: session)
-        .onAppear { controller.start(session: session) }
+        .onAppear { controller.start(session: session); battle.startDiscovery() }
     }
 }
 

@@ -8,6 +8,7 @@ A shared educational game for iPhone, iPad, and Apple Vision Pro that matches th
 - **Active combat:** both AMBER arm assemblies alternate wide dual-saber sweeps and trigger a torso spin on the third consecutive attack. Ranged loadouts fire collision-tested projectiles; Twin Blasters launch two visible beams and gain independent two-target locks after the Targeting Computer upgrade, while spider bots and Dalek-style sentry robots coordinate increasingly dense counterattacks.
 - **Matching keyboard controls:** use arrow keys or `WASD` to drive, press `Space` repeatedly for the saber combo, and hold `Q` to charge the shoulder laser on the website, iPad/iPhone with a hardware keyboard, and Vision Pro with a connected keyboard.
 - **Vision Pro tabletop controls:** place the complete scaled arena in a movable volumetric window, pinch and drag independent left/right tread pads with either hand, use both sticks plus action buttons on a gamepad, or drive each tread with its matching member of a paired spatial-controller set.
+- **AutoNet local deathmatch:** nearby iPhone, iPad, and Vision Pro simulators securely discover and join one another without an address or lobby code. Up to four pilots—one simulator and optional game controller each—vote between Neon Foundry, Orbital Ring, Reactor Grid, and Shadow Yard, then battle first-to-five in the standard view, spatial view, or iOS AR.
 - **Generative soundtrack:** an original procedural techno engine synthesizes its kick, hats, bass sequence, and level-reactive tempo locally at runtime. It does not download music or reuse a copyrighted recording.
 - **iOS game:** the shared campaign rendered with RealityKit controls and local high scores.
 - **iOS AR missions:** place the current campaign arena on a horizontal surface, then drive, fight, collect cells, unlock doors, and advance levels over the live camera view. AR shares health, weapons, objectives, collision, and progress with the standard and visionOS missions.
@@ -25,7 +26,7 @@ xcodegen generate
 open ROBTrainingGames.xcodeproj
 ```
 
-Select `ROBTrainingiOS` or `ROBTrainingVision`, choose your signing team, and run on a compatible device. AR camera behavior must be verified on physical hardware. No robot-control connection is included: every mission is simulated.
+Select `ROBTrainingiOS` or `ROBTrainingVision`, choose your signing team, and run on a compatible device. AR camera behavior and AutoNet discovery must be verified on physical hardware. Nearby battle uses the local-network permission and the `_rob-battle._tcp` Bonjour service with required Multipeer Connectivity encryption. No robot-control connection is included: every mission is simulated.
 
 Run the shared campaign tests on an iOS Simulator with `xcodebuild test -scheme ROBTrainingiOS -destination 'platform=iOS Simulator,name=iPhone 17'`. Build the `ROBTrainingVision` scheme against a visionOS Simulator to verify the shared combat renderer and spatial controls.
 

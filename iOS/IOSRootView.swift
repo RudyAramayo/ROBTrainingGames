@@ -4,6 +4,7 @@ import SwiftUI
 struct IOSRootView: View {
     @Bindable var session: GameSession
     @Bindable var voice: RobotVoice
+    @Bindable var battle: ROBBattleCoordinator
     @Environment(\.scenePhase) private var scenePhase
     @State private var fullScreenExperience: FullScreenExperience?
 
@@ -13,6 +14,8 @@ struct IOSRootView: View {
                 .tabItem { Label("Play", systemImage: "gamecontroller.fill") }
             ARLabLaunchView(session: session, launch: launchARLab)
                 .tabItem { Label("AR Lab", systemImage: "arkit") }
+            ROBBattleLaunchView(battle: battle, launchGame: launchBattle, launchAR: launchARBattle)
+                .tabItem { Label("Battle", systemImage: "person.3.fill") }
             ComponentExplorer(session: session).tabItem { Label("ROB", systemImage: "cpu") }
             RobotVoiceScreen(voice: voice, session: session).tabItem { Label("Voice", systemImage: "waveform") }
         }
@@ -26,6 +29,12 @@ struct IOSRootView: View {
                     .interactiveDismissDisabled()
             case .arLab:
                 ARLabView(session: session, onExit: exitARLab)
+                    .interactiveDismissDisabled()
+            case .battle:
+                ROBBattleView(battle: battle, onExit: exitBattle)
+                    .interactiveDismissDisabled()
+            case .arBattle:
+                ROBARBattleView(battle: battle, onExit: exitBattle)
                     .interactiveDismissDisabled()
             }
         }
@@ -56,11 +65,20 @@ struct IOSRootView: View {
         session.pause()
         fullScreenExperience = nil
     }
+
+    private func launchBattle() { fullScreenExperience = .battle }
+    private func launchARBattle() { fullScreenExperience = .arBattle }
+    private func exitBattle() {
+        battle.stopDrive()
+        fullScreenExperience = nil
+    }
 }
 
 private enum FullScreenExperience: String, Identifiable {
     case mission
     case arLab
+    case battle
+    case arBattle
 
     var id: String { rawValue }
 }

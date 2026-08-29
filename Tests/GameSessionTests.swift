@@ -1194,4 +1194,89 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.enemies[targetIndex].shields, shields - 2)
         XCTAssertTrue(game.message.localizedCaseInsensitiveContains("hammer"))
     }
+
+    func testAutoNetBattleRequiresEveryPilotVoteAndResolvesTieDeterministically() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha")
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
+
+        battle.testReceive(.init(kind: .hello, sender: remote))
+        XCTAssertEqual(battle.playerCount, 2)
+        XCTAssertTrue(battle.isHost)
+        XCTAssertFalse(battle.canStartMatch)
+
+        battle.vote(for: .neonFoundry)
+        battle.testReceive(.init(kind: .vote, sender: remote, vote: .orbitalRing))
+
+        XCTAssertTrue(battle.allPlayersHaveVoted)
+        XCTAssertTrue(battle.canStartMatch)
+        battle.startMatch()
+        XCTAssertEqual(battle.phase, .playing)
+        XCTAssertEqual(battle.arena, .neonFoundry, "A tied vote should use the stable arena ordering")
+        XCTAssertEqual(battle.allRobotStates.count, 2)
+    }
+
+    func testAutoNetBattleCapsLobbyAtFourPilots() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha")
+        for index in 2...6 {
+            let id = UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", index))!
+            let peer = ROBBattlePlayerIdentity(id: id, name: "Pilot \(index)", transportName: "ROB-\(index)", colorIndex: index % 4)
+            battle.testReceive(.init(kind: .hello, sender: peer))
+        }
+
+        XCTAssertEqual(battle.playerCount, ROBBattleCoordinator.maximumPlayers)
+    }
+
+    func testDeathmatchProjectileKnockoutScoresAndRespawnsROB() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha")
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
+        battle.testReceive(.init(kind: .hello, sender: remote))
+        battle.vote(for: .reactorGrid)
+        battle.testReceive(.init(kind: .vote, sender: remote, vote: .reactorGrid))
+        battle.startMatch()
+
+        let position = battle.localRobot.position
+        let hit = ROBBattleProjectile(
+            id: UUID(), ownerID: remoteID, x: position.x, z: position.z,
+            velocityX: 0, velocityZ: 0, remaining: 1, damage: 28
+        )
+        battle.testReceive(.init(kind: .projectile, sender: remote, projectile: hit))
+        battle.tick(0.01)
+        XCTAssertEqual(battle.localRobot.shields, 22)
+        XCTAssertEqual(battle.localRobot.health, 100)
+
+        let knockout = ROBBattleProjectile(
+            id: UUID(), ownerID: remoteID, x: position.x, z: position.z,
+            velocityX: 0, velocityZ: 0, remaining: 1, damage: 150
+        )
+        battle.testReceive(.init(kind: .projectile, sender: remote, projectile: knockout))
+        battle.tick(0.01)
+        XCTAssertFalse(battle.localRobot.isAlive)
+        XCTAssertEqual(battle.scores[remoteID], 1)
+        XCTAssertEqual(battle.deaths[localID], 1)
+
+        for _ in 0..<31 { battle.tick(0.1) }
+        XCTAssertTrue(battle.localRobot.isAlive)
+        XCTAssertEqual(battle.localRobot.health, 100)
+        XCTAssertEqual(battle.localRobot.shields, 50)
+    }
+
+    func testBattlePacketsRoundTripAllSynchronizedState() throws {
+        let player = ROBBattlePlayerIdentity(id: UUID(), name: "Pilot", transportName: "ROB-TEST", colorIndex: 2)
+        let projectile = ROBBattleProjectile(
+            id: UUID(), ownerID: player.id, x: 1, z: -2,
+            velocityX: 4, velocityZ: -5, remaining: 2, damage: 28
+        )
+        let packet = ROBBattlePacket(kind: .projectile, sender: player, projectile: projectile)
+
+        let decoded = try JSONDecoder().decode(ROBBattlePacket.self, from: JSONEncoder().encode(packet))
+
+        XCTAssertEqual(decoded.kind, .projectile)
+        XCTAssertEqual(decoded.sender, player)
+        XCTAssertEqual(decoded.projectile, projectile)
+    }
 }
