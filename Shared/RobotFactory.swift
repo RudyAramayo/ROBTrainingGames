@@ -12,6 +12,17 @@ import UIKit
         }
     }
 
+    static func faceColor(for color: ROBFaceColor) -> UIColor {
+        switch color {
+        case .lime: UIColor(red: 0.36, green: 1, blue: 0.42, alpha: 1)
+        case .cyan: UIColor(red: 0.32, green: 0.91, blue: 1, alpha: 1)
+        case .amber: UIColor(red: 1, green: 0.71, blue: 0.23, alpha: 1)
+        case .magenta: UIColor(red: 1, green: 0.38, blue: 0.82, alpha: 1)
+        case .white: UIColor(red: 0.95, green: 0.97, blue: 1, alpha: 1)
+        case .red: UIColor(red: 1, green: 0.32, blue: 0.41, alpha: 1)
+        }
+    }
+
     static func makeROB(
         componentMode: Bool = false,
         arPresentation: Bool = false
@@ -137,7 +148,23 @@ import UIKit
 
         part("Sensor Mast", [0.1, 0.48, 0.1], [0, 1.2, 0], .gray, parent: torso)
         let head = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: .black, isMetallic: !arPresentation)]); head.name = "Camera Head"; head.position = [0, 1.52, 0]; head.scale.z = 0.82; torso.addChild(head)
-        cylinder("Head Camera", radius: 0.055, height: 0.045, position: [0, 1.52, -0.2], color: .systemGreen, faceForward: true, parent: torso)
+        let smileMaterial = UnlitMaterial(color: faceColor(for: .lime))
+        let smileParts: [(String, Float, Float, Float)] = [
+            ("Face Smiley Left Eye", -0.075, 1.565, 0.026),
+            ("Face Smiley Right Eye", 0.075, 1.565, 0.026),
+            ("Face Smiley Left Corner", -0.09, 1.475, 0.022),
+            ("Face Smiley Left Smile", -0.045, 1.45, 0.022),
+            ("Face Smiley Center Smile", 0, 1.44, 0.022),
+            ("Face Smiley Right Smile", 0.045, 1.45, 0.022),
+            ("Face Smiley Right Corner", 0.09, 1.475, 0.022),
+        ]
+        for (name, x, y, radius) in smileParts {
+            let pixel = ModelEntity(mesh: .generateCylinder(height: 0.018, radius: radius), materials: [smileMaterial])
+            pixel.name = name
+            pixel.position = [x, y, -0.202]
+            pixel.orientation = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
+            torso.addChild(pixel)
+        }
         root.components.set(InputTargetComponent())
         root.generateCollisionShapes(recursive: true)
         root.collision = CollisionComponent(shapes: [
@@ -223,6 +250,14 @@ import UIKit
                     (robot.findEntity(named: name) as? ModelEntity)?.model?.materials = [material]
                 }
             }
+        }
+        let smileMaterial = UnlitMaterial(color: faceColor(for: session.faceColor))
+        for name in [
+            "Face Smiley Left Eye", "Face Smiley Right Eye", "Face Smiley Left Corner",
+            "Face Smiley Left Smile", "Face Smiley Center Smile", "Face Smiley Right Smile",
+            "Face Smiley Right Corner",
+        ] {
+            (robot.findEntity(named: name) as? ModelEntity)?.model?.materials = [smileMaterial]
         }
         robot.findEntity(named: "Right Shoulder Gatling")?.isEnabled = session.rangedWeapon == .shoulderGatling
         robot.findEntity(named: "Twin Blasters")?.isEnabled = session.rangedWeapon == .twinBlasters

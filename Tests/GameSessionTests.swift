@@ -766,6 +766,10 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNotNil(robot.findEntity(named: "Flipper Zero Hacker"))
         XCTAssertNotNil(robot.findEntity(named: "Gatling Lock Indicator"))
         XCTAssertNotNil(robot.findEntity(named: "Shoulder Laser Beam"))
+        XCTAssertNil(robot.findEntity(named: "Head Camera"))
+        XCTAssertNotNil(robot.findEntity(named: "Face Smiley Left Eye"))
+        XCTAssertNotNil(robot.findEntity(named: "Face Smiley Right Eye"))
+        XCTAssertNotNil(robot.findEntity(named: "Face Smiley Center Smile"))
         XCTAssertNotNil(robot.findEntity(named: "Left Tri-Wheel Tread"))
         XCTAssertNotNil(robot.findEntity(named: "Right Tri-Wheel Tread"))
         for side in ["Left", "Right"] {
@@ -860,16 +864,19 @@ final class GameSessionTests: XCTestCase {
         let game = GameSession(audioEnabled: false, progressStore: defaults)
         for _ in 0..<5 { completeCurrentLevel(game) }
         game.selectFinish(.rescueOrange)
+        game.selectFaceColor(.magenta)
         game.selectRangedWeapon(.twinBlasters)
         game.reset()
 
         XCTAssertEqual(game.highestCompletedLevel, 5)
         XCTAssertEqual(game.robotFinish, .rescueOrange)
+        XCTAssertEqual(game.faceColor, .magenta)
         XCTAssertEqual(game.rangedWeapon, .twinBlasters)
 
         let restored = GameSession(audioEnabled: false, progressStore: defaults)
         XCTAssertEqual(restored.highestCompletedLevel, 5)
         XCTAssertEqual(restored.robotFinish, .rescueOrange)
+        XCTAssertEqual(restored.faceColor, .magenta)
         XCTAssertEqual(restored.rangedWeapon, .twinBlasters)
     }
 

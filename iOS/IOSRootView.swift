@@ -566,6 +566,28 @@ struct ComponentExplorer: View {
                         .workshopCard()
 
                         VStack(alignment: .leading, spacing: 12) {
+                            Label("Smiley Color", systemImage: "face.smiling").font(.title3.bold())
+                            Text("Changes the glowing smile on ROB's camera head everywhere ROB appears.").font(.caption).foregroundStyle(.secondary)
+                            LazyVGrid(columns: finishColumns, spacing: 10) {
+                                ForEach(ROBFaceColor.allCases) { color in
+                                    Button { session.selectFaceColor(color) } label: {
+                                        VStack(spacing: 7) {
+                                            Image(systemName: "face.smiling")
+                                                .font(.system(size: 34, weight: .bold))
+                                                .foregroundStyle(Color(uiColor: RobotFactory.faceColor(for: color)))
+                                            Text(color.displayName).font(.caption.bold())
+                                            Image(systemName: session.faceColor == color ? "checkmark.circle.fill" : "circle").foregroundStyle(.cyan)
+                                        }
+                                        .frame(maxWidth: .infinity).padding(.vertical, 10)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .background(session.faceColor == color ? .cyan.opacity(0.18) : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+                                }
+                            }
+                        }
+                        .workshopCard()
+
+                        VStack(alignment: .leading, spacing: 12) {
                             Label("Ranged Weapons", systemImage: "scope").font(.title3.bold())
                             ForEach(ROBRangedWeapon.allCases) { weapon in
                                 LoadoutOption(
@@ -602,7 +624,10 @@ struct ComponentExplorer: View {
                             Text("Select a system to highlight where it lives inside ROB.")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
-                            InsideROBDiagram(component: selectedComponent)
+                            InsideROBDiagram(
+                                component: selectedComponent,
+                                faceColor: Color(uiColor: RobotFactory.faceColor(for: session.faceColor))
+                            )
 
                             ForEach(session.components) { component in
                                 let selected = component.id == selectedComponent.id
@@ -691,6 +716,7 @@ private struct WorkshopRobotPreview: View {
     }
 
     private var finish: Color { Color(uiColor: RobotFactory.finishColor(for: session.robotFinish)) }
+    private var smileColor: Color { Color(uiColor: RobotFactory.faceColor(for: session.faceColor)) }
 
     private var robotIllustration: some View {
         ZStack {
@@ -717,10 +743,10 @@ private struct WorkshopRobotPreview: View {
             RoundedRectangle(cornerRadius: 18).fill(finish.gradient).frame(width: 142, height: 104).overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.55), lineWidth: 2)).offset(y: 24)
             Rectangle().fill(.gray).frame(width: 18, height: 64).offset(y: -54)
             Ellipse().fill(finish.gradient).frame(width: 92, height: 65).overlay(Ellipse().stroke(.cyan.opacity(0.85), lineWidth: 3)).offset(y: -94)
-            HStack(spacing: 17) {
-                Circle().fill(.cyan).frame(width: 14, height: 14)
-                Circle().fill(.green).frame(width: 14, height: 14)
-            }.offset(y: -95)
+            Image(systemName: "face.smiling")
+                .font(.system(size: 36, weight: .bold))
+                .foregroundStyle(smileColor)
+                .offset(y: -95)
             HStack(spacing: 26) {
                 Circle().fill(.blue).frame(width: 25, height: 25)
                 Circle().fill(.cyan).frame(width: 25, height: 25)
@@ -772,6 +798,7 @@ private struct WorkshopRobotPreview: View {
 
 private struct InsideROBDiagram: View {
     let component: ROBComponent
+    let faceColor: Color
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -850,11 +877,10 @@ private struct InsideROBDiagram: View {
                 .overlay(Ellipse().stroke(.cyan.opacity(0.75), lineWidth: 2))
                 .frame(width: 76, height: 52)
                 .offset(y: -86)
-            HStack(spacing: 15) {
-                Circle().fill(.cyan).frame(width: 10, height: 10)
-                Circle().fill(.green).frame(width: 10, height: 10)
-            }
-            .offset(y: -86)
+            Image(systemName: "face.smiling")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(faceColor)
+                .offset(y: -86)
         }
         .frame(width: 280, height: 230)
     }

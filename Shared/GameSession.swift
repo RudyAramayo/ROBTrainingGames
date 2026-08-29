@@ -84,6 +84,27 @@ enum ROBFinish: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum ROBFaceColor: String, CaseIterable, Identifiable, Sendable {
+    case lime
+    case cyan
+    case amber
+    case magenta
+    case white
+    case red
+
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .lime: "Lime"
+        case .cyan: "Cyan"
+        case .amber: "Amber"
+        case .magenta: "Magenta"
+        case .white: "White"
+        case .red: "Red"
+        }
+    }
+}
+
 enum ROBRangedWeapon: String, CaseIterable, Identifiable, Sendable {
     case shoulderGatling
     case twinBlasters
@@ -222,7 +243,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.08.30"
+    static let gameplayRulesetVersion = "2026.08.31"
     static let robotCollisionRadius: Float = 0.62
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
@@ -297,6 +318,7 @@ final class GameSession {
     var situationCount = 0
     private(set) var highestCompletedLevel = 0
     private(set) var robotFinish: ROBFinish = .graphite
+    private(set) var faceColor: ROBFaceColor = .lime
     private(set) var rangedWeapon: ROBRangedWeapon = .shoulderGatling
     private(set) var meleeWeapon: ROBMeleeWeapon = .dualSabers
     private(set) var speedUpgradeLevel = 0
@@ -347,6 +369,7 @@ final class GameSession {
         if let store = self.progressStore {
             highestCompletedLevel = min(levels.count, max(0, store.integer(forKey: "robHighestCompletedLevel")))
             robotFinish = ROBFinish(rawValue: store.string(forKey: "robRobotFinish") ?? "") ?? .graphite
+            faceColor = ROBFaceColor(rawValue: store.string(forKey: "robFaceColor") ?? "") ?? .lime
             let savedRanged = ROBRangedWeapon(rawValue: store.string(forKey: "robRangedWeapon") ?? "") ?? .shoulderGatling
             let savedMelee = ROBMeleeWeapon(rawValue: store.string(forKey: "robMeleeWeapon") ?? "") ?? .dualSabers
             rangedWeapon = savedRanged.requiredCompletedLevel <= highestCompletedLevel ? savedRanged : .shoulderGatling
@@ -398,6 +421,11 @@ final class GameSession {
         robotFinish = finish
         progressStore?.set(finish.rawValue, forKey: "robRobotFinish")
         message = "\(finish.displayName) finish equipped."
+    }
+    func selectFaceColor(_ color: ROBFaceColor) {
+        faceColor = color
+        progressStore?.set(color.rawValue, forKey: "robFaceColor")
+        message = "\(color.displayName) smile equipped."
     }
     func selectRangedWeapon(_ weapon: ROBRangedWeapon) {
         guard isUnlocked(weapon) else {

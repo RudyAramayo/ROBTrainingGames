@@ -89,6 +89,13 @@ private struct VisionLoadoutMenu: View {
                     }
                 }
             }
+            Section("Smiley Color") {
+                ForEach(ROBFaceColor.allCases) { color in
+                    Button { session.selectFaceColor(color) } label: {
+                        Label(color.displayName, systemImage: session.faceColor == color ? "checkmark.circle.fill" : "face.smiling")
+                    }
+                }
+            }
             Section("Ranged Weapons") {
                 ForEach(ROBRangedWeapon.allCases) { weapon in
                     Button { session.selectRangedWeapon(weapon) } label: {
