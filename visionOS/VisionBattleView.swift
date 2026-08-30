@@ -8,12 +8,19 @@ struct VisionBattleWorkshop: View {
     var body: some View {
         Group {
             if battle.phase == .playing {
-                ROBBattleRealityScene(battle: battle, arenaScale: 0.075, arenaPosition: [0, -0.32, 0])
-                    .ornament(attachmentAnchor: .scene(.top)) {
-                        battleStatus.padding(12)
+                ROBBattleRealityScene(battle: battle, arenaScale: 0.068, arenaPosition: [0, 0.02, -0.08])
+                    .ornament(attachmentAnchor: .scene(.top), contentAlignment: .front) {
+                        battleStatus
+                            .padding(12)
+                            .offset(y: -38)
+                            .offset(z: 180)
                     }
-                    .ornament(attachmentAnchor: .scene(.bottom)) {
-                        VisionBattleControls(battle: battle).frame(width: 760).padding(12)
+                    .ornament(attachmentAnchor: .scene(.bottom), contentAlignment: .front) {
+                        VisionBattleControls(battle: battle)
+                            .frame(width: 760)
+                            .padding(12)
+                            .offset(y: 92)
+                            .offset(z: 220)
                     }
             } else {
                 lobby

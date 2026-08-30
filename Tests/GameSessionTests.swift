@@ -118,6 +118,22 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.collectedCells, 1)
     }
 
+    func testMissionToggleStartsPausesAndResumesForVisionControllerMenuButton() {
+        let game = GameSession(audioEnabled: false)
+
+        game.toggleMission()
+        XCTAssertTrue(game.isRunning)
+        XCTAssertFalse(game.isPaused)
+
+        game.toggleMission()
+        XCTAssertFalse(game.isRunning)
+        XCTAssertTrue(game.isPaused)
+
+        game.toggleMission()
+        XCTAssertTrue(game.isRunning)
+        XCTAssertFalse(game.isPaused)
+    }
+
     func testLevelTwoHasAVisibleReachableKeyOnTheStartingSide() {
         let game = GameSession(audioEnabled: false)
         game.levelIndex = 1
@@ -162,6 +178,24 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(lightRig.children.count, 3)
         XCTAssertEqual(lightRig.children.filter { $0.components[PointLightComponent.self] != nil }.count, 2)
         XCTAssertEqual(lightRig.children.filter { $0.components[DirectionalLightComponent.self] != nil }.count, 1)
+    }
+
+    func testVirtualArenasUsePBRSurfaceMaterialsAndFourLightRig() {
+        let game = GameSession(audioEnabled: false)
+        let room = RobotFactory.makeTrainingRoom(level: game.levelIndex, puzzle: game.puzzle)
+        let floor = room.findEntity(named: "Training Floor") as? ModelEntity
+        let wall = room.findEntity(named: "North Training Wall") as? ModelEntity
+        let lightRig = room.findEntity(named: "Arena Light Rig")
+
+        XCTAssertTrue(floor?.model?.materials.first is PhysicallyBasedMaterial)
+        XCTAssertTrue(wall?.model?.materials.first is PhysicallyBasedMaterial)
+        XCTAssertEqual(lightRig?.children.filter { $0.components[PointLightComponent.self] != nil }.count, 3)
+        XCTAssertEqual(lightRig?.children.filter { $0.components[DirectionalLightComponent.self] != nil }.count, 1)
+
+        let battleArena = ROBBattleFactory.makeArena(.neonFoundry)
+        let battleFloor = battleArena.findEntity(named: "Deathmatch Floor") as? ModelEntity
+        XCTAssertTrue(battleFloor?.model?.materials.first is PhysicallyBasedMaterial)
+        XCTAssertNotNil(battleArena.findEntity(named: "Arena Light Rig"))
     }
 
     func testARLabRendersAndUpdatesThePlayableMission() {

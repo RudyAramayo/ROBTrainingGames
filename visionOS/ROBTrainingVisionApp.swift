@@ -11,7 +11,7 @@ import SwiftUI
             TabletopROBWorkshop(session: session, controller: controller)
         }
         .windowStyle(.volumetric)
-        .defaultSize(width: 1.15, height: 0.78, depth: 1.15, in: .meters)
+        .defaultSize(width: 1.3, height: 0.94, depth: 1.3, in: .meters)
         WindowGroup(id: "ROBDeathmatch") {
             VisionBattleWorkshop(battle: battle)
         }

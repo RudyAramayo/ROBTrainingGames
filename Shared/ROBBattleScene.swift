@@ -10,10 +10,22 @@ enum ROBBattleFactory {
         let root = Entity()
         root.name = "Deathmatch Arena \(arena.rawValue)"
         let accent = playerColors[arena.accentIndex % playerColors.count]
-        func box(_ name: String, size: SIMD3<Float>, position: SIMD3<Float>, color: UIColor) {
+        func box(
+            _ name: String,
+            size: SIMD3<Float>,
+            position: SIMD3<Float>,
+            color: UIColor,
+            material: (any RealityKit.Material)? = nil
+        ) {
+            let materials: [any RealityKit.Material]
+            if let material {
+                materials = [material]
+            } else {
+                materials = [SimpleMaterial(color: color, isMetallic: !arPresentation)]
+            }
             let entity = ModelEntity(
                 mesh: .generateBox(size: size, cornerRadius: 0.06),
-                materials: [SimpleMaterial(color: color, isMetallic: !arPresentation)]
+                materials: materials
             )
             entity.name = name
             entity.position = position
@@ -24,7 +36,8 @@ enum ROBBattleFactory {
             "Deathmatch Floor",
             size: [17.6, 0.16, 17.6],
             position: [0, -0.09, 0],
-            color: UIColor(red: 0.025, green: 0.045, blue: 0.075, alpha: arPresentation ? 0.82 : 1)
+            color: UIColor(red: 0.22, green: 0.27, blue: 0.32, alpha: arPresentation ? 0.82 : 1),
+            material: RobotFactory.arenaFloorMaterial(arPresentation: arPresentation)
         )
         for index in -8...8 {
             let color = accent.withAlphaComponent(index.isMultiple(of: 4) ? 0.58 : 0.2)
@@ -32,17 +45,19 @@ enum ROBBattleFactory {
             box("Grid Z \(index)", size: [17.2, 0.018, 0.025], position: [0, 0.015, Float(index)], color: color)
         }
         let wallColor = UIColor(red: 0.13, green: 0.18, blue: 0.24, alpha: 1)
-        box("North Wall", size: [17.8, 1.15, 0.3], position: [0, 0.55, -8.65], color: wallColor)
-        box("South Wall", size: [17.8, 1.15, 0.3], position: [0, 0.55, 8.65], color: wallColor)
-        box("West Wall", size: [0.3, 1.15, 17.8], position: [-8.65, 0.55, 0], color: wallColor)
-        box("East Wall", size: [0.3, 1.15, 17.8], position: [8.65, 0.55, 0], color: wallColor)
+        let wallMaterial = RobotFactory.arenaWallMaterial(arPresentation: arPresentation)
+        box("North Wall", size: [17.8, 1.15, 0.3], position: [0, 0.55, -8.65], color: wallColor, material: wallMaterial)
+        box("South Wall", size: [17.8, 1.15, 0.3], position: [0, 0.55, 8.65], color: wallColor, material: wallMaterial)
+        box("West Wall", size: [0.3, 1.15, 17.8], position: [-8.65, 0.55, 0], color: wallColor, material: wallMaterial)
+        box("East Wall", size: [0.3, 1.15, 17.8], position: [8.65, 0.55, 0], color: wallColor, material: wallMaterial)
 
         for (index, barrier) in arena.barriers.enumerated() {
             box(
                 "Arena Cover \(index)",
                 size: [barrier.width, 1.3, barrier.depth],
                 position: [barrier.x, 0.65, barrier.z],
-                color: index.isMultiple(of: 2) ? accent.withAlphaComponent(0.82) : wallColor
+                color: index.isMultiple(of: 2) ? accent.withAlphaComponent(0.82) : wallColor,
+                material: wallMaterial
             )
             box(
                 "Arena Cover Light \(index)",
@@ -62,6 +77,7 @@ enum ROBBattleFactory {
             pad.position = spawn + SIMD3<Float>(0, 0.04, 0)
             root.addChild(pad)
         }
+        if !arPresentation { root.addChild(RobotFactory.makeArenaLightRig(halfExtent: 8.8)) }
         return root
     }
 

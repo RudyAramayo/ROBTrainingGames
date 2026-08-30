@@ -809,6 +809,15 @@ final class GameSession {
         message = "Level \(level.id) resumed."
         return true
     }
+    func toggleMission() {
+        if isRunning {
+            _ = pause()
+        } else if isPaused {
+            _ = resume()
+        } else {
+            begin()
+        }
+    }
     func toggleMusic() { musicEnabled.toggle(); guard audioEnabled else { return }; if musicEnabled && isRunning { TechnoMusicEngine.shared.start(level: levelIndex) } else { TechnoMusicEngine.shared.stop() } }
     func setDrive(forward: Double, steering: Double) { forwardDemand = forward; steeringDemand = steering }
     func setTreads(left: Double, right: Double) {

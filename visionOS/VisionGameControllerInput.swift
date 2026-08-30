@@ -181,8 +181,8 @@ final class VisionGameControllerInput: NSObject {
         if saberPressed && !saberWasPressed { session?.saberAttack() }
         if laserPressed && !laserWasPressed { session?.beginLaserCharge() }
         if !laserPressed && laserWasPressed { session?.releaseLaserCharge() }
-        if hackPressed && !hackWasPressed { session?.startDoorHack() }
-        if menuPressed && !menuWasPressed { toggleMission() }
+        if hackPressed && !hackWasPressed { session?.startFlipperHack() }
+        if menuPressed && !menuWasPressed { session?.toggleMission() }
         saberWasPressed = saberPressed
         laserWasPressed = laserPressed
         hackWasPressed = hackPressed
@@ -201,13 +201,6 @@ final class VisionGameControllerInput: NSObject {
         } else {
             modeDescription = "Pinch and drag both tread pads"
         }
-    }
-
-    private func toggleMission() {
-        guard let session else { return }
-        if session.isRunning { _ = session.pause() }
-        else if session.isPaused { _ = session.resume() }
-        else { session.begin() }
     }
 
     private func availableSpatialSide() -> TreadSide {

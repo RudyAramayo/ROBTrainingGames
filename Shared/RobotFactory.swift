@@ -412,21 +412,121 @@ import UIKit
         return puzzle.barriers + perimeter + (puzzle.door.map { [$0] } ?? [])
     }
 
+    static func arenaFloorMaterial(arPresentation: Bool = false) -> any Material {
+        if arPresentation {
+            return SimpleMaterial(color: UIColor(white: 0.22, alpha: 0.38), isMetallic: false)
+        }
+        return arenaMaterial(
+            textureName: "arena-floor-material",
+            fallback: UIColor(white: 0.58, alpha: 1),
+            roughness: 0.7,
+            metallic: 0.18
+        )
+    }
+
+    static func arenaWallMaterial(arPresentation: Bool = false) -> any Material {
+        if arPresentation {
+            return SimpleMaterial(color: UIColor(white: 0.3, alpha: 0.82), isMetallic: false)
+        }
+        return arenaMaterial(
+            textureName: "arena-wall-material",
+            fallback: UIColor(white: 0.68, alpha: 1),
+            roughness: 0.52,
+            metallic: 0.22
+        )
+    }
+
+    static func makeArenaLightRig(halfExtent: Float) -> Entity {
+        let rig = Entity()
+        rig.name = "Arena Light Rig"
+
+        let daylight = Entity()
+        daylight.name = "Arena Directional Light"
+        daylight.look(at: [0, 0, 0], from: [-halfExtent * 0.45, halfExtent, halfExtent * 0.55], relativeTo: nil)
+        daylight.components.set(DirectionalLightComponent(
+            color: UIColor(red: 0.86, green: 0.93, blue: 1, alpha: 1),
+            intensity: 7_500
+        ))
+        rig.addChild(daylight)
+
+        let radius = max(6, halfExtent * 2.4)
+        for (name, position, color, intensity) in [
+            (
+                "Arena Key Light",
+                SIMD3<Float>(-halfExtent * 0.48, halfExtent * 0.7, halfExtent * 0.35),
+                UIColor(red: 0.8, green: 0.91, blue: 1, alpha: 1),
+                Float(28_000)
+            ),
+            (
+                "Arena Fill Light",
+                SIMD3<Float>(halfExtent * 0.48, halfExtent * 0.55, -halfExtent * 0.3),
+                UIColor(red: 1, green: 0.91, blue: 0.78, alpha: 1),
+                Float(20_000)
+            ),
+            (
+                "Arena Center Light",
+                SIMD3<Float>(0, halfExtent * 0.85, 0),
+                UIColor.white,
+                Float(18_000)
+            ),
+        ] {
+            let light = Entity()
+            light.name = name
+            light.position = position
+            light.components.set(PointLightComponent(color: color, intensity: intensity, attenuationRadius: radius))
+            rig.addChild(light)
+        }
+        return rig
+    }
+
+    private static func arenaMaterial(
+        textureName: String,
+        fallback: UIColor,
+        roughness: Float,
+        metallic: Float
+    ) -> PhysicallyBasedMaterial {
+        var material = PhysicallyBasedMaterial()
+        if let resource = try? TextureResource.load(named: textureName) {
+            material.baseColor = .init(tint: .white, texture: .init(resource))
+        } else {
+            material.baseColor = .init(tint: fallback)
+        }
+        material.roughness = .init(floatLiteral: roughness)
+        material.metallic = .init(floatLiteral: metallic)
+        return material
+    }
+
     static func makeTrainingRoom(level: Int, puzzle: PuzzleGeometry, arPresentation: Bool = false) -> Entity {
         let room = Entity(); room.name = "Training Room-\(level)"
-        let color: UIColor = level == 1 ? .systemIndigo : UIColor(white: 0.16, alpha: 1)
         let size = puzzle.arenaHalfExtent * 2
-        let floorColor = arPresentation ? color.withAlphaComponent(0.38) : color
-        let wallColor = UIColor(white: 0.12, alpha: arPresentation ? 0.82 : 1)
-        let barrierColor = UIColor(white: 0.28, alpha: arPresentation ? 0.88 : 1)
-        let floor = ModelEntity(mesh: .generatePlane(width: size, depth: size), materials: [SimpleMaterial(color: floorColor, isMetallic: false)]); floor.name = "Training Floor"; room.addChild(floor)
-        for (position, wallSize) in [
-            (SIMD3<Float>(0, 0.55, -puzzle.arenaHalfExtent), SIMD3<Float>(size, 1.1, 0.18)),
-            (SIMD3<Float>(0, 0.55, puzzle.arenaHalfExtent), SIMD3<Float>(size, 1.1, 0.18)),
-            (SIMD3<Float>(-puzzle.arenaHalfExtent, 0.55, 0), SIMD3<Float>(0.18, 1.1, size)),
-            (SIMD3<Float>(puzzle.arenaHalfExtent, 0.55, 0), SIMD3<Float>(0.18, 1.1, size)),
-        ] { let wall = ModelEntity(mesh: .generateBox(size: wallSize, cornerRadius: 0.03), materials: [SimpleMaterial(color: wallColor, isMetallic: !arPresentation)]); wall.position = position; room.addChild(wall) }
-        for barrier in puzzle.barriers { let block = ModelEntity(mesh: .generateBox(size: [barrier.size.x, 0.75, barrier.size.y], cornerRadius: 0.03), materials: [SimpleMaterial(color: barrierColor, isMetallic: !arPresentation)]); block.position = [barrier.center.x, 0.375, barrier.center.y]; room.addChild(block) }
+        let floor = ModelEntity(mesh: .generatePlane(width: size, depth: size), materials: [arenaFloorMaterial(arPresentation: arPresentation)])
+        floor.name = "Training Floor"
+        room.addChild(floor)
+        let walls: [(String, SIMD3<Float>, SIMD3<Float>)] = [
+            ("North Training Wall", [0, 0.55, -puzzle.arenaHalfExtent], [size, 1.1, 0.18]),
+            ("South Training Wall", [0, 0.55, puzzle.arenaHalfExtent], [size, 1.1, 0.18]),
+            ("West Training Wall", [-puzzle.arenaHalfExtent, 0.55, 0], [0.18, 1.1, size]),
+            ("East Training Wall", [puzzle.arenaHalfExtent, 0.55, 0], [0.18, 1.1, size]),
+        ]
+        for (name, position, wallSize) in walls {
+            let wall = ModelEntity(
+                mesh: .generateBox(size: wallSize, cornerRadius: 0.03),
+                materials: [arenaWallMaterial(arPresentation: arPresentation)]
+            )
+            wall.name = name
+            wall.position = position
+            room.addChild(wall)
+        }
+        for (index, barrier) in puzzle.barriers.enumerated() {
+            let block = ModelEntity(
+                mesh: .generateBox(size: [barrier.size.x, 0.75, barrier.size.y], cornerRadius: 0.03),
+                materials: [arenaWallMaterial(arPresentation: arPresentation)]
+            )
+            block.name = "Training Barrier \(index)"
+            block.position = [barrier.center.x, 0.375, barrier.center.y]
+            room.addChild(block)
+        }
+        if !arPresentation { room.addChild(makeArenaLightRig(halfExtent: puzzle.arenaHalfExtent)) }
         if let door = puzzle.door { let entity = ModelEntity(mesh: .generateBox(size: [door.size.x, 0.9, door.size.y], cornerRadius: 0.025), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); entity.name = "Puzzle Door"; entity.position = [door.center.x, 0.45, door.center.y]; room.addChild(entity) }
         if let terminal = puzzle.hackTerminal {
             let root = Entity(); root.name = "Hack Terminal"; root.position = [terminal.x, 0, terminal.y]; room.addChild(root)

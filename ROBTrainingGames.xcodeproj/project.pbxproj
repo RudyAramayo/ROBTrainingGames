@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		01DBFA2260BE112F576CCBD9 /* ROBBattleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A037348E135227A957A0365B /* ROBBattleViews.swift */; };
 		05121A09D28DFDEB5BB51293 /* ROBBattle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C64E98B656622C765FF41748 /* ROBBattle.swift */; };
+		0734375F540FCE947075ACE5 /* arena-wall-material.png in Resources */ = {isa = PBXBuildFile; fileRef = 4922F873A21CB27EAB947293 /* arena-wall-material.png */; };
 		0EA151C76007B45172EFCFE9 /* RobotFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8EABD4931412AA8A676C80 /* RobotFactory.swift */; };
 		124AFA151BFFCED32FC5B941 /* TechnoMusicEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F74BC0EEE41DF8682BB1619 /* TechnoMusicEngine.swift */; };
 		15953347EA4132F63B131F4A /* pickup.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 14F0E4F7ED1B3521087B505C /* pickup.m4a */; };
@@ -19,11 +20,13 @@
 		2C9151B4644B259D0962A455 /* pickup.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 14F0E4F7ED1B3521087B505C /* pickup.m4a */; };
 		374094AD795CF2CAD529E072 /* VisionDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D19BBDDC5D490212B965846 /* VisionDashboard.swift */; };
 		39DA35854B101739582EF190 /* IOSRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF0F5FCFB2ACB31F1C6AD186 /* IOSRootView.swift */; };
+		4A170A168F8A17FC165AB965 /* arena-floor-material.png in Resources */ = {isa = PBXBuildFile; fileRef = F3A117093C1A37B4CF5DA2C8 /* arena-floor-material.png */; };
 		506257F4720091349F2D80AB /* LaserChargeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86F46D4F36051CC6C3E326B /* LaserChargeButton.swift */; };
 		55B33C4761AB7A8D346EB27C /* rob-training-key-art.png in Resources */ = {isa = PBXBuildFile; fileRef = 765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */; };
 		59C21018AE39553475ADF2C0 /* RobotVoicePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */; };
 		5A7B452D8C82B7E964553832 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A494856CC93CF9C98076DE8A /* GameSession.swift */; };
 		5F24C21F936B161D686DDBFE /* GameSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEBC1A2DCC5F0625E90BCDE7 /* GameSessionTests.swift */; };
+		5FA527B8630C2707AC02D5F4 /* arena-floor-material.png in Resources */ = {isa = PBXBuildFile; fileRef = F3A117093C1A37B4CF5DA2C8 /* arena-floor-material.png */; };
 		64A1347719E0197CDACA6D3E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 98A698093E163C5AD99F842C /* Assets.xcassets */; };
 		6CFB7C4FCE1E8C49F724F115 /* ROBTrainingiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */; };
 		755B13E4179BDBE68AE89146 /* ARLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCEF00562EAF419AACD5E344 /* ARLabView.swift */; };
@@ -35,6 +38,7 @@
 		81A5669F7DB12E4AC7CEC8EC /* LaserChargeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86F46D4F36051CC6C3E326B /* LaserChargeButton.swift */; };
 		8E92EDF0CC8A176364702C1A /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A494856CC93CF9C98076DE8A /* GameSession.swift */; };
 		8F5D5EA3ADB8F70CFA08BA08 /* SoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */; };
+		9037DF571D43ABB1EBD7890F /* arena-wall-material.png in Resources */ = {isa = PBXBuildFile; fileRef = 4922F873A21CB27EAB947293 /* arena-wall-material.png */; };
 		B0D1FEF0D8A64D0B703D8DE8 /* level-complete.m4a in Resources */ = {isa = PBXBuildFile; fileRef = DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */; };
 		B53BF48805AEF932ECEA4F91 /* ROBBattleScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39FA9B438E19CFEC2BE06F5B /* ROBBattleScene.swift */; };
 		B7203185730E33816035D094 /* laser.m4a in Resources */ = {isa = PBXBuildFile; fileRef = E0A2FF07C60F58B44ADD1698 /* laser.m4a */; };
@@ -71,6 +75,7 @@
 		39FA9B438E19CFEC2BE06F5B /* ROBBattleScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBBattleScene.swift; sourceTree = "<group>"; };
 		3F74BC0EEE41DF8682BB1619 /* TechnoMusicEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TechnoMusicEngine.swift; sourceTree = "<group>"; };
 		43C86D54778FEDD1EDB6D00E /* mission-start.m4a */ = {isa = PBXFileReference; path = "mission-start.m4a"; sourceTree = "<group>"; };
+		4922F873A21CB27EAB947293 /* arena-wall-material.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "arena-wall-material.png"; sourceTree = "<group>"; };
 		4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		63220C95F6BF85ACADC6A078 /* ROBTrainingVision.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ROBTrainingVision.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "rob-training-key-art.png"; sourceTree = "<group>"; };
@@ -95,12 +100,15 @@
 		E0A2FF07C60F58B44ADD1698 /* laser.m4a */ = {isa = PBXFileReference; path = laser.m4a; sourceTree = "<group>"; };
 		E77C631610B09DFC69177CB4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		ED736CF0A1C7EA4EA2B179F5 /* ROBTrainingiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBTrainingiOSApp.swift; sourceTree = "<group>"; };
+		F3A117093C1A37B4CF5DA2C8 /* arena-floor-material.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "arena-floor-material.png"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		032F22C9CDE7E3453F3118FE /* Artwork */ = {
 			isa = PBXGroup;
 			children = (
+				F3A117093C1A37B4CF5DA2C8 /* arena-floor-material.png */,
+				4922F873A21CB27EAB947293 /* arena-wall-material.png */,
 				765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */,
 			);
 			path = Artwork;
@@ -308,6 +316,8 @@
 			files = (
 				64A1347719E0197CDACA6D3E /* Assets.xcassets in Resources */,
 				80ACD0D4BE8A79DA1446F819 /* PrivacyInfo.xcprivacy in Resources */,
+				4A170A168F8A17FC165AB965 /* arena-floor-material.png in Resources */,
+				0734375F540FCE947075ACE5 /* arena-wall-material.png in Resources */,
 				B7203185730E33816035D094 /* laser.m4a in Resources */,
 				1D7E170D9A3B66DC4DC17F7C /* level-complete.m4a in Resources */,
 				801F959142CF82D4438D01F3 /* mission-start.m4a in Resources */,
@@ -322,6 +332,8 @@
 			files = (
 				F8CC61AB94CDC2BD86B1A149 /* Assets.xcassets in Resources */,
 				DFCB9518DD1D2EC5D31C7920 /* PrivacyInfo.xcprivacy in Resources */,
+				5FA527B8630C2707AC02D5F4 /* arena-floor-material.png in Resources */,
+				9037DF571D43ABB1EBD7890F /* arena-wall-material.png in Resources */,
 				FD7F118B5CF5202E5ED50555 /* laser.m4a in Resources */,
 				B0D1FEF0D8A64D0B703D8DE8 /* level-complete.m4a in Resources */,
 				B7C66E4EB88560CD50A43CFD /* mission-start.m4a in Resources */,

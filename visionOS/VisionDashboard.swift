@@ -1,3 +1,4 @@
+import Foundation
 import RealityKit
 import SwiftUI
 
@@ -70,6 +71,7 @@ struct VisionDashboard: View {
                     Button("Open Tabletop Game", systemImage: "cube.transparent") {
                         openWindow(id: "ROBTabletop")
                     }
+                    .keyboardShortcut("t", modifiers: .command)
                     Button(immersive ? "Leave Room-Scale Game" : "Enter Room-Scale Game", systemImage: immersive ? "rectangle.portrait.and.arrow.right" : "vision.pro") {
                         Task {
                             if immersive {
@@ -105,32 +107,47 @@ struct VisionDashboard: View {
             .padding(28)
         }
         .robGameKeyboardControls(session: session)
-        .onAppear { controller.start(session: session); battle.startDiscovery() }
+        .onAppear {
+            controller.start(session: session)
+            battle.startDiscovery()
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["ROB_TRAINING_UI_TEST_TABLETOP"] == "1" {
+                openWindow(id: "ROBTabletop")
+            }
+            if ProcessInfo.processInfo.environment["ROB_TRAINING_UI_TEST_START"] == "1" {
+                session.begin()
+            }
+            #endif
+        }
     }
 }
 
 struct TabletopROBWorkshop: View {
     @Bindable var session: GameSession
     @Bindable var controller: VisionGameControllerInput
-    @State private var arenaScale: Float = 0.085
+    @State private var arenaScale: Float = 0.075
     @State private var timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        ROBSpatialArena(session: session, scale: arenaScale, position: [0, -0.3, 0])
-            .ornament(attachmentAnchor: .scene(.top)) {
+        ROBSpatialArena(session: session, scale: arenaScale, position: [0, 0.04, -0.08])
+            .ornament(attachmentAnchor: .scene(.top), contentAlignment: .front) {
                 VisionArenaStatus(session: session, controller: controller)
                     .padding(10)
+                    .offset(y: -38)
+                    .offset(z: 180)
             }
-            .ornament(attachmentAnchor: .scene(.bottom)) {
+            .ornament(attachmentAnchor: .scene(.bottom), contentAlignment: .front) {
                 VisionControlDeck(
                     session: session,
                     controller: controller,
                     arenaScale: $arenaScale,
-                    scaleRange: 0.065...0.105,
+                    scaleRange: 0.06...0.095,
                     placementHelp: "Grab the volume bar to place this arena on a tabletop."
                 )
-                .frame(width: 760)
+                .frame(width: 820)
                 .padding(12)
+                .offset(y: 108)
+                .offset(z: 220)
             }
             .robGameKeyboardControls(session: session)
             .onAppear { controller.start(session: session) }
@@ -145,12 +162,14 @@ struct ImmersiveROBWorkshop: View {
     @State private var timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        ROBSpatialArena(session: session, scale: arenaScale, position: [0, 0.72, -2.0])
-            .ornament(attachmentAnchor: .scene(.top)) {
+        ROBSpatialArena(session: session, scale: arenaScale, position: [0, 0.9, -2.2])
+            .ornament(attachmentAnchor: .scene(.top), contentAlignment: .front) {
                 VisionArenaStatus(session: session, controller: controller)
                     .padding(10)
+                    .offset(y: -38)
+                    .offset(z: 180)
             }
-            .ornament(attachmentAnchor: .scene(.bottom)) {
+            .ornament(attachmentAnchor: .scene(.bottom), contentAlignment: .front) {
                 VisionControlDeck(
                     session: session,
                     controller: controller,
@@ -158,8 +177,10 @@ struct ImmersiveROBWorkshop: View {
                     scaleRange: 0.1...0.24,
                     placementHelp: "Room-scale view keeps the entire arena grouped and centered."
                 )
-                .frame(width: 760)
+                .frame(width: 820)
                 .padding(12)
+                .offset(y: 82)
+                .offset(z: 220)
             }
             .robGameKeyboardControls(session: session)
             .onAppear { controller.start(session: session) }
@@ -247,49 +268,83 @@ private struct VisionControlDeck: View {
             if session.isUpgradeIntermission {
                 VisionUpgradeIntermission(session: session)
             } else {
-                Text("HAND + CONTROLLER DRIVE DECK").font(.headline)
-                Text("Pinch each tread pad and drag up or down. Two hands can command the treads independently.")
-                    .font(.caption)
-                    .foregroundStyle(.cyan)
-                VisionHandDriveControls(session: session)
-                HStack {
-                    LaserChargeButton(session: session, title: session.rangedWeapon.displayName, compact: true)
-                    Button(session.meleeWeapon.displayName, systemImage: "bolt.fill") { session.saberAttack() }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.pink)
-                    if session.hasFlipperHackTargets {
-                        Button(session.flipperHackDescription, systemImage: "dot.radiowaves.left.and.right") {
-                            session.startFlipperHack()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(session.isHackingCamera || session.isHackingDoor ? .yellow : session.canStartCameraHack ? .cyan : session.canStartDoorHack ? .orange : .gray)
-                        .disabled(!session.canStartFlipperHack)
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("ROB MISSION CONTROL").font(.headline)
+                        Text("Pinch and drag both tread pads, or use a connected controller.")
+                            .font(.caption)
+                            .foregroundStyle(.cyan)
                     }
-                    VisionLoadoutMenu(session: session, compact: true)
-                }
-                HStack {
-                    Button(session.isRunning ? "Pause" : session.isPaused ? "Resume" : "Start Mission", systemImage: session.isRunning ? "pause.fill" : "play.fill") {
-                        if session.isRunning { _ = session.pause() }
-                        else if session.isPaused { _ = session.resume() }
-                        else { session.begin() }
+                    Spacer()
+                    Button(missionButtonTitle, systemImage: missionButtonIcon) {
+                        session.toggleMission()
                     }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(session.isRunning ? .orange : .green)
+                    .accessibilityIdentifier("vision-mission-toggle")
                     Button("Reset", systemImage: "arrow.counterclockwise") { session.reset() }
-                    if session.canFinish {
-                        Button(session.levelIndex == session.levels.count - 1 ? "Finish Campaign" : "Complete Level") { session.nextLevel() }
-                    }
-                    Slider(value: $arenaScale, in: scaleRange) { Text("Arena size") }
-                        .frame(width: 180)
                 }
-                Label(controller.modeDescription, systemImage: controller.isConnected ? "gamecontroller.fill" : "hand.point.up.left.fill")
-                    .font(.caption.bold())
-                    .foregroundStyle(controller.spatialControllerCount >= 2 ? .green : .secondary)
-                Text(placementHelp).font(.caption2).foregroundStyle(.secondary)
-                CombatHealthBars(session: session, compact: true).frame(width: 390)
+                HStack(alignment: .center, spacing: 18) {
+                    VisionHandDriveControls(session: session)
+                        .frame(width: 360)
+                    Divider().frame(height: 164)
+                    VStack(spacing: 10) {
+                        HStack(spacing: 8) {
+                            LaserChargeButton(session: session, title: session.rangedWeapon.displayName, compact: true)
+                            Button(session.meleeWeapon.displayName, systemImage: "bolt.fill") { session.saberAttack() }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.pink)
+                        }
+                        if session.hasFlipperHackTargets {
+                            Button(session.flipperHackDescription, systemImage: "dot.radiowaves.left.and.right") {
+                                session.startFlipperHack()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(session.isHackingCamera || session.isHackingDoor ? .yellow : session.canStartCameraHack ? .cyan : session.canStartDoorHack ? .orange : .gray)
+                            .disabled(!session.canStartFlipperHack)
+                        }
+                        HStack(spacing: 10) {
+                            VisionLoadoutMenu(session: session, compact: true)
+                            Label(controller.modeDescription, systemImage: controller.isConnected ? "gamecontroller.fill" : "hand.point.up.left.fill")
+                                .font(.caption.bold())
+                                .foregroundStyle(controller.spatialControllerCount >= 2 ? .green : .secondary)
+                                .lineLimit(2)
+                        }
+                        CombatHealthBars(session: session, compact: true).frame(width: 390)
+                    }
+                    .frame(width: 400)
+                }
+                HStack(spacing: 10) {
+                    Text(placementHelp)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer()
+                    Text("Arena size").font(.caption2.bold())
+                    Slider(value: $arenaScale, in: scaleRange)
+                        .frame(width: 160)
+                }
+                if session.canFinish {
+                    Button(session.levelIndex == session.levels.count - 1 ? "Finish Campaign" : "Complete Level") {
+                        session.nextLevel()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                }
             }
         }
-        .padding(14)
+        .padding(12)
         .glassBackgroundEffect()
         .onDisappear { session.stopDrive() }
+    }
+
+    private var missionButtonTitle: String {
+        session.isRunning ? "Pause" : session.isPaused ? "Resume" : "Start Mission"
+    }
+
+    private var missionButtonIcon: String {
+        session.isRunning ? "pause.fill" : "play.fill"
     }
 }
 
