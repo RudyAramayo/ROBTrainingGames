@@ -79,6 +79,10 @@ import UIKit
             (parent ?? root).addChild(entity)
         }
         part("Tri-Wheel Chassis", [0.72, 0.2, 0.68], [0, 0.48, 0], .black)
+        let baseFlipper = Entity(); baseFlipper.name = "Base Lift Flipper Assembly"; baseFlipper.position = [0, 0.46, -0.38]; root.addChild(baseFlipper)
+        cylinder("Base Lift Flipper Motor", radius: 0.11, height: 0.62, position: .zero, color: .systemOrange, sideways: true, parent: baseFlipper)
+        part("Base Lift Flipper Blade", [0.58, 0.09, 0.88], [0, -0.04, -0.45], .darkGray, parent: baseFlipper)
+        part("Base Lift Flipper Floor Pad", [0.7, 0.12, 0.18], [0, -0.04, -0.92], .systemOrange, parent: baseFlipper)
         for side: Float in [-1, 1] {
             let prefix = side < 0 ? "Left" : "Right"
             let tread = Entity(); tread.name = "\(prefix) Tri-Wheel Tread"; tread.position = [side * 0.47, 0, 0]; root.addChild(tread)
@@ -135,9 +139,10 @@ import UIKit
         let torso = Entity(); torso.name = "Torso Assembly"; root.addChild(torso)
         part("Cerebro Torso", [0.68, 0.64, 0.54], [0, 0.72, 0], UIColor(red: 0.08, green: 0.12, blue: 0.16, alpha: 1), parent: torso)
         for x: Float in [-0.19, 0.19] {
+            let prefix = x < 0 ? "Left" : "Right"
             let color: UIColor = x < 0 ? .systemBlue : .systemCyan
-            cylinder("Torso Light Ring", radius: 0.12, height: 0.025, position: [x, 0.8, -0.285], color: color, faceForward: true, parent: torso)
-            cylinder("Torso Speaker", radius: 0.078, height: 0.032, position: [x, 0.8, -0.305], color: UIColor(white: 0.025, alpha: 1), faceForward: true, parent: torso)
+            cylinder("\(prefix) ROB Speaker Ring", radius: 0.12, height: 0.025, position: [x, 0.8, -0.285], color: color, faceForward: true, parent: torso)
+            cylinder("\(prefix) ROB Speaker Cone", radius: 0.078, height: 0.032, position: [x, 0.8, -0.305], color: UIColor(white: 0.025, alpha: 1), faceForward: true, parent: torso)
         }
         part("Depth Camera", [0.2, 0.1, 0.065], [0, 0.59, -0.3], .gray, parent: torso)
         let flipper = Entity(); flipper.name = "Flipper Zero Hacker"; torso.addChild(flipper)
@@ -202,6 +207,10 @@ import UIKit
 
         part("Sensor Mast", [0.1, 0.48, 0.1], [0, 1.2, 0], .gray, parent: torso)
         let head = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: .black, isMetallic: !arPresentation)]); head.name = "Camera Head"; head.position = [0, 1.52, 0]; head.scale.z = 0.82; torso.addChild(head)
+        let conferenceMicrophone = Entity(); conferenceMicrophone.name = "Conference Microphone"; conferenceMicrophone.position = [0, 1.82, 0.02]; torso.addChild(conferenceMicrophone)
+        cylinder("Conference Microphone Capsule", radius: 0.08, height: 0.19, position: .zero, color: .systemYellow, sideways: true, parent: conferenceMicrophone)
+        cylinder("Conference Microphone Stand", radius: 0.014, height: 0.16, position: [0, -0.1, 0], color: .gray, parent: conferenceMicrophone)
+        cylinder("Conference Microphone Base", radius: 0.1, height: 0.025, position: [0, -0.19, 0], color: .darkGray, parent: conferenceMicrophone)
         let smileMaterial = UnlitMaterial(color: faceColor(for: .lime))
         let smileParts: [(String, Float, Float, Float)] = [
             ("Face Smiley Left Eye", -0.075, 1.565, 0.026),
@@ -347,6 +356,12 @@ import UIKit
         for (prefix, angle) in [("Left", session.leftWheelAngle), ("Right", session.rightWheelAngle)] {
             for index in 1...3 { robot.findEntity(named: "\(prefix) Tri-Wheel \(index)")?.orientation = simd_quatf(angle: angle, axis: [1, 0, 0]) }
         }
+        robot.findEntity(named: "Base Lift Flipper Assembly")?.orientation = simd_quatf(angle: session.baseFlipperAngle, axis: [1, 0, 0])
+        let speakerPulse: Float = session.musicEnabled && session.isRunning
+            ? 1 + max(0, Float(sin(session.elapsed * .pi * 8))) * 0.13
+            : 1
+        robot.findEntity(named: "Left ROB Speaker Cone")?.scale = [speakerPulse, 1, speakerPulse]
+        robot.findEntity(named: "Right ROB Speaker Cone")?.scale = [1 + (speakerPulse - 1) * 0.78, 1, 1 + (speakerPulse - 1) * 0.78]
         let progress = Float(1 - session.saberAnimation), arc = sin(progress * .pi)
         let torso = robot.findEntity(named: "Torso Assembly")
         var torsoYaw: Float = 0

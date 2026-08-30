@@ -312,8 +312,8 @@ struct ROBARView: UIViewRepresentable {
         root.addChild(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle, arPresentation: true))
 
         let robot = RobotFactory.makeROB(arPresentation: true)
-        robot.position = session.robotPosition
-        robot.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0])
+        robot.position = session.presentationPosition
+        robot.orientation = session.presentationOrientation
         RobotFactory.applyWeapons(to: robot, session: session, arPresentation: true)
         root.addChild(robot)
 
@@ -323,8 +323,8 @@ struct ROBARView: UIViewRepresentable {
 
     static func updateMissionRoot(_ root: Entity, session: GameSession) {
         if let robot = root.findEntity(named: "ROB") {
-            robot.position = session.robotPosition
-            robot.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0])
+            robot.position = session.presentationPosition
+            robot.orientation = session.presentationOrientation
             RobotFactory.applyWeapons(to: robot, session: session, arPresentation: true)
         }
 

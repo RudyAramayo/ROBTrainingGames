@@ -55,6 +55,9 @@ enum ROBDroidSection: String, CaseIterable, Codable, Identifiable, Sendable {
     case bellyCompute
     case arms
     case commissioned
+    case baseFlipper
+    case voiceAudio
+    case showReady
 
     var id: String { rawValue }
     var displayName: String {
@@ -64,7 +67,10 @@ enum ROBDroidSection: String, CaseIterable, Codable, Identifiable, Sendable {
         case .cameraNetwork: "Camera & network"
         case .bellyCompute: "Belly compute"
         case .arms: "Arm system"
-        case .commissioned: "Mission-ready ROB"
+        case .commissioned: "Core mission-ready ROB"
+        case .baseFlipper: "Base lift flipper"
+        case .voiceAudio: "Voice & audio"
+        case .showReady: "Show-ready systems"
         }
     }
     var symbol: String {
@@ -75,6 +81,9 @@ enum ROBDroidSection: String, CaseIterable, Codable, Identifiable, Sendable {
         case .bellyCompute: "desktopcomputer"
         case .arms: "figure.strengthtraining.traditional"
         case .commissioned: "flag.checkered"
+        case .baseFlipper: "arrow.up.and.down.circle.fill"
+        case .voiceAudio: "mic.and.signal.meter.fill"
+        case .showReady: "theatermasks.fill"
         }
     }
 }

@@ -260,11 +260,11 @@ struct MissionView: View {
             ZStack(alignment: .bottom) {
                 RealityView { content in
                     content.add(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle))
-                    let rob = RobotFactory.makeROB(); rob.position = session.robotPosition; content.add(rob)
+                    let rob = RobotFactory.makeROB(); rob.position = session.presentationPosition; content.add(rob)
                     content.add(RobotFactory.makeCombatLayer(session: session))
                     let camera = PerspectiveCamera(); camera.name = "Mission Camera"; camera.look(at: session.robotPosition + SIMD3<Float>(0, 0.65, -1.1), from: session.robotPosition + SIMD3<Float>(3.4, 5.2, 5.4), relativeTo: nil); content.add(camera)
                 } update: { content in
-                    if let rob = content.entities.first(where: { $0.name == "ROB" }) { rob.position = session.robotPosition; rob.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0]); RobotFactory.applyWeapons(to: rob, session: session) }
+                    if let rob = content.entities.first(where: { $0.name == "ROB" }) { rob.position = session.presentationPosition; rob.orientation = session.presentationOrientation; RobotFactory.applyWeapons(to: rob, session: session) }
                     if let camera = content.entities.first(where: { $0.name == "Mission Camera" }) { camera.look(at: session.robotPosition + SIMD3<Float>(0, 0.65, -1.1), from: session.robotPosition + SIMD3<Float>(3.4, 5.2, 5.4), relativeTo: nil) }
                     let roomName = "Training Room-\(session.levelIndex)"
                     if let room = content.entities.first(where: { $0.name == roomName }) { RobotFactory.applyPuzzleState(to: room, session: session) }
@@ -471,6 +471,13 @@ struct MobileTankControls: View {
         HStack(alignment: .bottom, spacing: 8) {
             TreadJoystick(title: "LEFT", demand: updateLeft)
             VStack(spacing: 5) {
+                Button { session.activateBaseFlipper() } label: {
+                    Label(session.isBaseFlipperActive ? "Lifting…" : "Base Lift", systemImage: "arrow.up.and.down.circle.fill")
+                        .font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(session.isBaseFlipperActive ? .yellow : .orange)
+                .disabled(!session.isRunning || session.isBaseFlipperActive)
                 if session.hasFlipperHackTargets {
                     Button { session.startFlipperHack() } label: {
                         Label(session.flipperHackDescription, systemImage: "dot.radiowaves.left.and.right")

@@ -13,7 +13,7 @@ struct CircuitSchoolPortal: View {
                         Label("ROB CIRCUIT SCHOOL", systemImage: "bolt.circle.fill")
                             .font(.caption.bold()).tracking(3).foregroundStyle(.cyan)
                         Text("Learn. Build. Customize. Play.").font(.system(size: 42, weight: .black, design: .rounded))
-                        Text("Circuit Quest is the interactive web lab for closed loops, Ohm's law, AC/DC, Arduino, 555 timers, op amps, RLC circuits, and ROB's real systems architecture. Finished ROB chapters become assembled sections in your portable droid profile.")
+                        Text("Circuit Quest now has 90 builds: an 80-build core passport plus ten advanced Book Bridge missions. Learn closed loops, Ohm's law, AC/DC, Arduino, chips, ROB's architecture, the base lift flipper, speaker transducers, generated techno, and far-field voice safety. Finished chapters become assembled sections in your portable droid profile.")
                             .foregroundStyle(.secondary).lineSpacing(4)
                         Link(destination: URL(string: "https://www.orbitusrobotics.com/robot-lab/")!) {
                             Label("Open interactive Circuit Quest", systemImage: "arrow.up.right.square.fill")
@@ -38,6 +38,15 @@ struct CircuitSchoolPortal: View {
                             }
                         }
                         .padding().background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("BOOK BRIDGE 81–90", systemImage: "books.vertical.fill").font(.headline).foregroundStyle(.yellow)
+                            Text("Builds 81–84 add the independent lift motor, feedback, jam timeout, center-of-mass checks, and a guarded recovery state. Builds 85–90 follow samples into ROB's speakers, animate the original techno engine, compare close and distant conference-mic speech, cancel echo, clarify uncertain intent, and stop every show cue locally.")
+                                .font(.caption).foregroundStyle(.secondary).lineSpacing(3)
+                            Text("The established Maker Faire reward still unlocks at the 80-build core finish line.")
+                                .font(.caption.bold()).foregroundStyle(.cyan)
+                        }
+                        .padding().background(.yellow.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
 
                         Text("The red target dot and blue balloon beam are virtual effects only. Never aim a real laser at a person, animal, vehicle, aircraft, or reflective surface.")
                             .font(.caption.bold()).foregroundStyle(.yellow).padding()

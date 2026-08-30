@@ -1436,4 +1436,56 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNotNil(robot.findEntity(named: "Left Maker Frame Rail"))
         XCTAssertNotNil(robot.findEntity(named: "Virtual Blue Balloon Beam Emitter"))
     }
+
+    func testBaseLiftFlipperNeutralizesTreadsConsumesEnergyAndReturnsToTravel() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        game.setDrive(forward: 1, steering: 0)
+        game.tick(0.2)
+        XCTAssertGreaterThan(game.leftTread, 0)
+        let energyBeforeLift = game.energy
+
+        XCTAssertTrue(game.activateBaseFlipper())
+        XCTAssertTrue(game.isBaseFlipperActive)
+        XCTAssertEqual(game.leftTread, 0, accuracy: 0.0001)
+        XCTAssertEqual(game.rightTread, 0, accuracy: 0.0001)
+        XCTAssertEqual(game.energy, energyBeforeLift - GameSession.baseFlipperEnergyCost, accuracy: 0.0001)
+
+        game.tick(0.6)
+        XCTAssertEqual(game.baseFlipperPhase, 1, accuracy: 0.0001)
+        XCTAssertLessThan(game.baseFlipperAngle, 0)
+        XCTAssertGreaterThan(game.presentationPosition.y, game.robotPosition.y)
+
+        game.tick(GameSession.baseFlipperDuration)
+        XCTAssertFalse(game.isBaseFlipperActive)
+        XCTAssertEqual(game.baseFlipperAngle, 0, accuracy: 0.0001)
+        XCTAssertEqual(game.presentationPosition.y, game.robotPosition.y, accuracy: 0.0001)
+    }
+
+    func testRobotModelIncludesDistinctBaseLiftSpeakersAndConferenceMicrophone() {
+        let game = GameSession(audioEnabled: false)
+        let robot = RobotFactory.makeROB()
+        for name in [
+            "Base Lift Flipper Assembly", "Base Lift Flipper Motor", "Base Lift Flipper Blade",
+            "Left ROB Speaker Cone", "Right ROB Speaker Cone", "Conference Microphone",
+        ] {
+            XCTAssertNotNil(robot.findEntity(named: name), "Missing \(name)")
+        }
+        XCTAssertNotNil(robot.findEntity(named: "Flipper Zero Hacker"))
+
+        game.begin()
+        XCTAssertTrue(game.activateBaseFlipper())
+        game.tick(0.6)
+        RobotFactory.applyWeapons(to: robot, session: game)
+        XCTAssertNotEqual(robot.findEntity(named: "Base Lift Flipper Assembly")?.orientation, simd_quatf(angle: 0, axis: [1, 0, 0]))
+    }
+
+    func testBookBridgeDroidSectionsRoundTripAndStayOrdered() throws {
+        let profile = ROBDroidProfile(
+            name: "Encore ROB",
+            sections: [.showReady, .voiceAudio, .baseFlipper, .treads]
+        )
+        XCTAssertEqual(profile.sections, [.treads, .baseFlipper, .voiceAudio, .showReady])
+        XCTAssertEqual(try ROBDroidProfileCode.decode(ROBDroidProfileCode.encode(profile)), profile)
+    }
 }

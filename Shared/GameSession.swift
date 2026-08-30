@@ -304,13 +304,15 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.09"
+    static let gameplayRulesetVersion = "2026.09.10"
     static let robotCollisionRadius: Float = 0.62
     static let baseDriveSpeed: Float = 1.2
     static let securityCameraHalfAngle: Float = .pi / 5
     static let securityCameraHackRange: Float = 1.55
     static let flipperHackDuration = 2.2
     static let flipperHackReward = 300
+    static let baseFlipperEnergyCost = 8.0
+    static let baseFlipperDuration = 2.8
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
     let maxHealth = 100
@@ -336,10 +338,13 @@ final class GameSession {
     ]
     let components = [
         ROBComponent(id: "base", name: "Tri-Wheel Tracked Base", summary: "Three-wheel triangular tread pods expose the road wheels while a drive mixer preserves independent left and right tread speeds.", color: 0x263746),
+        ROBComponent(id: "baseFlipper", name: "Base Lift Flipper", summary: "An independent guarded motor channel deploys a front flipper to change the support polygon, lift the base, detect jams, and retract before travel.", color: 0xFF8B2F),
         ROBComponent(id: "power", name: "Power System", summary: "Batteries, protection, disconnects, and motor electronics form ROB’s energy path.", color: 0xF1B93A),
         ROBComponent(id: "cerebro", name: "Cerebro", summary: "The Mac-based control layer coordinates operator intent, cameras, networking, and diagnostics.", color: 0x36DFFF),
         ROBComponent(id: "sensors", name: "Sensors", summary: "Cameras, lidar, inertial sensing, and infrared observations help ROB describe its environment.", color: 0x55DD88),
         ROBComponent(id: "arms", name: "Dual AMBER B1 Arms", summary: "Each arm has seven visible joint stages. Tool motion must respect joint limits, self-collision, and safe separation.", color: 0xAEB9C4),
+        ROBComponent(id: "audio", name: "ROB Audio", summary: "Left and right speakers turn bounded digital audio into magnetic force, cone motion, and ROB Training's locally generated techno.", color: 0x36DFFF),
+        ROBComponent(id: "conferenceMic", name: "Conference Microphone", summary: "A far-field microphone supports voice lessons about distance, room noise, echo cancellation, visible notice, confidence, and operator authority.", color: 0xF1B93A),
         ROBComponent(id: "safety", name: "Safety Layer", summary: "A trained operator, exclusion zone, tested physical stop, and bounded trials remain essential.", color: 0xFF5C72),
     ]
     var levelIndex = 0
@@ -387,6 +392,7 @@ final class GameSession {
     private(set) var isPaused = false
     private(set) var isUpgradeIntermission = false
     var musicEnabled = true
+    private(set) var baseFlipperElapsed: TimeInterval?
     var lastSituation = "ROB systems ready."
     var situationCount = 0
     private(set) var highestCompletedLevel = 0
@@ -421,6 +427,22 @@ final class GameSession {
     var weaponDamageBonus: Int { weaponUpgradeLevel }
     var hasIndependentTwinTargeting: Bool { targetingComputerUpgradeLevel > 0 }
     var isSecurityAlerted: Bool { securityAlertRemaining > 0 }
+    var isBaseFlipperActive: Bool { baseFlipperElapsed != nil }
+    var baseFlipperPhase: Float {
+        guard let elapsed = baseFlipperElapsed, elapsed >= 0, elapsed < Self.baseFlipperDuration else { return 0 }
+        let linear: Double
+        if elapsed < 0.6 { linear = elapsed / 0.6 }
+        else if elapsed < 1.55 { linear = 1 }
+        else { linear = 1 - (elapsed - 1.55) / (Self.baseFlipperDuration - 1.55) }
+        return Float(0.5 - cos(min(1, max(0, linear)) * .pi) / 2)
+    }
+    var baseFlipperAngle: Float { -0.95 * baseFlipperPhase }
+    var baseLiftHeight: Float { 0.24 * baseFlipperPhase }
+    var baseLiftPitch: Float { 0.075 * baseFlipperPhase }
+    var presentationPosition: SIMD3<Float> { robotPosition + SIMD3<Float>(0, baseLiftHeight, 0) }
+    var presentationOrientation: simd_quatf {
+        simd_quatf(angle: robotHeading, axis: [0, 1, 0]) * simd_quatf(angle: baseLiftPitch, axis: [1, 0, 0])
+    }
     var isInShadow: Bool {
         let point = SIMD3<Float>(robotPosition.x, 0, robotPosition.z)
         return puzzle.shadowZones.contains { Self.intersects(point, barrier: $0, radius: 0) }
@@ -816,7 +838,7 @@ final class GameSession {
     private func configureLevel() {
         isUpgradeIntermission = false
         elapsed = 0; collectedCells = 0
-        hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingCameraID = nil; hackingProgress = 0; securityAlertRemaining = 0; disabledSecurityCameraIDs = []
+        hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingCameraID = nil; hackingProgress = 0; securityAlertRemaining = 0; disabledSecurityCameraIDs = []; baseFlipperElapsed = nil
         collectedCellIndices = []; collectedShieldPickupIndices = []; collectedRepairPickupIndices = []
         saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
         laserProjectiles = []; laserCharge = 0; laserShotCharge = 0; isChargingLaser = false; lockedEnemyID = nil; secondaryLockedEnemyID = nil
@@ -889,6 +911,24 @@ final class GameSession {
         steeringDemand = (right - left) / 1.44
     }
     func stopDrive() { setDrive(forward: 0, steering: 0); leftTread = 0; rightTread = 0 }
+    @discardableResult
+    func activateBaseFlipper() -> Bool {
+        guard isRunning, !isBaseFlipperActive else { return false }
+        guard !isHackingDoor, !isHackingCamera else {
+            message = "Finish the security task before using the base lift."
+            return false
+        }
+        guard energy >= Self.baseFlipperEnergyCost else {
+            message = "Base lift needs \(Int(Self.baseFlipperEnergyCost)) system energy. Hold position or collect a cell."
+            return false
+        }
+        stopDrive()
+        energy -= Self.baseFlipperEnergyCost
+        baseFlipperElapsed = 0
+        message = "Base lift cycle: treads neutral, flipper deploying, chassis rising, then guarded retract."
+        report(message)
+        return true
+    }
     func moveStep(forward: Double = 0, steering: Double = 0) {
         guard !isPaused else { return }
         guard isRunning else { begin(); return }
@@ -902,8 +942,9 @@ final class GameSession {
         damageInvulnerabilityRemaining = max(0, damageInvulnerabilityRemaining - delta)
         securityAlertRemaining = max(0, securityAlertRemaining - delta)
         let hasDriveEnergy = energy > 0.05
-        let targetLeft = hasDriveEnergy ? max(-1, min(1, forwardDemand - steeringDemand * 0.72)) : 0
-        let targetRight = hasDriveEnergy ? max(-1, min(1, forwardDemand + steeringDemand * 0.72)) : 0
+        if baseFlipperElapsed != nil { stopDrive() }
+        let targetLeft = hasDriveEnergy && !isBaseFlipperActive ? max(-1, min(1, forwardDemand - steeringDemand * 0.72)) : 0
+        let targetRight = hasDriveEnergy && !isBaseFlipperActive ? max(-1, min(1, forwardDemand + steeringDemand * 0.72)) : 0
         let smoothing = min(1, delta * 8)
         leftTread += (targetLeft - leftTread) * smoothing; rightTread += (targetRight - rightTread) * smoothing
         let speedMultiplier = Float(driveSpeedMultiplier)
@@ -949,7 +990,7 @@ final class GameSession {
         let driveLoad = (abs(leftTread) + abs(rightTread)) * 0.5
         if hasDriveEnergy && driveLoad > 0.01 {
             energy = max(0, energy - delta * (4.4 + driveLoad * 2.2))
-        } else if !isHackingDoor && !isHackingCamera {
+        } else if !isHackingDoor && !isHackingCamera && !isBaseFlipperActive {
             energy = min(maxEnergy, energy + delta * passiveEnergyRecharge)
         }
         if energy <= 0.05, !wasEnergyDepleted {
@@ -974,6 +1015,10 @@ final class GameSession {
             if saberAnimation == 0 { saberStyle = nil }
         }
         if isChargingLaser { laserCharge = min(1, laserCharge + delta / 1.25) }
+        if let flipperElapsed = baseFlipperElapsed {
+            let next = flipperElapsed + delta
+            baseFlipperElapsed = next < Self.baseFlipperDuration ? next : nil
+        }
         updateLaserProjectiles(delta)
         updateEnemies(delta)
         updateLaserLock()

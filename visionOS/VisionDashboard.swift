@@ -214,8 +214,8 @@ private struct ROBSpatialArena: View {
             arenaRoot.name = "ROB Spatial Arena Root"
             arenaRoot.scale = .init(repeating: scale)
             arenaRoot.position = position
-            robot.position = session.robotPosition
-            robot.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0])
+            robot.position = session.presentationPosition
+            robot.orientation = session.presentationOrientation
             arenaRoot.addChild(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle))
             arenaRoot.addChild(RobotFactory.makeCombatLayer(session: session))
             arenaRoot.addChild(robot)
@@ -223,8 +223,8 @@ private struct ROBSpatialArena: View {
         } update: { _ in
             arenaRoot.scale = .init(repeating: scale)
             arenaRoot.position = position
-            robot.position = session.robotPosition
-            robot.orientation = simd_quatf(angle: session.robotHeading, axis: [0, 1, 0])
+            robot.position = session.presentationPosition
+            robot.orientation = session.presentationOrientation
             RobotFactory.applyWeapons(to: robot, session: session, componentMode: true)
 
             let roomName = "Training Room-\(session.levelIndex)"
@@ -310,6 +310,12 @@ private struct VisionControlDeck: View {
                                 .buttonStyle(.borderedProminent)
                                 .tint(.pink)
                         }
+                        Button(session.isBaseFlipperActive ? "Base lifting…" : "Base Lift", systemImage: "arrow.up.and.down.circle.fill") {
+                            session.activateBaseFlipper()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(session.isBaseFlipperActive ? .yellow : .orange)
+                        .disabled(!session.isRunning || session.isBaseFlipperActive)
                         if session.hasFlipperHackTargets {
                             Button(session.flipperHackDescription, systemImage: "dot.radiowaves.left.and.right") {
                                 session.startFlipperHack()
