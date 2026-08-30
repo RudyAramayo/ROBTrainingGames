@@ -17,10 +17,12 @@ struct IOSRootView: View {
             ROBBattleLaunchView(battle: battle, launchGame: launchBattle, launchAR: launchARBattle)
                 .tabItem { Label("Battle", systemImage: "person.3.fill") }
             ComponentExplorer(session: session).tabItem { Label("ROB", systemImage: "cpu") }
+            CircuitSchoolPortal(session: session).tabItem { Label("Learn", systemImage: "bolt.circle.fill") }
             RobotVoiceScreen(voice: voice, session: session).tabItem { Label("Voice", systemImage: "waveform") }
         }
         .tint(.cyan)
         .onChange(of: session.situationCount) { _, count in if count > 0 { voice.react(to: session.lastSituation, game: session) } }
+        .onChange(of: session.droidProfile) { _, profile in battle.updateLocalProfile(profile) }
         .onChange(of: scenePhase) { _, phase in if phase != .active { session.pause() } }
         .fullScreenCover(item: $fullScreenExperience) { experience in
             switch experience {
@@ -38,6 +40,7 @@ struct IOSRootView: View {
                     .interactiveDismissDisabled()
             }
         }
+        .onAppear { battle.updateLocalProfile(session.droidProfile) }
     }
 
     private func launchMission() {
@@ -593,6 +596,9 @@ struct ComponentExplorer: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         WorkshopRobotPreview(session: session)
+
+                        DroidProfileWorkshopCard(session: session)
+                            .workshopCard()
 
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {

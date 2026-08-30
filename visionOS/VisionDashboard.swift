@@ -11,6 +11,7 @@ struct VisionDashboard: View {
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
     @Environment(\.openWindow) private var openWindow
     @State private var immersive = false
+    @State private var portableDroidCode = ""
 
     var body: some View {
         NavigationSplitView {
@@ -26,6 +27,16 @@ struct VisionDashboard: View {
                 Section("ROB Loadout") {
                     Label("\(session.highestCompletedLevel)/\(session.levels.count) levels complete", systemImage: "wrench.and.screwdriver.fill")
                     VisionLoadoutMenu(session: session)
+                }
+                Section("Circuit School") {
+                    Link("Open interactive Circuit Quest", destination: URL(string: "https://www.orbitusrobotics.com/robot-lab/")!)
+                    Label("\(session.droidProfile.sections.count)/\(ROBDroidSection.allCases.count) robot sections", systemImage: "bolt.circle.fill")
+                }
+                Section("Portable Droid Code") {
+                    TextField("Paste code", text: $portableDroidCode)
+                    Button("Load my code") { portableDroidCode = session.droidCode }
+                    Button("Import code") { _ = session.importDroidCode(portableDroidCode) }
+                    ShareLink(item: session.droidCode) { Label("Share my droid", systemImage: "square.and.arrow.up") }
                 }
                 Section("Explore ROB") {
                     ForEach(session.components) { component in
@@ -109,6 +120,8 @@ struct VisionDashboard: View {
         .robGameKeyboardControls(session: session)
         .onAppear {
             controller.start(session: session)
+            battle.updateLocalProfile(session.droidProfile)
+            if portableDroidCode.isEmpty { portableDroidCode = session.droidCode }
             battle.startDiscovery()
             #if DEBUG
             if ProcessInfo.processInfo.environment["ROB_TRAINING_UI_TEST_TABLETOP"] == "1" {
@@ -119,6 +132,7 @@ struct VisionDashboard: View {
             }
             #endif
         }
+        .onChange(of: session.droidProfile) { _, profile in battle.updateLocalProfile(profile) }
     }
 }
 
@@ -489,6 +503,20 @@ private struct VisionLoadoutMenu: View {
                 ForEach(ROBFaceColor.allCases) { color in
                     Button { session.selectFaceColor(color) } label: {
                         Label(color.displayName, systemImage: session.faceColor == color ? "checkmark.circle.fill" : "face.smiling")
+                    }
+                }
+            }
+            Section("Housing Material") {
+                ForEach(ROBHousingMaterial.allCases) { material in
+                    Button { session.selectHousingMaterial(material) } label: {
+                        Label(material.displayName, systemImage: session.droidProfile.material == material ? "checkmark.circle.fill" : "circle")
+                    }
+                }
+            }
+            Section("Panel Style") {
+                ForEach(ROBHousingStyle.allCases) { housing in
+                    Button { session.selectHousingStyle(housing) } label: {
+                        Label(housing.displayName, systemImage: session.droidProfile.housing == housing ? "checkmark.circle.fill" : "square.3.layers.3d")
                     }
                 }
             }

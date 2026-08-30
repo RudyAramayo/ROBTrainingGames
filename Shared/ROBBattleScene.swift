@@ -88,7 +88,7 @@ enum ROBBattleFactory {
         robot.findEntity(named: "Twin Blasters")?.isEnabled = false
         robot.findEntity(named: "Arc Cannon")?.isEnabled = false
         robot.findEntity(named: "Power Hammer")?.isEnabled = false
-        applyColor(to: robot, colorIndex: identity.colorIndex, arPresentation: arPresentation)
+        applyAppearance(to: robot, identity: identity, arPresentation: arPresentation)
 
         let color = playerColors[identity.colorIndex % playerColors.count]
         let beacon = ModelEntity(
@@ -116,6 +116,14 @@ enum ROBBattleFactory {
         }
     }
 
+    static func applyAppearance(to robot: Entity, identity: ROBBattlePlayerIdentity, arPresentation: Bool) {
+        guard let profile = identity.droidProfile else {
+            applyColor(to: robot, colorIndex: identity.colorIndex, arPresentation: arPresentation)
+            return
+        }
+        RobotFactory.applyDroidAppearance(to: robot, profile: profile, arPresentation: arPresentation, markerPrefix: "Battle Appearance")
+    }
+
     static func synchronize(root: Entity, battle: ROBBattleCoordinator, arPresentation: Bool = false) {
         let states = Dictionary(uniqueKeysWithValues: battle.allRobotStates.map { ($0.id, $0) })
         for (id, state) in states {
@@ -130,6 +138,7 @@ enum ROBBattleFactory {
             } else {
                 continue
             }
+            if let identity = battle.players[id] { applyAppearance(to: robot, identity: identity, arPresentation: arPresentation) }
             robot.isEnabled = state.isAlive
             robot.position = state.position
             robot.orientation = simd_quatf(angle: state.heading, axis: [0, 1, 0])
@@ -155,9 +164,10 @@ enum ROBBattleFactory {
                 entity = existing
             } else {
                 let colorIndex = battle.players[projectile.ownerID]?.colorIndex ?? 0
+                let projectileColor: UIColor = battle.players[projectile.ownerID]?.droidProfile == nil ? playerColors[colorIndex % playerColors.count] : .systemBlue
                 let created = ModelEntity(
                     mesh: .generateSphere(radius: 0.095),
-                    materials: [UnlitMaterial(color: playerColors[colorIndex % playerColors.count])]
+                    materials: [UnlitMaterial(color: projectileColor)]
                 )
                 created.name = name
                 root.addChild(created)

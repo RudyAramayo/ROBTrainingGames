@@ -119,7 +119,7 @@ struct LaserChargeButton: View {
                     }
             )
             .accessibilityAddTraits(.isButton)
-            .accessibilityLabel("Charge and fire shoulder laser")
+            .accessibilityLabel("Charge and fire virtual pan-tilt training laser")
             .accessibilityValue(session.laserLockDescription)
             .accessibilityAction { session.fireLaser() }
             .onDisappear { if pressing { session.releaseLaserCharge(); pressing = false } }

@@ -105,6 +105,7 @@ struct ROBBattlePlayerIdentity: Codable, Equatable, Identifiable, Sendable {
     let name: String
     let transportName: String
     let colorIndex: Int
+    var droidProfile: ROBDroidProfile? = nil
 }
 
 struct ROBBattleRobotState: Codable, Equatable, Identifiable, Sendable {
@@ -334,7 +335,7 @@ final class ROBBattleCoordinator {
     static let arenaHalfExtent: Float = 8.2
     static let robotRadius: Float = 0.64
 
-    let localIdentity: ROBBattlePlayerIdentity
+    private(set) var localIdentity: ROBBattlePlayerIdentity
     private(set) var players: [UUID: ROBBattlePlayerIdentity]
     private(set) var votes: [UUID: ROBBattleArena] = [:]
     private(set) var phase = ROBBattlePhase.voting
@@ -381,7 +382,8 @@ final class ROBBattleCoordinator {
     init(
         networkingEnabled: Bool = true,
         playerID: UUID? = nil,
-        playerName: String? = nil
+        playerName: String? = nil,
+        droidProfile: ROBDroidProfile = ROBDroidProfile()
     ) {
         let id = playerID ?? Self.installationID()
         let name = playerName ?? Self.defaultPlayerName()
@@ -390,7 +392,8 @@ final class ROBBattleCoordinator {
             id: id,
             name: String(name.prefix(24)),
             transportName: transportName,
-            colorIndex: id.uuidString.utf8.reduce(0) { ($0 + Int($1)) % Self.maximumPlayers }
+            colorIndex: id.uuidString.utf8.reduce(0) { ($0 + Int($1)) % Self.maximumPlayers },
+            droidProfile: droidProfile
         )
         localIdentity = identity
         players = [id: identity]
@@ -411,6 +414,13 @@ final class ROBBattleCoordinator {
     }
 
     func stopNetworking() { network?.stop() }
+
+    func updateLocalProfile(_ profile: ROBDroidProfile) {
+        guard localIdentity.droidProfile != profile else { return }
+        localIdentity.droidProfile = profile
+        players[localIdentity.id] = localIdentity
+        broadcastHello()
+    }
 
     func vote(for arena: ROBBattleArena) {
         guard phase == .voting else { return }

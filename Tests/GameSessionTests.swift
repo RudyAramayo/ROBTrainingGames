@@ -1238,13 +1238,49 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(restored.rangedWeapon, .twinBlasters)
     }
 
+    func testDroidCodeMatchesThePortableWebFormatAndRejectsDamage() throws {
+        let profile = ROBDroidProfile(
+            name: "Nova 7",
+            finish: .plasmaPurple,
+            faceColor: .cyan,
+            material: .brushedAluminum,
+            housing: .festivalArmor,
+            sections: [.treads, .torso, .cameraNetwork]
+        )
+        let expected = "ROBDROID1.eyJiIjoiYmx1ZSIsImMiOiJjeWFuIiwiZiI6InBsYXNtYVB1cnBsZSIsImgiOiJmZXN0aXZhbEFybW9yIiwibSI6ImJydXNoZWRBbHVtaW51bSIsIm4iOiJOb3ZhIDciLCJzIjpbInRyZWFkcyIsInRvcnNvIiwiY2FtZXJhTmV0d29yayJdLCJ0IjoicmVkIiwidiI6MSwidyI6InBhblRpbHRHYXRsaW5nIn0.A3BE7536"
+
+        XCTAssertEqual(ROBDroidProfileCode.encode(profile), expected)
+        XCTAssertEqual(try ROBDroidProfileCode.decode(expected), profile)
+        XCTAssertThrowsError(try ROBDroidProfileCode.decode(String(expected.dropLast()) + "0"))
+    }
+
+    func testImportedDroidProfilePersistsAcrossGameSessions() {
+        let suiteName = "ROBTrainingTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let imported = ROBDroidProfile(
+            name: "Maker One", finish: .makerPink, faceColor: .amber,
+            material: .impactPolymer, housing: .openMakerFrame, sections: [.treads, .torso]
+        )
+        let game = GameSession(audioEnabled: false, progressStore: defaults)
+
+        XCTAssertTrue(game.importDroidCode(ROBDroidProfileCode.encode(imported)))
+        XCTAssertEqual(game.droidProfile, imported)
+        XCTAssertEqual(game.robotFinish, .makerPink)
+        XCTAssertEqual(game.faceColor, .amber)
+
+        let restored = GameSession(audioEnabled: false, progressStore: defaults)
+        XCTAssertEqual(restored.droidProfile, imported)
+        XCTAssertEqual(restored.droidCode, game.droidCode)
+    }
+
     func testSelectedLoadoutChangesVisibleRobotWeapons() {
         let game = GameSession(audioEnabled: false)
         let robot = RobotFactory.makeROB()
         game.selectFinish(.rescueOrange)
         RobotFactory.applyWeapons(to: robot, session: game)
 
-        XCTAssertNotNil(robot.findEntity(named: "Applied Appearance rescueOrange"))
+        XCTAssertNotNil(robot.findEntity(named: "Applied Appearance \(game.droidProfile.appearanceKey)"))
         XCTAssertTrue(robot.findEntity(named: "Right Shoulder Gatling")?.isEnabled == true)
         XCTAssertTrue(robot.findEntity(named: "Twin Blasters")?.isEnabled == false)
         XCTAssertTrue(robot.findEntity(named: "Left Lightsaber")?.isEnabled == true)
@@ -1368,7 +1404,8 @@ final class GameSessionTests: XCTestCase {
     }
 
     func testBattlePacketsRoundTripAllSynchronizedState() throws {
-        let player = ROBBattlePlayerIdentity(id: UUID(), name: "Pilot", transportName: "ROB-TEST", colorIndex: 2)
+        let profile = ROBDroidProfile(name: "Blue Nova", finish: .cobaltBlue, faceColor: .magenta, material: .carbonComposite, housing: .festivalArmor, sections: [.treads, .torso, .cameraNetwork])
+        let player = ROBBattlePlayerIdentity(id: UUID(), name: "Pilot", transportName: "ROB-TEST", colorIndex: 2, droidProfile: profile)
         let projectile = ROBBattleProjectile(
             id: UUID(), ownerID: player.id, x: 1, z: -2,
             velocityX: 4, velocityZ: -5, remaining: 2, damage: 28
@@ -1379,6 +1416,24 @@ final class GameSessionTests: XCTestCase {
 
         XCTAssertEqual(decoded.kind, .projectile)
         XCTAssertEqual(decoded.sender, player)
+        XCTAssertEqual(decoded.sender.droidProfile, profile)
         XCTAssertEqual(decoded.projectile, projectile)
+    }
+
+    func testNearbyBattleDownloadsAndRendersEachDroidProfile() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let localProfile = ROBDroidProfile(name: "Local", finish: .solarYellow, material: .brushedAluminum, housing: .fieldShell)
+        let remoteProfile = ROBDroidProfile(name: "Remote", finish: .makerPink, faceColor: .cyan, material: .impactPolymer, housing: .openMakerFrame, sections: [.treads])
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", droidProfile: localProfile)
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1, droidProfile: remoteProfile)
+
+        battle.testReceive(.init(kind: .hello, sender: remote))
+
+        XCTAssertEqual(battle.players[remoteID]?.droidProfile, remoteProfile)
+        let robot = ROBBattleFactory.makeBattleRobot(identity: remote)
+        XCTAssertNotNil(robot.findEntity(named: "Battle Appearance \(remoteProfile.appearanceKey)"))
+        XCTAssertNotNil(robot.findEntity(named: "Left Maker Frame Rail"))
+        XCTAssertNotNil(robot.findEntity(named: "Virtual Blue Balloon Beam Emitter"))
     }
 }

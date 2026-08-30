@@ -106,12 +106,15 @@ enum SaberAttackStyle: Sendable, Equatable {
     case hammerSmash
 }
 
-enum ROBFinish: String, CaseIterable, Identifiable, Sendable {
+enum ROBFinish: String, CaseIterable, Codable, Identifiable, Sendable {
     case graphite
     case rescueOrange
     case arcticWhite
     case cobaltBlue
     case tacticalGreen
+    case solarYellow
+    case plasmaPurple
+    case makerPink
 
     var id: String { rawValue }
     var displayName: String {
@@ -121,11 +124,14 @@ enum ROBFinish: String, CaseIterable, Identifiable, Sendable {
         case .arcticWhite: "Arctic White"
         case .cobaltBlue: "Cobalt Blue"
         case .tacticalGreen: "Tactical Green"
+        case .solarYellow: "Solar Yellow"
+        case .plasmaPurple: "Plasma Purple"
+        case .makerPink: "Maker Pink"
         }
     }
 }
 
-enum ROBFaceColor: String, CaseIterable, Identifiable, Sendable {
+enum ROBFaceColor: String, CaseIterable, Codable, Identifiable, Sendable {
     case lime
     case cyan
     case amber
@@ -154,7 +160,7 @@ enum ROBRangedWeapon: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
     var displayName: String {
         switch self {
-        case .shoulderGatling: "Shoulder Gatling"
+        case .shoulderGatling: "Pan-Tilt Gatling"
         case .twinBlasters: "Twin Blasters"
         case .arcCannon: "Arc Cannon"
         }
@@ -298,7 +304,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.08"
+    static let gameplayRulesetVersion = "2026.09.09"
     static let robotCollisionRadius: Float = 0.62
     static let baseDriveSpeed: Float = 1.2
     static let securityCameraHalfAngle: Float = .pi / 5
@@ -388,6 +394,7 @@ final class GameSession {
     private(set) var faceColor: ROBFaceColor = .lime
     private(set) var rangedWeapon: ROBRangedWeapon = .shoulderGatling
     private(set) var meleeWeapon: ROBMeleeWeapon = .dualSabers
+    private(set) var droidProfile = ROBDroidProfile()
     private(set) var speedUpgradeLevel = 0
     private(set) var energyUpgradeLevel = 0
     private(set) var weaponUpgradeLevel = 0
@@ -490,6 +497,15 @@ final class GameSession {
             energyUpgradeLevel = min(ROBUpgrade.energyCapacity.maximumLevel, max(0, store.integer(forKey: "robEnergyUpgradeLevel")))
             weaponUpgradeLevel = min(ROBUpgrade.weaponPower.maximumLevel, max(0, store.integer(forKey: "robWeaponUpgradeLevel")))
             targetingComputerUpgradeLevel = min(ROBUpgrade.targetingComputer.maximumLevel, max(0, store.integer(forKey: "robTargetingComputerUpgradeLevel")))
+            if let savedCode = store.string(forKey: ROBDroidProfile.storageKey),
+               let savedProfile = try? ROBDroidProfileCode.decode(savedCode) {
+                droidProfile = savedProfile
+                robotFinish = savedProfile.finish
+                faceColor = savedProfile.faceColor
+            } else {
+                droidProfile = ROBDroidProfile(finish: robotFinish, faceColor: faceColor)
+                persistDroidProfile()
+            }
         }
         configureLevel()
     }
@@ -536,11 +552,15 @@ final class GameSession {
     func selectFinish(_ finish: ROBFinish) {
         robotFinish = finish
         progressStore?.set(finish.rawValue, forKey: "robRobotFinish")
+        droidProfile.finish = finish
+        persistDroidProfile()
         message = "\(finish.displayName) finish equipped."
     }
     func selectFaceColor(_ color: ROBFaceColor) {
         faceColor = color
         progressStore?.set(color.rawValue, forKey: "robFaceColor")
+        droidProfile.faceColor = color
+        persistDroidProfile()
         message = "\(color.displayName) smile equipped."
     }
     func selectRangedWeapon(_ weapon: ROBRangedWeapon) {
@@ -560,6 +580,48 @@ final class GameSession {
         meleeWeapon = weapon
         progressStore?.set(weapon.rawValue, forKey: "robMeleeWeapon")
         message = "\(weapon.displayName) equipped."
+    }
+
+    var droidCode: String { ROBDroidProfileCode.encode(droidProfile) }
+
+    func renameDroid(_ name: String) {
+        droidProfile.name = ROBDroidProfile.cleanName(name)
+        persistDroidProfile()
+        message = "\(droidProfile.name) saved as this droid's designation."
+    }
+
+    func selectHousingMaterial(_ material: ROBHousingMaterial) {
+        droidProfile.material = material
+        persistDroidProfile()
+        message = "\(material.displayName) housing equipped."
+    }
+
+    func selectHousingStyle(_ housing: ROBHousingStyle) {
+        droidProfile.housing = housing
+        persistDroidProfile()
+        message = "\(housing.displayName) panels equipped."
+    }
+
+    @discardableResult
+    func importDroidCode(_ code: String) -> Bool {
+        do {
+            let imported = try ROBDroidProfileCode.decode(code)
+            droidProfile = imported
+            robotFinish = imported.finish
+            faceColor = imported.faceColor
+            progressStore?.set(robotFinish.rawValue, forKey: "robRobotFinish")
+            progressStore?.set(faceColor.rawValue, forKey: "robFaceColor")
+            persistDroidProfile()
+            message = "\(imported.name) imported. Its appearance is ready for training and nearby battles."
+            return true
+        } catch {
+            message = error.localizedDescription
+            return false
+        }
+    }
+
+    private func persistDroidProfile() {
+        progressStore?.set(ROBDroidProfileCode.encode(droidProfile), forKey: ROBDroidProfile.storageKey)
     }
 
     private static func puzzleGeometry(for level: ROBLevel) -> PuzzleGeometry {
