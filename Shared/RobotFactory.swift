@@ -640,7 +640,8 @@ import UIKit
         }
         if let key = puzzle.key {
             let entity = makePuzzleKey()
-            entity.position = [key.x, 0.04, key.y]
+            entity.position = [key.x, puzzleKeySurfaceOffset, key.y]
+            entity.orientation = simd_quatf(angle: -0.32, axis: [0, 1, 0])
             room.addChild(entity)
         }
         for (index, cell) in puzzle.cells.enumerated() { let entity = ModelEntity(mesh: .generateCylinder(height: 0.28, radius: 0.11), materials: [SimpleMaterial(color: .systemYellow, isMetallic: true)]); entity.name = "Puzzle Cell \(index)"; entity.position = [cell.x, 0.2, cell.y]; room.addChild(entity) }
@@ -662,28 +663,65 @@ import UIKit
         return room
     }
 
+    static let puzzleKeySurfaceOffset: Float = 0.001
+
     static func makePuzzleKey() -> Entity {
         let root = Entity()
         root.name = "Puzzle Key"
-        let material = UnlitMaterial(color: .systemCyan)
-        let shaft = ModelEntity(mesh: .generateBox(size: [0.56, 0.09, 0.16], cornerRadius: 0.035), materials: [material])
-        shaft.position = [0.08, 0.1, 0]
+
+        let keyColor = UIColor(red: 0.88, green: 0.65, blue: 0.18, alpha: 1)
+        let material = SimpleMaterial(color: keyColor, isMetallic: true)
+        let thickness: Float = 0.055
+        let restingHeight = thickness / 2 + 0.002
+
+        // Build the bow from tangent segments so it reads as a key ring from the
+        // overhead game camera without using the solid disc that resembled a gem.
+        let bowCenterX: Float = -0.29
+        let bowRadius: Float = 0.18
+        let bowSegmentCount = 16
+        let segmentLength = 2 * Float.pi * bowRadius / Float(bowSegmentCount) * 1.12
+        for index in 0..<bowSegmentCount {
+            let angle = 2 * Float.pi * Float(index) / Float(bowSegmentCount)
+            let segment = ModelEntity(
+                mesh: .generateBox(size: [segmentLength, thickness, 0.052], cornerRadius: 0.018),
+                materials: [material]
+            )
+            segment.name = "Puzzle Key Bow Segment \(index)"
+            segment.position = [
+                bowCenterX + cos(angle) * bowRadius,
+                restingHeight,
+                sin(angle) * bowRadius,
+            ]
+            segment.orientation = simd_quatf(angle: -angle - .pi / 2, axis: [0, 1, 0])
+            root.addChild(segment)
+        }
+
+        let shaft = ModelEntity(
+            mesh: .generateBox(size: [0.58, thickness, 0.085], cornerRadius: 0.018),
+            materials: [material]
+        )
+        shaft.name = "Puzzle Key Shaft"
+        shaft.position = [0.08, restingHeight, 0]
         root.addChild(shaft)
-        let ring = ModelEntity(mesh: .generateCylinder(height: 0.1, radius: 0.2), materials: [material])
-        ring.position = [-0.27, 0.1, 0]
-        root.addChild(ring)
-        for x: Float in [0.24, 0.39] {
-            let tooth = ModelEntity(mesh: .generateBox(size: [0.09, 0.09, 0.22], cornerRadius: 0.025), materials: [material])
-            tooth.position = [x, 0.1, 0.1]
+
+        for (index, x) in [Float(0.21), 0.34].enumerated() {
+            let tooth = ModelEntity(
+                mesh: .generateBox(size: [0.085, thickness, 0.16], cornerRadius: 0.016),
+                materials: [material]
+            )
+            tooth.name = "Puzzle Key Tooth \(index)"
+            tooth.position = [x, restingHeight, 0.075]
             root.addChild(tooth)
         }
-        let beacon = ModelEntity(
-            mesh: .generateCylinder(height: 0.8, radius: 0.025),
-            materials: [UnlitMaterial(color: UIColor.systemCyan.withAlphaComponent(0.55))]
+
+        let tip = ModelEntity(
+            mesh: .generateBox(size: [0.1, thickness, 0.12], cornerRadius: 0.016),
+            materials: [material]
         )
-        beacon.name = "Puzzle Key Beacon"
-        beacon.position = [0, 0.5, 0]
-        root.addChild(beacon)
+        tip.name = "Puzzle Key Tip"
+        tip.position = [0.415, restingHeight, 0.018]
+        root.addChild(tip)
+
         return root
     }
 

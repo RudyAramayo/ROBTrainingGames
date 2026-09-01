@@ -150,8 +150,12 @@ final class GameSessionTests: XCTestCase {
         guard let renderedKey = room.findEntity(named: "Puzzle Key") else {
             return XCTFail("Level 2 did not render its key")
         }
-        XCTAssertNotNil(renderedKey.findEntity(named: "Puzzle Key Beacon"))
-        XCTAssertGreaterThan(renderedKey.children.count, 3)
+        XCTAssertEqual(renderedKey.position.y, RobotFactory.puzzleKeySurfaceOffset, accuracy: 0.0001)
+        XCTAssertNil(renderedKey.findEntity(named: "Puzzle Key Beacon"))
+        XCTAssertNotNil(renderedKey.findEntity(named: "Puzzle Key Shaft"))
+        XCTAssertNotNil(renderedKey.findEntity(named: "Puzzle Key Bow Segment 0"))
+        XCTAssertNotNil(renderedKey.findEntity(named: "Puzzle Key Tooth 0"))
+        XCTAssertGreaterThan(renderedKey.children.count, 16)
 
         game.robotPosition = [key.x, 0, key.y]
         game.tick(1.0 / 30.0)
