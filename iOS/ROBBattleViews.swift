@@ -26,7 +26,7 @@ struct ROBBattleLaunchView: View {
                                 .foregroundStyle(.cyan)
                                 .shadow(color: .cyan, radius: 20)
                             Text("AutoNet Robot Battle").font(.largeTitle.bold()).multilineTextAlignment(.center)
-                            Text("Nearby ROB Training simulators find each other automatically for encrypted, four-player deathmatches. Each simulator contributes one pilot and controller.")
+                            Text("Nearby ROB Training simulators find each other automatically for encrypted Deathmatch or Capture the Flag battles. Each simulator contributes one pilot and controller.")
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
                         }
@@ -36,10 +36,14 @@ struct ROBBattleLaunchView: View {
 
                         switch battle.phase {
                         case .voting:
+                            modeSelection
                             arenaVoting
                             if battle.isHost {
                                 Button { battle.startMatch() } label: {
-                                    Label(battle.allPlayersHaveVoted ? "Start Voted Arena" : "Waiting for Every Vote", systemImage: "play.fill")
+                                    Label(
+                                        battle.allPlayersHaveVoted ? "Start \(battle.mode.name)" : "Waiting for Every Vote",
+                                        systemImage: "play.fill"
+                                    )
                                         .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.borderedProminent)
@@ -52,7 +56,7 @@ struct ROBBattleLaunchView: View {
                             }
                         case .playing:
                             VStack(spacing: 12) {
-                                Text("\(battle.arena.name) is live").font(.title2.bold())
+                                Text("\(battle.mode.name) · \(battle.arena.name) is live").font(.title2.bold())
                                 HStack {
                                     Button(action: launchGame) {
                                         Label("Enter Game View", systemImage: "gamecontroller.fill").frame(maxWidth: .infinity)
@@ -100,6 +104,27 @@ struct ROBBattleLaunchView: View {
         .onAppear { battle.startDiscovery() }
     }
 
+    private var modeSelection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Game mode", systemImage: battle.mode.symbol).font(.headline)
+            Picker(
+                "Game mode",
+                selection: Binding(get: { battle.mode }, set: { battle.selectMode($0) })
+            ) {
+                ForEach(ROBBattleMode.allCases) { mode in
+                    Label(mode.name, systemImage: mode.symbol).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(!battle.isHost)
+            Text(battle.mode.summary).font(.caption).foregroundStyle(.secondary)
+            if !battle.isHost {
+                Text("The host chooses the game mode.").font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .battleCard()
+    }
+
     private var arenaVoting: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Vote for the next arena", systemImage: "checkmark.bubble.fill").font(.headline)
@@ -135,6 +160,7 @@ struct ROBBattleLobbyStatus: View {
             HStack {
                 Label("AutoNet nearby lobby", systemImage: "network")
                 Spacer()
+                Label(battle.mode.name, systemImage: battle.mode.symbol).foregroundStyle(.yellow)
                 Text(battle.networkPlayerDescription).monospacedDigit().foregroundStyle(.cyan)
             }
             .font(.headline)
@@ -174,7 +200,11 @@ struct ROBBattleScoreboard: View {
                 HStack {
                     Text(player.name).lineLimit(1)
                     Spacer()
-                    Text("\(battle.scores[player.id, default: 0]) KOs")
+                    if battle.mode == .captureTheFlag {
+                        Text("\(battle.captures[player.id, default: 0]) captures").foregroundStyle(.yellow)
+                    } else {
+                        Text("\(battle.scores[player.id, default: 0]) KOs")
+                    }
                     Text("\(battle.deaths[player.id, default: 0]) downs").foregroundStyle(.secondary)
                 }
                 .font(.subheadline.bold()).monospacedDigit()
@@ -211,7 +241,7 @@ private struct ROBBattlePlayOverlay: View {
             HStack {
                 Button(action: onExit) { Label("Lobby", systemImage: "xmark.circle.fill") }
                 Spacer()
-                Text(battle.arena.name).font(.headline)
+                Text("\(battle.mode.name) · \(battle.arena.name)").font(.headline).lineLimit(1)
                 Spacer()
                 Label(timeText, systemImage: "timer").monospacedDigit()
             }
@@ -225,10 +255,19 @@ private struct ROBBattlePlayOverlay: View {
                     Text("H \(battle.localRobot.health)").monospacedDigit()
                     ProgressView(value: battle.localShieldFraction).tint(.cyan)
                     Text("S \(battle.localRobot.shields)").monospacedDigit()
-                    Text("\(battle.localScore) KOs").foregroundStyle(.yellow).monospacedDigit()
+                    Text(
+                        battle.mode == .captureTheFlag
+                            ? "\(battle.localScore) captures"
+                            : "\(battle.localScore) KOs"
+                    )
+                    .foregroundStyle(.yellow).monospacedDigit()
                 }
                 .font(.caption.bold())
                 ROBBattleScoreboard(battle: battle)
+                if let objective = battle.localFlagObjectiveText {
+                    Label(objective, systemImage: "flag.fill")
+                        .font(.caption.bold()).foregroundStyle(.yellow).lineLimit(2)
+                }
                 if !battle.localRobot.isAlive {
                     Text("REBUILDING \(Int(ceil(battle.localRobot.respawnRemaining)))")
                         .font(.title2.bold()).foregroundStyle(.orange).monospacedDigit()
@@ -333,7 +372,7 @@ struct ROBARBattleView: View {
                 ROBBattleARContainer(battle: battle).id(placementID).ignoresSafeArea()
                 ROBBattlePlayOverlay(battle: battle, onExit: onExit)
             case .checking:
-                ProgressView("Preparing AR deathmatch…")
+                ProgressView("Preparing AR battle…")
             case .denied:
                 ContentUnavailableView("Camera access is off", systemImage: "camera.fill", description: Text("Enable camera access in Settings to place the battle arena."))
             case .unsupported:

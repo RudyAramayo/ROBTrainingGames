@@ -115,6 +115,50 @@ enum ROBBattleFactory {
         return robot
     }
 
+    static func makeFlagBase(flag: ROBBattleFlagState, identity: ROBBattlePlayerIdentity) -> Entity {
+        let root = Entity()
+        root.name = flagBaseName(flag.ownerID)
+        root.position = flag.basePosition + SIMD3<Float>(0, 0.035, 0)
+        let color = playerColors[identity.colorIndex % playerColors.count]
+        let pad = ModelEntity(
+            mesh: .generateCylinder(height: 0.055, radius: 0.92),
+            materials: [UnlitMaterial(color: color.withAlphaComponent(0.42))]
+        )
+        pad.name = "Flag Base Pad"
+        root.addChild(pad)
+        let core = ModelEntity(
+            mesh: .generateCylinder(height: 0.075, radius: 0.26),
+            materials: [UnlitMaterial(color: color)]
+        )
+        core.name = "Flag Base Core"
+        core.position.y = 0.025
+        root.addChild(core)
+        return root
+    }
+
+    static func makeFlag(flag: ROBBattleFlagState, identity: ROBBattlePlayerIdentity, arPresentation: Bool = false) -> Entity {
+        let root = Entity()
+        root.name = flagName(flag.ownerID)
+        let color = playerColors[identity.colorIndex % playerColors.count]
+        let metal = SimpleMaterial(color: .lightGray, isMetallic: !arPresentation)
+        let pole = ModelEntity(mesh: .generateCylinder(height: 1.22, radius: 0.035), materials: [metal])
+        pole.name = "Flag Pole"
+        pole.position.y = 0.61
+        root.addChild(pole)
+        let banner = ModelEntity(
+            mesh: .generateBox(size: [0.5, 0.32, 0.035], cornerRadius: 0.018),
+            materials: [UnlitMaterial(color: color)]
+        )
+        banner.name = "Flag Banner"
+        banner.position = [0.25, 1.04, 0]
+        root.addChild(banner)
+        let finial = ModelEntity(mesh: .generateSphere(radius: 0.07), materials: [UnlitMaterial(color: color)])
+        finial.name = "Flag Finial"
+        finial.position.y = 1.27
+        root.addChild(finial)
+        return root
+    }
+
     static func applyColor(to robot: Entity, colorIndex: Int, arPresentation: Bool) {
         let color = playerColors[colorIndex % playerColors.count]
         let material = SimpleMaterial(color: color, isMetallic: !arPresentation)
@@ -172,6 +216,7 @@ enum ROBBattleFactory {
             let idText = String(child.name.dropFirst("Battle ROB ".count))
             if let id = UUID(uuidString: idText), states[id] == nil { child.removeFromParent() }
         }
+        synchronizeFlags(root: root, battle: battle, robotStates: states, arPresentation: arPresentation)
 
         let projectileNames = Set(battle.projectiles.map { projectileName($0.id) })
         for child in Array(root.children) where child.name.hasPrefix("Battle Projectile ") && !projectileNames.contains(child.name) {
@@ -194,6 +239,68 @@ enum ROBBattleFactory {
                 entity = created
             }
             entity.position = projectile.position
+        }
+    }
+
+    private static func synchronizeFlags(
+        root: Entity,
+        battle: ROBBattleCoordinator,
+        robotStates: [UUID: ROBBattleRobotState],
+        arPresentation: Bool
+    ) {
+        guard battle.mode == .captureTheFlag else {
+            for child in Array(root.children) where child.name.hasPrefix("Battle Flag ") || child.name.hasPrefix("Battle Base ") {
+                child.removeFromParent()
+            }
+            return
+        }
+
+        let flagIDs = Set(battle.flags.keys)
+        for child in Array(root.children) where child.name.hasPrefix("Battle Flag ") || child.name.hasPrefix("Battle Base ") {
+            let prefix = child.name.hasPrefix("Battle Flag ") ? "Battle Flag " : "Battle Base "
+            let idText = String(child.name.dropFirst(prefix.count))
+            if let id = UUID(uuidString: idText), !flagIDs.contains(id) { child.removeFromParent() }
+        }
+
+        for flag in battle.flags.values {
+            guard let identity = battle.players[flag.ownerID] else { continue }
+            let base: Entity
+            if let existing = root.findEntity(named: flagBaseName(flag.ownerID)) {
+                base = existing
+            } else {
+                let created = makeFlagBase(flag: flag, identity: identity)
+                root.addChild(created)
+                base = created
+            }
+            base.position = flag.basePosition + SIMD3<Float>(0, 0.035, 0)
+
+            let entity: Entity
+            if let existing = root.findEntity(named: flagName(flag.ownerID)) {
+                entity = existing
+            } else {
+                let created = makeFlag(flag: flag, identity: identity, arPresentation: arPresentation)
+                root.addChild(created)
+                entity = created
+            }
+            switch flag.disposition {
+            case .atBase:
+                entity.position = flag.basePosition + SIMD3<Float>(0, 0.07, 0)
+                entity.scale = .init(repeating: 1)
+                entity.orientation = simd_quatf(angle: 0, axis: [0, 0, 1])
+            case .dropped:
+                entity.position = flag.position + SIMD3<Float>(0, 0.07, 0)
+                entity.scale = .init(repeating: 0.82)
+                entity.orientation = simd_quatf(angle: 0.72, axis: [0, 0, 1])
+            case .carried:
+                if let carrierID = flag.carrierID, let robot = robotStates[carrierID] {
+                    let rearOffset = SIMD3<Float>(sin(robot.heading) * 0.42, 0.72, cos(robot.heading) * 0.42)
+                    entity.position = robot.position + rearOffset
+                } else {
+                    entity.position = flag.position + SIMD3<Float>(0, 0.72, 0)
+                }
+                entity.scale = .init(repeating: 0.58)
+                entity.orientation = simd_quatf(angle: 0, axis: [0, 0, 1])
+            }
         }
     }
 
@@ -245,6 +352,8 @@ enum ROBBattleFactory {
 
     static func robotName(_ id: UUID) -> String { "Battle ROB \(id.uuidString)" }
     static func projectileName(_ id: UUID) -> String { "Battle Projectile \(id.uuidString)" }
+    static func flagName(_ id: UUID) -> String { "Battle Flag \(id.uuidString)" }
+    static func flagBaseName(_ id: UUID) -> String { "Battle Base \(id.uuidString)" }
 }
 
 struct ROBBattleRealityScene: View {

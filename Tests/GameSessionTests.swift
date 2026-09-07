@@ -1524,6 +1524,153 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(battle.playerCount, ROBBattleCoordinator.maximumPlayers)
     }
 
+    func testOnlyTheHostCanSelectAndSynchronizeTheBattleMode() {
+        let clientID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let hostID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: clientID, playerName: "Beta", audioEnabled: false)
+        let host = ROBBattlePlayerIdentity(id: hostID, name: "Alpha", transportName: "ROB-ALPHA", colorIndex: 0)
+        battle.testReceive(.init(kind: .hello, sender: host))
+
+        XCTAssertFalse(battle.isHost)
+        battle.selectMode(.captureTheFlag)
+        XCTAssertEqual(battle.mode, .deathmatch)
+
+        battle.testReceive(.init(kind: .modeSelection, sender: host, mode: .captureTheFlag))
+        XCTAssertEqual(battle.mode, .captureTheFlag)
+    }
+
+    func testCaptureTheFlagCreatesVisibleBasesAndScoresReturnedEnemyFlags() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", audioEnabled: false)
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
+        battle.testReceive(.init(kind: .hello, sender: remote))
+        battle.selectMode(.captureTheFlag)
+        battle.vote(for: .neonFoundry)
+        battle.testReceive(.init(kind: .vote, sender: remote, vote: .neonFoundry))
+        battle.startMatch()
+
+        XCTAssertEqual(battle.mode, .captureTheFlag)
+        XCTAssertEqual(battle.flags.count, 2)
+        XCTAssertTrue(battle.flags.values.allSatisfy { $0.disposition == .atBase && $0.carrierID == nil })
+
+        let root = Entity()
+        root.addChild(ROBBattleFactory.makeArena(battle.arena))
+        ROBBattleFactory.synchronize(root: root, battle: battle)
+        XCTAssertNotNil(root.findEntity(named: ROBBattleFactory.flagName(localID)))
+        XCTAssertNotNil(root.findEntity(named: ROBBattleFactory.flagBaseName(localID)))
+        XCTAssertNotNil(root.findEntity(named: ROBBattleFactory.flagName(remoteID))?.findEntity(named: "Flag Banner"))
+
+        var remoteAway = battle.remoteRobots[remoteID]!
+        remoteAway.x = 4.5
+        remoteAway.z = 6.4
+        battle.testReceive(.init(kind: .snapshot, sender: remote, snapshot: remoteAway, snapshotSequence: 10))
+        let localBase = battle.flags[localID]!.basePosition
+        let remoteBase = battle.flags[remoteID]!.basePosition
+
+        for expectedCaptures in 1...ROBBattleMode.captureTheFlag.scoreLimit {
+            battle.testSetLocalRobotPosition(remoteBase)
+            battle.tick(0.01)
+            XCTAssertEqual(battle.flags[remoteID]?.disposition, .carried)
+            XCTAssertEqual(battle.flags[remoteID]?.carrierID, localID)
+
+            battle.testSetLocalRobotPosition(localBase)
+            battle.tick(0.01)
+            XCTAssertEqual(battle.captures[localID], expectedCaptures)
+            XCTAssertEqual(battle.flags[remoteID]?.disposition, .atBase)
+            XCTAssertNil(battle.flags[remoteID]?.carrierID)
+        }
+
+        XCTAssertEqual(battle.phase, .results)
+        XCTAssertEqual(battle.winnerID, localID)
+        XCTAssertEqual(battle.localScore, ROBBattleMode.captureTheFlag.scoreLimit)
+    }
+
+    func testCaptureTheFlagDropsCarriedFlagWhenCarrierIsKnockedOut() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        var cues: [ROBBattleSoundCue] = []
+        let battle = ROBBattleCoordinator(
+            networkingEnabled: false,
+            playerID: localID,
+            playerName: "Alpha",
+            audioEnabled: false,
+            soundFeedback: { cues.append($0) }
+        )
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
+        battle.testReceive(.init(kind: .hello, sender: remote))
+        battle.selectMode(.captureTheFlag)
+        battle.vote(for: .orbitalRing)
+        battle.testReceive(.init(kind: .vote, sender: remote, vote: .orbitalRing))
+        battle.startMatch()
+
+        var remoteAway = battle.remoteRobots[remoteID]!
+        remoteAway.x = 4.5
+        remoteAway.z = 6.4
+        battle.testReceive(.init(kind: .snapshot, sender: remote, snapshot: remoteAway, snapshotSequence: 10))
+        battle.testSetLocalRobotPosition(battle.flags[remoteID]!.basePosition)
+        battle.tick(0.01)
+        XCTAssertEqual(battle.flags[remoteID]?.carrierID, localID)
+
+        cues.removeAll()
+        let deathPosition = battle.localRobot.position
+        let knockout = ROBBattleProjectile(
+            id: UUID(), ownerID: remoteID,
+            x: deathPosition.x, z: deathPosition.z,
+            velocityX: 0, velocityZ: 0,
+            remaining: 1, damage: 200
+        )
+        battle.testReceive(.init(kind: .projectile, sender: remote, projectile: knockout))
+        battle.tick(0.01)
+
+        XCTAssertFalse(battle.localRobot.isAlive)
+        XCTAssertEqual(battle.flags[remoteID]?.disposition, .dropped)
+        XCTAssertNil(battle.flags[remoteID]?.carrierID)
+        XCTAssertEqual(battle.flags[remoteID]?.x ?? 0, deathPosition.x, accuracy: 0.001)
+        XCTAssertEqual(battle.flags[remoteID]?.z ?? 0, deathPosition.z, accuracy: 0.001)
+        XCTAssertEqual(cues.filter { $0 == .flagDrop }.count, 1)
+    }
+
+    func testCaptureTheFlagOwnerReturnsTheirDroppedFlag() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", audioEnabled: false)
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
+        battle.testReceive(.init(kind: .hello, sender: remote))
+        battle.selectMode(.captureTheFlag)
+        battle.vote(for: .shadowYard)
+        battle.testReceive(.init(kind: .vote, sender: remote, vote: .shadowYard))
+        battle.startMatch()
+
+        let localBase = battle.flags[localID]!.basePosition
+        var remoteAtFlag = battle.remoteRobots[remoteID]!
+        remoteAtFlag.x = localBase.x
+        remoteAtFlag.z = localBase.z
+        battle.testReceive(.init(kind: .snapshot, sender: remote, snapshot: remoteAtFlag, snapshotSequence: 10))
+        let pickup = ROBBattleFlagRequest(
+            id: UUID(), matchID: battle.matchID,
+            playerID: remoteID, flagOwnerID: localID, action: .pickup
+        )
+        battle.testReceive(.init(kind: .flagRequest, sender: remote, flagRequest: pickup))
+        XCTAssertEqual(battle.flags[localID]?.carrierID, remoteID)
+
+        let knockout = ROBBattleKnockout(id: UUID(), attackerID: localID, victimID: remoteID)
+        battle.testReceive(.init(kind: .knockout, sender: remote, knockout: knockout))
+        XCTAssertEqual(battle.flags[localID]?.disposition, .dropped)
+        XCTAssertNil(battle.flags[localID]?.carrierID)
+
+        var remoteAway = remoteAtFlag
+        remoteAway.x = 4.5
+        remoteAway.z = 6.4
+        battle.testReceive(.init(kind: .snapshot, sender: remote, snapshot: remoteAway, snapshotSequence: 11))
+        battle.testSetLocalRobotPosition(localBase)
+        battle.tick(0.01)
+
+        XCTAssertEqual(battle.flags[localID]?.disposition, .atBase)
+        XCTAssertEqual(battle.flags[localID]?.position, localBase)
+        XCTAssertTrue(battle.statusMessage.localizedCaseInsensitiveContains("returned"))
+    }
+
     func testBattleSpawnAssignmentsFaceEveryDroidTowardArenaCenter() {
         let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
@@ -1758,6 +1905,88 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(decoded.projectile, projectile)
     }
 
+    func testCaptureTheFlagUpdatePacketRoundTripsAuthoritativeState() throws {
+        let ownerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let carrierID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let host = ROBBattlePlayerIdentity(id: ownerID, name: "Host", transportName: "ROB-HOST", colorIndex: 0)
+        let flag = ROBBattleFlagState(
+            ownerID: ownerID,
+            baseX: -6.4, baseZ: -6.4,
+            x: -1.25, z: 2.5,
+            disposition: .carried, carrierID: carrierID
+        )
+        let update = ROBBattleFlagUpdate(
+            matchID: UUID(),
+            revision: 4,
+            flags: [flag],
+            captures: [.init(playerID: carrierID, captures: 2)],
+            action: .pickup,
+            actorID: carrierID,
+            flagOwnerID: ownerID
+        )
+        let packet = ROBBattlePacket(kind: .flagUpdate, sender: host, flagUpdate: update)
+
+        let decoded = try JSONDecoder().decode(ROBBattlePacket.self, from: JSONEncoder().encode(packet))
+
+        XCTAssertEqual(decoded.kind, .flagUpdate)
+        XCTAssertEqual(decoded.flagUpdate, update)
+    }
+
+    func testCaptureTheFlagClientAppliesOnlyNewHostFlagUpdates() {
+        let hostID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let clientID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let client = ROBBattleCoordinator(networkingEnabled: false, playerID: clientID, playerName: "Beta", audioEnabled: false)
+        let host = ROBBattlePlayerIdentity(id: hostID, name: "Alpha", transportName: "ROB-ALPHA", colorIndex: 0)
+        client.testReceive(.init(kind: .hello, sender: host))
+        let start = ROBBattleMatchStart(
+            matchID: UUID(),
+            mode: .captureTheFlag,
+            arena: .reactorGrid,
+            assignments: [
+                .init(playerID: hostID, spawnIndex: 0),
+                .init(playerID: clientID, spawnIndex: 1),
+            ],
+            duration: ROBBattleCoordinator.matchDuration,
+            scoreLimit: ROBBattleMode.captureTheFlag.scoreLimit
+        )
+        client.testReceive(.init(kind: .matchStart, sender: host, matchStart: start))
+
+        var hostFlag = client.flags[hostID]!
+        hostFlag.disposition = .carried
+        hostFlag.carrierID = clientID
+        let accepted = ROBBattleFlagUpdate(
+            matchID: client.matchID,
+            revision: 2,
+            flags: [hostFlag, client.flags[clientID]!],
+            captures: [
+                .init(playerID: hostID, captures: 0),
+                .init(playerID: clientID, captures: 1),
+            ],
+            action: .pickup,
+            actorID: clientID,
+            flagOwnerID: hostID
+        )
+        client.testReceive(.init(kind: .flagUpdate, sender: host, flagUpdate: accepted))
+        XCTAssertEqual(client.flags[hostID]?.carrierID, clientID)
+        XCTAssertEqual(client.captures[clientID], 1)
+
+        var staleFlag = hostFlag
+        staleFlag.disposition = .atBase
+        staleFlag.carrierID = nil
+        let stale = ROBBattleFlagUpdate(
+            matchID: client.matchID,
+            revision: 1,
+            flags: [staleFlag, client.flags[clientID]!],
+            captures: [.init(playerID: clientID, captures: 0)],
+            action: .returnHome,
+            actorID: hostID,
+            flagOwnerID: hostID
+        )
+        client.testReceive(.init(kind: .flagUpdate, sender: host, flagUpdate: stale))
+        XCTAssertEqual(client.flags[hostID]?.carrierID, clientID)
+        XCTAssertEqual(client.captures[clientID], 1)
+    }
+
     func testBattleSnapshotsInterpolateRemoteMovementAndDiscardStaleUpdates() {
         let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
@@ -1824,6 +2053,10 @@ final class GameSessionTests: XCTestCase {
         )
         XCTAssertEqual(
             ROBBattleNetwork.deliveryMode(for: .collision).rawValue,
+            MCSessionSendDataMode.reliable.rawValue
+        )
+        XCTAssertEqual(
+            ROBBattleNetwork.deliveryMode(for: .flagUpdate).rawValue,
             MCSessionSendDataMode.reliable.rawValue
         )
     }

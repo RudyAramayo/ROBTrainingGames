@@ -4,6 +4,41 @@ import Foundation
 import Observation
 import simd
 
+enum ROBBattleMode: String, CaseIterable, Codable, Identifiable, Sendable {
+    case deathmatch
+    case captureTheFlag
+
+    var id: String { rawValue }
+
+    var name: String {
+        switch self {
+        case .deathmatch: "Deathmatch"
+        case .captureTheFlag: "Capture the Flag"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .deathmatch: "Disable opponents. The first pilot to five knockouts wins."
+        case .captureTheFlag: "Steal an opponent's flag and return it to your base. First to three captures wins."
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .deathmatch: "scope"
+        case .captureTheFlag: "flag.checkered"
+        }
+    }
+
+    var scoreLimit: Int {
+        switch self {
+        case .deathmatch: 5
+        case .captureTheFlag: 3
+        }
+    }
+}
+
 enum ROBBattleArena: String, CaseIterable, Codable, Identifiable, Sendable {
     case neonFoundry
     case orbitalRing
@@ -158,6 +193,56 @@ struct ROBBattleCollisionEvent: Codable, Equatable, Sendable {
     let impulse: Float
 }
 
+enum ROBBattleFlagDisposition: String, Codable, Equatable, Sendable {
+    case atBase
+    case carried
+    case dropped
+}
+
+struct ROBBattleFlagState: Codable, Equatable, Identifiable, Sendable {
+    var id: UUID { ownerID }
+    let ownerID: UUID
+    let baseX: Float
+    let baseZ: Float
+    var x: Float
+    var z: Float
+    var disposition: ROBBattleFlagDisposition
+    var carrierID: UUID?
+
+    var position: SIMD3<Float> { [x, 0, z] }
+    var basePosition: SIMD3<Float> { [baseX, 0, baseZ] }
+}
+
+enum ROBBattleFlagAction: String, Codable, Equatable, Sendable {
+    case pickup
+    case drop
+    case returnHome
+    case capture
+}
+
+struct ROBBattleFlagRequest: Codable, Equatable, Sendable {
+    let id: UUID
+    let matchID: UUID
+    let playerID: UUID
+    let flagOwnerID: UUID
+    let action: ROBBattleFlagAction
+}
+
+struct ROBBattleCaptureScore: Codable, Equatable, Sendable {
+    let playerID: UUID
+    let captures: Int
+}
+
+struct ROBBattleFlagUpdate: Codable, Equatable, Sendable {
+    let matchID: UUID
+    let revision: UInt64
+    let flags: [ROBBattleFlagState]
+    let captures: [ROBBattleCaptureScore]
+    let action: ROBBattleFlagAction
+    let actorID: UUID
+    let flagOwnerID: UUID
+}
+
 struct ROBBattleSpawnAssignment: Codable, Equatable, Sendable {
     let playerID: UUID
     let spawnIndex: Int
@@ -165,6 +250,7 @@ struct ROBBattleSpawnAssignment: Codable, Equatable, Sendable {
 
 struct ROBBattleMatchStart: Codable, Equatable, Sendable {
     let matchID: UUID
+    let mode: ROBBattleMode
     let arena: ROBBattleArena
     let assignments: [ROBBattleSpawnAssignment]
     let duration: Double
@@ -172,12 +258,14 @@ struct ROBBattleMatchStart: Codable, Equatable, Sendable {
 }
 
 enum ROBBattlePacketKind: String, Codable, Sendable {
-    case hello, vote, matchStart, snapshot, projectile, projectileImpact, melee, knockout, collision, matchEnd, nextVote
+    case hello, modeSelection, vote, matchStart, snapshot, projectile, projectileImpact, melee, knockout, collision
+    case flagRequest, flagUpdate, matchEnd, nextVote
 }
 
 struct ROBBattlePacket: Codable, Sendable {
     let kind: ROBBattlePacketKind
     let sender: ROBBattlePlayerIdentity
+    var mode: ROBBattleMode?
     var vote: ROBBattleArena?
     var matchStart: ROBBattleMatchStart?
     var snapshot: ROBBattleRobotState?
@@ -186,6 +274,8 @@ struct ROBBattlePacket: Codable, Sendable {
     var melee: ROBBattleMeleeEvent?
     var knockout: ROBBattleKnockout?
     var collision: ROBBattleCollisionEvent?
+    var flagRequest: ROBBattleFlagRequest?
+    var flagUpdate: ROBBattleFlagUpdate?
     var winnerID: UUID?
     var snapshotSequence: UInt64?
 }
@@ -223,7 +313,7 @@ final class ROBBattleNetwork: NSObject {
     )
     @ObservationIgnored private lazy var advertiser = MCNearbyServiceAdvertiser(
         peer: localPeer,
-        discoveryInfo: ["game": "deathmatch", "version": "2"],
+        discoveryInfo: ["game": "battle", "version": "3"],
         serviceType: Self.serviceType
     )
     @ObservationIgnored private lazy var browser = MCNearbyServiceBrowser(peer: localPeer, serviceType: Self.serviceType)
@@ -317,7 +407,7 @@ extension ROBBattleNetwork: MCSessionDelegate {
 
 extension ROBBattleNetwork: MCNearbyServiceBrowserDelegate {
     nonisolated func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String: String]?) {
-        guard info?["game"] == "deathmatch", info?["version"] == "2" else { return }
+        guard info?["game"] == "battle", info?["version"] == "3" else { return }
         let box = ROBBattlePeerBox(peer: peerID)
         Task { @MainActor [weak self] in self?.found(box.peer) }
     }
@@ -364,9 +454,10 @@ struct ROBBattleRobotAnimationState: Equatable, Sendable {
 final class ROBBattleCoordinator {
     static let maximumPlayers = 4
     static let matchDuration = 180.0
-    static let scoreLimit = 5
     static let arenaHalfExtent: Float = 8.2
     static let robotRadius: Float = 0.64
+    static let flagInteractionRadius: Float = 0.95
+    static let flagCaptureRadius: Float = 1.15
     static let remoteInterpolationDuration = 0.1
     static let remoteSnapDistance: Float = 3
     static let collisionImpulse: Float = 0.38
@@ -377,6 +468,7 @@ final class ROBBattleCoordinator {
     private(set) var players: [UUID: ROBBattlePlayerIdentity]
     private(set) var votes: [UUID: ROBBattleArena] = [:]
     private(set) var phase = ROBBattlePhase.voting
+    private(set) var mode = ROBBattleMode.deathmatch
     private(set) var arena = ROBBattleArena.neonFoundry
     private(set) var matchID = UUID()
     private(set) var remainingTime = ROBBattleCoordinator.matchDuration
@@ -385,6 +477,8 @@ final class ROBBattleCoordinator {
     private(set) var projectiles: [ROBBattleProjectile] = []
     private(set) var robotAnimations: [UUID: ROBBattleRobotAnimationState] = [:]
     private(set) var scores: [UUID: Int] = [:]
+    private(set) var captures: [UUID: Int] = [:]
+    private(set) var flags: [UUID: ROBBattleFlagState] = [:]
     private(set) var deaths: [UUID: Int] = [:]
     private(set) var winnerID: UUID?
     private(set) var statusMessage = "AutoNet is looking for nearby ROB Training battles…"
@@ -403,6 +497,8 @@ final class ROBBattleCoordinator {
     @ObservationIgnored private var remoteInterpolations: [UUID: ROBBattleRemoteInterpolation] = [:]
     @ObservationIgnored private var lastCollisionTimes: [UUID: Double] = [:]
     @ObservationIgnored private var lastCollisionSoundTime = -Double.infinity
+    @ObservationIgnored private var flagRevision: UInt64 = 0
+    @ObservationIgnored private var lastFlagRequestTime = -Double.infinity
 
     var orderedPlayers: [ROBBattlePlayerIdentity] {
         players.values.sorted { lhs, rhs in
@@ -417,12 +513,34 @@ final class ROBBattleCoordinator {
     var canStartMatch: Bool { phase == .voting && isHost && allPlayersHaveVoted }
     var selectedVote: ROBBattleArena? { votes[localIdentity.id] }
     var allRobotStates: [ROBBattleRobotState] { [localRobot] + Array(remoteRobots.values) }
-    var localScore: Int { scores[localIdentity.id, default: 0] }
+    var localScore: Int { matchScore(for: localIdentity.id) }
     var localDeaths: Int { deaths[localIdentity.id, default: 0] }
     var localHealthFraction: Double { Double(localRobot.health) / 100 }
     var localShieldFraction: Double { Double(localRobot.shields) / 50 }
     var winnerName: String? { winnerID.flatMap { players[$0]?.name } }
     var networkPlayerDescription: String { "\(playerCount)/\(Self.maximumPlayers) players" }
+    var localCarriedFlag: ROBBattleFlagState? { flags.values.first { $0.carrierID == localIdentity.id } }
+
+    var localFlagObjectiveText: String? {
+        guard mode == .captureTheFlag, let ownFlag = flags[localIdentity.id] else { return nil }
+        if let carried = localCarriedFlag {
+            let owner = players[carried.ownerID]?.name ?? "Opponent"
+            return ownFlag.disposition == .atBase
+                ? "Carrying \(owner)'s flag — return to your base"
+                : "Carrying \(owner)'s flag — recover your flag before scoring"
+        }
+        switch ownFlag.disposition {
+        case .atBase: return "Your flag is secure"
+        case .carried:
+            let carrier = ownFlag.carrierID.flatMap { players[$0]?.name } ?? "An opponent"
+            return "\(carrier) has your flag"
+        case .dropped: return "Your flag was dropped — touch it to return it"
+        }
+    }
+
+    func matchScore(for playerID: UUID) -> Int {
+        mode == .captureTheFlag ? captures[playerID, default: 0] : scores[playerID, default: 0]
+    }
 
     func animationState(for robotID: UUID) -> ROBBattleRobotAnimationState {
         robotAnimations[robotID, default: .init()]
@@ -456,6 +574,7 @@ final class ROBBattleCoordinator {
         )
         robotAnimations = [id: .init()]
         scores = [id: 0]
+        captures = [id: 0]
         deaths = [id: 0]
         if let soundFeedback {
             self.soundFeedback = soundFeedback
@@ -486,6 +605,13 @@ final class ROBBattleCoordinator {
         broadcastHello()
     }
 
+    func selectMode(_ selectedMode: ROBBattleMode) {
+        guard phase == .voting, isHost else { return }
+        mode = selectedMode
+        statusMessage = "\(selectedMode.name) selected. Vote for an arena."
+        send(.init(kind: .modeSelection, sender: localIdentity, mode: selectedMode))
+    }
+
     func vote(for arena: ROBBattleArena) {
         guard phase == .voting else { return }
         votes[localIdentity.id] = arena
@@ -503,10 +629,11 @@ final class ROBBattleCoordinator {
         }
         let start = ROBBattleMatchStart(
             matchID: UUID(),
+            mode: mode,
             arena: winningArena,
             assignments: assignments,
             duration: Self.matchDuration,
-            scoreLimit: Self.scoreLimit
+            scoreLimit: mode.scoreLimit
         )
         applyMatchStart(start)
         send(.init(kind: .matchStart, sender: localIdentity, matchStart: start))
@@ -539,6 +666,7 @@ final class ROBBattleCoordinator {
         updateProjectiles(step)
         updateRemoteInterpolation(step)
         updateRobotAnimationTimers(step)
+        updateFlagInteractions()
 
         let matchElapsed = Self.matchDuration - remainingTime
         if matchElapsed - lastSnapshotSent >= 1.0 / 15.0 {
@@ -546,7 +674,8 @@ final class ROBBattleCoordinator {
             broadcastSnapshot()
         }
 
-        if isHost, remainingTime <= 0 || scores.values.max() ?? 0 >= Self.scoreLimit {
+        let leadingScore = players.keys.map(matchScore(for:)).max() ?? 0
+        if isHost, remainingTime <= 0 || leadingScore >= mode.scoreLimit {
             finishMatch()
         }
     }
@@ -727,6 +856,176 @@ final class ROBBattleCoordinator {
         return current
     }
 
+    private func updateFlagInteractions() {
+        guard mode == .captureTheFlag, phase == .playing, localRobot.isAlive else { return }
+        let position = SIMD2<Float>(localRobot.x, localRobot.z)
+
+        if let carried = localCarriedFlag {
+            guard let ownFlag = flags[localIdentity.id], ownFlag.disposition == .atBase else { return }
+            let base = SIMD2<Float>(ownFlag.baseX, ownFlag.baseZ)
+            if simd_distance(position, base) <= Self.flagCaptureRadius {
+                requestFlagAction(.capture, flagOwnerID: carried.ownerID)
+            }
+            return
+        }
+
+        if let ownFlag = flags[localIdentity.id], ownFlag.disposition == .dropped,
+           simd_distance(position, SIMD2<Float>(ownFlag.x, ownFlag.z)) <= Self.flagInteractionRadius {
+            requestFlagAction(.returnHome, flagOwnerID: localIdentity.id)
+            return
+        }
+
+        var availableEnemyFlag: ROBBattleFlagState?
+        var nearestDistance = Float.greatestFiniteMagnitude
+        for flag in flags.values where flag.ownerID != localIdentity.id && flag.carrierID == nil {
+            guard flag.disposition == .atBase || flag.disposition == .dropped else { continue }
+            let distance = simd_distance(position, SIMD2<Float>(flag.x, flag.z))
+            guard distance <= Self.flagInteractionRadius else { continue }
+            if distance < nearestDistance ||
+                (distance == nearestDistance && flag.ownerID.uuidString < (availableEnemyFlag?.ownerID.uuidString ?? "")) {
+                availableEnemyFlag = flag
+                nearestDistance = distance
+            }
+        }
+        if let availableEnemyFlag {
+            requestFlagAction(.pickup, flagOwnerID: availableEnemyFlag.ownerID)
+        }
+    }
+
+    private func requestFlagAction(_ action: ROBBattleFlagAction, flagOwnerID: UUID) {
+        let now = Self.matchDuration - remainingTime
+        if !isHost {
+            guard now - lastFlagRequestTime >= 0.3 else { return }
+            lastFlagRequestTime = now
+        }
+        let request = ROBBattleFlagRequest(
+            id: UUID(),
+            matchID: matchID,
+            playerID: localIdentity.id,
+            flagOwnerID: flagOwnerID,
+            action: action
+        )
+        if isHost {
+            applyFlagRequest(request, senderID: localIdentity.id)
+        } else {
+            send(.init(kind: .flagRequest, sender: localIdentity, flagRequest: request))
+        }
+    }
+
+    private func applyFlagRequest(_ request: ROBBattleFlagRequest, senderID: UUID) {
+        guard isHost, mode == .captureTheFlag, phase == .playing,
+              request.matchID == matchID,
+              request.playerID == senderID,
+              processedEvents.insert(request.id).inserted,
+              let robot = authoritativeRobotState(for: request.playerID), robot.isAlive,
+              var flag = flags[request.flagOwnerID] else { return }
+        let robotPosition = SIMD2<Float>(robot.x, robot.z)
+
+        switch request.action {
+        case .pickup:
+            guard flag.ownerID != request.playerID,
+                  flag.carrierID == nil,
+                  flag.disposition == .atBase || flag.disposition == .dropped,
+                  !flags.values.contains(where: { $0.carrierID == request.playerID }),
+                  simd_distance(robotPosition, SIMD2<Float>(flag.x, flag.z)) <= Self.flagInteractionRadius + 0.35
+            else { return }
+            flag.disposition = .carried
+            flag.carrierID = request.playerID
+            flags[flag.ownerID] = flag
+            commitFlagUpdate(action: .pickup, actorID: request.playerID, flagOwnerID: flag.ownerID)
+        case .returnHome:
+            guard flag.ownerID == request.playerID,
+                  flag.disposition == .dropped,
+                  simd_distance(robotPosition, SIMD2<Float>(flag.x, flag.z)) <= Self.flagInteractionRadius + 0.35
+            else { return }
+            returnFlagToBase(&flag)
+            flags[flag.ownerID] = flag
+            commitFlagUpdate(action: .returnHome, actorID: request.playerID, flagOwnerID: flag.ownerID)
+        case .capture:
+            guard flag.ownerID != request.playerID,
+                  flag.disposition == .carried,
+                  flag.carrierID == request.playerID,
+                  let ownFlag = flags[request.playerID], ownFlag.disposition == .atBase,
+                  simd_distance(robotPosition, SIMD2<Float>(ownFlag.baseX, ownFlag.baseZ)) <= Self.flagCaptureRadius + 0.35
+            else { return }
+            captures[request.playerID, default: 0] += 1
+            returnFlagToBase(&flag)
+            flags[flag.ownerID] = flag
+            commitFlagUpdate(action: .capture, actorID: request.playerID, flagOwnerID: flag.ownerID)
+        case .drop:
+            break
+        }
+    }
+
+    private func authoritativeRobotState(for playerID: UUID) -> ROBBattleRobotState? {
+        if playerID == localIdentity.id { return localRobot }
+        return remoteInterpolations[playerID]?.target ?? remoteRobots[playerID]
+    }
+
+    private func returnFlagToBase(_ flag: inout ROBBattleFlagState) {
+        flag.x = flag.baseX
+        flag.z = flag.baseZ
+        flag.disposition = .atBase
+        flag.carrierID = nil
+    }
+
+    private func dropCarriedFlag(from playerID: UUID) {
+        guard isHost, mode == .captureTheFlag,
+              let carried = flags.values.first(where: { $0.carrierID == playerID }),
+              let robot = authoritativeRobotState(for: playerID),
+              var flag = flags[carried.ownerID] else { return }
+        flag.x = robot.x
+        flag.z = robot.z
+        flag.disposition = .dropped
+        flag.carrierID = nil
+        flags[flag.ownerID] = flag
+        commitFlagUpdate(action: .drop, actorID: playerID, flagOwnerID: flag.ownerID)
+    }
+
+    private func commitFlagUpdate(action: ROBBattleFlagAction, actorID: UUID, flagOwnerID: UUID) {
+        flagRevision &+= 1
+        let update = ROBBattleFlagUpdate(
+            matchID: matchID,
+            revision: flagRevision,
+            flags: flags.values.sorted { $0.ownerID.uuidString < $1.ownerID.uuidString },
+            captures: captures.map { ROBBattleCaptureScore(playerID: $0.key, captures: $0.value) }
+                .sorted { $0.playerID.uuidString < $1.playerID.uuidString },
+            action: action,
+            actorID: actorID,
+            flagOwnerID: flagOwnerID
+        )
+        presentFlagUpdate(update)
+        send(.init(kind: .flagUpdate, sender: localIdentity, flagUpdate: update))
+    }
+
+    private func applyFlagUpdate(_ update: ROBBattleFlagUpdate, senderID: UUID) {
+        guard mode == .captureTheFlag, update.matchID == matchID,
+              senderID == hostID, update.revision > flagRevision else { return }
+        flagRevision = update.revision
+        flags = Dictionary(uniqueKeysWithValues: update.flags.map { ($0.ownerID, $0) })
+        captures = Dictionary(uniqueKeysWithValues: update.captures.map { ($0.playerID, $0.captures) })
+        presentFlagUpdate(update)
+    }
+
+    private func presentFlagUpdate(_ update: ROBBattleFlagUpdate) {
+        let actor = players[update.actorID]?.name ?? "A pilot"
+        let owner = players[update.flagOwnerID]?.name ?? "an opponent"
+        switch update.action {
+        case .pickup:
+            statusMessage = "\(actor) took \(owner)'s flag!"
+            play(.flagPickup)
+        case .drop:
+            statusMessage = "\(actor) was disabled and dropped \(owner)'s flag."
+            play(.flagDrop)
+        case .returnHome:
+            statusMessage = "\(actor) returned their flag to base."
+            play(.flagPickup)
+        case .capture:
+            statusMessage = "\(actor) captured \(owner)'s flag!"
+            play(.flagCapture)
+        }
+    }
+
     private func acceptRemoteSnapshot(_ snapshot: ROBBattleRobotState, sequence: UInt64?) {
         if let sequence {
             guard sequence > lastRemoteSnapshotSequences[snapshot.id, default: 0] else { return }
@@ -900,6 +1199,7 @@ final class ROBBattleCoordinator {
     private func applyKnockout(_ knockout: ROBBattleKnockout) {
         guard processedEvents.insert(knockout.id).inserted else { return }
         scores[knockout.attackerID, default: 0] += 1
+        dropCarriedFlag(from: knockout.victimID)
         if knockout.victimID != localIdentity.id {
             deaths[knockout.victimID, default: 0] += 1
             play(.knockout)
@@ -933,13 +1233,29 @@ final class ROBBattleCoordinator {
 
     private func applyMatchStart(_ start: ROBBattleMatchStart) {
         matchID = start.matchID
+        mode = start.mode
         arena = start.arena
         phase = .playing
         remainingTime = start.duration
         winnerID = nil
         scores = Dictionary(uniqueKeysWithValues: players.keys.map { ($0, 0) })
+        captures = Dictionary(uniqueKeysWithValues: players.keys.map { ($0, 0) })
         deaths = Dictionary(uniqueKeysWithValues: players.keys.map { ($0, 0) })
         projectiles = []
+        flags = mode == .captureTheFlag
+            ? Dictionary(uniqueKeysWithValues: start.assignments.map { assignment in
+                let base = arena.spawnPoints[assignment.spawnIndex % arena.spawnPoints.count]
+                return (
+                    assignment.playerID,
+                    ROBBattleFlagState(
+                        ownerID: assignment.playerID,
+                        baseX: base.x, baseZ: base.z,
+                        x: base.x, z: base.z,
+                        disposition: .atBase, carrierID: nil
+                    )
+                )
+            })
+            : [:]
         robotAnimations = Dictionary(uniqueKeysWithValues: players.keys.map { ($0, .init()) })
         processedEvents = []
         outgoingSnapshotSequence = 0
@@ -947,6 +1263,8 @@ final class ROBBattleCoordinator {
         remoteInterpolations = [:]
         lastCollisionTimes = [:]
         lastCollisionSoundTime = -.infinity
+        flagRevision = 0
+        lastFlagRequestTime = -.infinity
         lastSnapshotSent = -.infinity
         lastLaserTime = -.infinity
         lastMeleeTime = -.infinity
@@ -967,21 +1285,25 @@ final class ROBBattleCoordinator {
             )
         }
         network?.pauseDiscovery()
-        statusMessage = "\(arena.name) deathmatch: first to \(Self.scoreLimit) knockouts wins."
+        statusMessage = mode == .captureTheFlag
+            ? "\(arena.name) Capture the Flag: return \(mode.scoreLimit) enemy flags to your base."
+            : "\(arena.name) deathmatch: first to \(mode.scoreLimit) knockouts wins."
         play(.matchStart)
         broadcastSnapshot()
     }
 
     private func finishMatch() {
         guard phase == .playing else { return }
-        winnerID = scores.keys.sorted { lhs, rhs in
-            let left = scores[lhs, default: 0], right = scores[rhs, default: 0]
-            return left == right ? lhs.uuidString < rhs.uuidString : left > right
+        winnerID = players.keys.sorted { lhs, rhs in
+            let left = matchScore(for: lhs), right = matchScore(for: rhs)
+            if left != right { return left > right }
+            let leftKOs = scores[lhs, default: 0], rightKOs = scores[rhs, default: 0]
+            return leftKOs == rightKOs ? lhs.uuidString < rhs.uuidString : leftKOs > rightKOs
         }.first
         phase = .results
         stopDrive()
         projectiles = []
-        statusMessage = winnerName.map { "\($0) wins \(arena.name)!" } ?? "Deathmatch complete."
+        statusMessage = winnerName.map { "\($0) wins \(arena.name) \(mode.name)!" } ?? "\(mode.name) complete."
         play(.victory)
         send(.init(kind: .matchEnd, sender: localIdentity, winnerID: winnerID))
     }
@@ -991,12 +1313,15 @@ final class ROBBattleCoordinator {
         votes = [:]
         winnerID = nil
         remoteRobots = [:]
+        flags = [:]
+        captures = Dictionary(uniqueKeysWithValues: players.keys.map { ($0, 0) })
         robotAnimations = [localIdentity.id: .init()]
         remoteInterpolations = [:]
         lastRemoteSnapshotSequences = [:]
         lastCollisionTimes = [:]
+        flagRevision = 0
         projectiles = []
-        statusMessage = "Vote for the next deathmatch arena."
+        statusMessage = "Choose a mode and vote for the next battle arena."
         network?.start()
         broadcastHello()
     }
@@ -1027,9 +1352,15 @@ final class ROBBattleCoordinator {
         if packet.kind == .hello {
             statusMessage = "\(packet.sender.name) joined. \(networkPlayerDescription) ready."
             if isNewPlayer { broadcastHello() }
+            if isHost { send(.init(kind: .modeSelection, sender: localIdentity, mode: mode)) }
         }
         switch packet.kind {
         case .hello: break
+        case .modeSelection:
+            if phase == .voting, packet.sender.id == hostID, let selectedMode = packet.mode {
+                mode = selectedMode
+                statusMessage = "Host selected \(selectedMode.name). Vote for an arena."
+            }
         case .vote:
             if phase == .voting, let vote = packet.vote { votes[packet.sender.id] = vote }
         case .matchStart:
@@ -1057,13 +1388,17 @@ final class ROBBattleCoordinator {
             if let knockout = packet.knockout { applyKnockout(knockout) }
         case .collision:
             if let collision = packet.collision { applyCollision(collision, senderID: packet.sender.id) }
+        case .flagRequest:
+            if let request = packet.flagRequest { applyFlagRequest(request, senderID: packet.sender.id) }
+        case .flagUpdate:
+            if let update = packet.flagUpdate { applyFlagUpdate(update, senderID: packet.sender.id) }
         case .matchEnd:
             guard packet.sender.id == hostID else { return }
             winnerID = packet.winnerID
             phase = .results
             stopDrive()
             projectiles = []
-            statusMessage = winnerName.map { "\($0) wins \(arena.name)!" } ?? "Deathmatch complete."
+            statusMessage = winnerName.map { "\($0) wins \(arena.name) \(mode.name)!" } ?? "\(mode.name) complete."
             play(.victory)
         case .nextVote:
             if packet.sender.id == hostID { applyNextVote() }
@@ -1117,6 +1452,10 @@ final class ROBBattleCoordinator {
     // Deterministic hooks keep the networking protocol and arena rules testable
     // without opening Bonjour sockets in the unit-test process.
     func testReceive(_ packet: ROBBattlePacket) { receive(packet) }
+    func testSetLocalRobotPosition(_ position: SIMD3<Float>) {
+        localRobot.x = position.x
+        localRobot.z = position.z
+    }
 }
 
 @MainActor

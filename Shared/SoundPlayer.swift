@@ -6,6 +6,9 @@ enum ROBBattleSoundCue: Equatable, Sendable {
     case saber
     case impact
     case collision
+    case flagPickup
+    case flagDrop
+    case flagCapture
     case knockout
     case respawn
     case victory
@@ -56,7 +59,7 @@ enum ROBBattleSoundCue: Equatable, Sendable {
         case .matchStart: play("mission-start")
         case .laser: playLaser(charge: 0.32)
         case .victory: play("level-complete")
-        case .saber, .impact, .collision, .knockout, .respawn:
+        case .saber, .impact, .collision, .flagPickup, .flagDrop, .flagCapture, .knockout, .respawn:
             guard let buffer = makeBattleBuffer(cue) else { return }
             playProceduralBuffer(buffer)
         }
@@ -147,6 +150,9 @@ enum ROBBattleSoundCue: Equatable, Sendable {
         case .saber: 0.32
         case .impact: 0.22
         case .collision: 0.2
+        case .flagPickup: 0.3
+        case .flagDrop: 0.34
+        case .flagCapture: 0.62
         case .knockout: 0.55
         case .respawn: 0.5
         case .matchStart, .laser, .victory: 0
@@ -184,6 +190,21 @@ enum ROBBattleSoundCue: Equatable, Sendable {
                     (lowRing * 0.42 + midRing * 0.29 + highRing * 0.13) * resonance * 0.38
                     + strike * 0.18
                 )
+            case .flagPickup:
+                let pitch = 430 + progress * 520
+                let carrier = sin(2 * .pi * pitch * time)
+                let chime = sin(2 * .pi * pitch * 1.5 * time)
+                samples[frame] = Float((carrier * 0.65 + chime * 0.35) * sin(.pi * progress) * 0.3)
+            case .flagDrop:
+                let pitch = max(120, 480 - progress * 330)
+                let carrier = sin(2 * .pi * pitch * time)
+                samples[frame] = Float((carrier * 0.72 + white * 0.28) * (1 - progress) * 0.36)
+            case .flagCapture:
+                let notes = [523.25, 659.25, 783.99]
+                let noteIndex = min(notes.count - 1, Int(progress * Double(notes.count)))
+                let noteProgress = (progress * Double(notes.count)).truncatingRemainder(dividingBy: 1)
+                let carrier = sin(2 * .pi * notes[noteIndex] * time)
+                samples[frame] = Float(carrier * sin(.pi * noteProgress) * 0.34)
             case .knockout:
                 let pitch = max(72, 620 - time * 950)
                 let carrier = sin(2 * .pi * pitch * time)

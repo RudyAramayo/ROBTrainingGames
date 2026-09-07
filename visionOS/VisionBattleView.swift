@@ -39,10 +39,11 @@ struct VisionBattleWorkshop: View {
             VStack(spacing: 18) {
                 Label("AutoNet Robot Battle", systemImage: "dot.radiowaves.left.and.right")
                     .font(.largeTitle.bold()).foregroundStyle(.cyan)
-                Text("Nearby iPhone, iPad, and Vision Pro simulators join automatically. Up to four pilots battle in the same voted arena.")
+                Text("Nearby iPhone, iPad, and Vision Pro simulators join automatically for Deathmatch or Capture the Flag. Up to four pilots battle in the same voted arena.")
                     .multilineTextAlignment(.center).foregroundStyle(.secondary)
                 HStack {
                     Label(battle.networkPlayerDescription, systemImage: "person.3.fill")
+                    Label(battle.mode.name, systemImage: battle.mode.symbol).foregroundStyle(.cyan)
                     if battle.isHost { Label("Host", systemImage: "crown.fill").foregroundStyle(.yellow) }
                 }
                 .font(.headline)
@@ -57,6 +58,24 @@ struct VisionBattleWorkshop: View {
                 }
                 Divider()
                 if battle.phase == .voting {
+                    Text("Game mode").font(.title2.bold())
+                    HStack {
+                        ForEach(ROBBattleMode.allCases) { mode in
+                            Button { battle.selectMode(mode) } label: {
+                                VStack(spacing: 6) {
+                                    Label(mode.name, systemImage: mode.symbol).font(.headline)
+                                    Text(mode.summary).font(.caption).foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 86)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(battle.mode == mode ? .cyan : .gray)
+                            .disabled(!battle.isHost)
+                        }
+                    }
+                    if !battle.isHost {
+                        Text("The host chooses the game mode.").font(.caption).foregroundStyle(.secondary)
+                    }
                     Text("Vote for the next arena").font(.title2.bold())
                     LazyVGrid(columns: [.init(.flexible()), .init(.flexible())]) {
                         ForEach(ROBBattleArena.allCases) { arena in
@@ -73,7 +92,7 @@ struct VisionBattleWorkshop: View {
                         }
                     }
                     if battle.isHost {
-                        Button("Start Voted Arena", systemImage: "play.fill") { battle.startMatch() }
+                        Button("Start \(battle.mode.name)", systemImage: "play.fill") { battle.startMatch() }
                             .buttonStyle(.borderedProminent).tint(.cyan)
                             .disabled(!battle.canStartMatch)
                     } else if battle.playerCount > 1 {
@@ -98,11 +117,16 @@ struct VisionBattleWorkshop: View {
 
     private var battleStatus: some View {
         HStack(spacing: 16) {
+            Label(battle.mode.name, systemImage: battle.mode.symbol)
             Label(battle.arena.name, systemImage: battle.arena.symbol)
             Label(timeText, systemImage: "timer").monospacedDigit()
             Label("\(battle.localRobot.health) H", systemImage: "heart.fill").foregroundStyle(.red)
             Label("\(battle.localRobot.shields) S", systemImage: "shield.fill").foregroundStyle(.cyan)
-            Label("\(battle.localScore) KOs", systemImage: "scope").foregroundStyle(.yellow)
+            Label(
+                battle.mode == .captureTheFlag ? "\(battle.localScore) captures" : "\(battle.localScore) KOs",
+                systemImage: battle.mode.symbol
+            )
+            .foregroundStyle(.yellow)
         }
         .font(.headline)
         .glassBackgroundEffect()
@@ -113,7 +137,11 @@ struct VisionBattleWorkshop: View {
             ForEach(battle.orderedPlayers) { player in
                 HStack {
                     Text(player.name); Spacer()
-                    Text("\(battle.scores[player.id, default: 0]) KOs · \(battle.deaths[player.id, default: 0]) downs")
+                    Text(
+                        battle.mode == .captureTheFlag
+                            ? "\(battle.captures[player.id, default: 0]) captures · \(battle.deaths[player.id, default: 0]) downs"
+                            : "\(battle.scores[player.id, default: 0]) KOs · \(battle.deaths[player.id, default: 0]) downs"
+                    )
                         .monospacedDigit()
                 }
             }
@@ -135,6 +163,9 @@ private struct VisionBattleControls: View {
 
     var body: some View {
         VStack(spacing: 10) {
+            if let objective = battle.localFlagObjectiveText {
+                Label(objective, systemImage: "flag.fill").font(.headline).foregroundStyle(.yellow)
+            }
             HStack {
                 VStack { Text("LEFT TREAD").font(.caption.bold()); Slider(value: treadBinding(isLeft: true), in: -1...1) }.frame(width: 210)
                 Button("SLASH", systemImage: "bolt.fill") { battle.saberAttack() }
