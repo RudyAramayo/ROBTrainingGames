@@ -308,6 +308,7 @@ private struct ROBBattlePlayOverlay: View {
                 }
                 .padding(28)
                 .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 28))
+                .padding(12)
             }
         }
         .fullScreenCover(isPresented: $showsBattleDetails) {
