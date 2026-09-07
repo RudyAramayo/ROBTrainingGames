@@ -16,6 +16,7 @@ struct GameKeyboardControls: ViewModifier {
                     heldKeys.insert(press.key)
                     if !wasHeld {
                         if press.key == "q" { session.beginLaserCharge() }
+                        if press.key == "e" { session.activateShield() }
                         if press.key == "f" { session.moveBaseFlipperForward() }
                         if press.key == "b" { session.moveBaseFlipperBackward() }
                         if press.key == .space { session.saberAttack() }
@@ -46,7 +47,7 @@ struct GameKeyboardControls: ViewModifier {
     }
 
     private static let supportedKeys: Set<KeyEquivalent> = [
-        "w", "a", "s", "d", "q", "f", "b", .upArrow, .downArrow, .leftArrow, .rightArrow, .space,
+        "w", "a", "s", "d", "q", "e", "f", "b", .upArrow, .downArrow, .leftArrow, .rightArrow, .space,
     ]
 }
 

@@ -332,7 +332,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.13"
+    static let gameplayRulesetVersion = "2026.09.14"
     static let robotCollisionRadius: Float = 0.54
     static let baseDriveSpeed: Float = 1.2
     static let securityCameraHalfAngle: Float = .pi / 5
@@ -347,6 +347,7 @@ final class GameSession {
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
     static let maximumTrialLives = 3
+    static let shieldActivationDuration = 2.5
     let maxHealth = 100
     let maxShields = 40
     let shieldPickupStrength = 24
@@ -384,6 +385,7 @@ final class GameSession {
     private(set) var upgradePoints = 0
     private(set) var health = 100
     private(set) var shields = 40
+    private(set) var shieldTimeRemaining = 0.0
     private(set) var lives = GameSession.maximumTrialLives
     private(set) var energy = 100.0
     var collectedCells = 0
@@ -453,6 +455,8 @@ final class GameSession {
     var activeBoss: TrainingEnemy? { enemies.first(where: { $0.isBoss && $0.isActive }) }
     var healthFraction: Double { Double(health) / Double(maxHealth) }
     var shieldFraction: Double { Double(shields) / Double(maxShields) }
+    var shieldActivationFraction: Double { min(1, max(0, shieldTimeRemaining / Self.shieldActivationDuration)) }
+    var isShieldActive: Bool { isRunning && shields > 0 && shieldTimeRemaining > 0 }
     var maxEnergy: Double { 100 + Double(energyUpgradeLevel * 60) }
     var energyFraction: Double { energy / maxEnergy }
     var driveSpeedMultiplier: Double { 1 + Double(speedUpgradeLevel) * 0.6 }
@@ -891,6 +895,7 @@ final class GameSession {
         hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingCameraID = nil; hackingProgress = 0; securityAlertRemaining = 0; disabledSecurityCameraIDs = []
         baseFlipperAngle = Self.baseFlipperRearAngle; baseFlipperTarget = .rear
         collectedCellIndices = []; collectedShieldPickupIndices = []; collectedRepairPickupIndices = []
+        shieldTimeRemaining = 0
         saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
         laserProjectiles = []; laserCharge = 0; laserShotCharge = 0; isChargingLaser = false; lockedEnemyID = nil; secondaryLockedEnemyID = nil
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
@@ -930,6 +935,7 @@ final class GameSession {
         stopDrive()
         isChargingLaser = false
         laserCharge = 0
+        shieldTimeRemaining = 0
         isRunning = false
         isPaused = true
         if audioEnabled { TechnoMusicEngine.shared.stop() }
@@ -1000,6 +1006,7 @@ final class GameSession {
         elapsed += delta
         damageInvulnerabilityRemaining = max(0, damageInvulnerabilityRemaining - delta)
         securityAlertRemaining = max(0, securityAlertRemaining - delta)
+        shieldTimeRemaining = max(0, shieldTimeRemaining - delta)
         updateBaseFlipper(delta)
         let hasDriveEnergy = energy > 0.05
         let ledgeDriveScale = isOnLedge && !isLedgeStabilized ? 0.42 : 1.0
@@ -1885,11 +1892,21 @@ final class GameSession {
     }
     func openDoor() { startDoorHack() }
     @discardableResult
+    func activateShield() -> Bool {
+        guard isRunning, shields > 0, !isShieldActive else { return false }
+        shieldTimeRemaining = Self.shieldActivationDuration
+        message = "Bubble shield active for \(Self.shieldActivationDuration.formatted(.number.precision(.fractionLength(1)))) seconds."
+        report(message)
+        return true
+    }
+    @discardableResult
     func enemyContact(_ attack: String = "Enemy contact", damage: Int = 5) -> Bool {
         guard isRunning, damageInvulnerabilityRemaining <= 0 else { return false }
         let appliedDamage = max(0, damage)
-        let absorbedDamage = min(shields, appliedDamage)
+        let shieldWasActive = isShieldActive
+        let absorbedDamage = shieldWasActive ? min(shields, appliedDamage) : 0
         shields -= absorbedDamage
+        if shields == 0 { shieldTimeRemaining = 0 }
         let hullDamage = appliedDamage - absorbedDamage
         health = max(0, health - hullDamage)
         score = max(0, score - appliedDamage * 20)
@@ -1911,6 +1928,8 @@ final class GameSession {
             message = "\(attack) broke ROB’s shield and dealt \(hullDamage) hull damage. Health: \(health)/\(maxHealth)."
         } else if absorbedDamage > 0 {
             message = "\(attack) drained \(absorbedDamage) shield points. ROB shields: \(shields)/\(maxShields)."
+        } else if !shieldWasActive, shields > 0 {
+            message = "\(attack) dealt \(hullDamage) hull damage while the bubble shield was inactive. ROB health: \(health)/\(maxHealth)."
         } else {
             message = "\(attack) dealt \(hullDamage) hull damage. ROB health: \(health)/\(maxHealth)."
         }

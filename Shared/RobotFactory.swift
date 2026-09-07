@@ -255,6 +255,7 @@ import UIKit
         shieldField.name = "ROB Shield Field"
         shieldField.position = [0, 0.92, -0.08]
         shieldField.scale = [1, 0.92, 1]
+        shieldField.isEnabled = false
         root.addChild(shieldField)
         return root
     }
@@ -435,7 +436,8 @@ import UIKit
         robot.findEntity(named: "Right Lightsaber")?.isEnabled = session.meleeWeapon == .dualSabers
         robot.findEntity(named: "Power Hammer")?.isEnabled = session.meleeWeapon == .powerHammer
         if let shieldField = robot.findEntity(named: "ROB Shield Field") {
-            shieldField.isEnabled = session.shields > 0
+            shieldField.isEnabled = session.isShieldActive
+            shieldField.components.set(OpacityComponent(opacity: Float(session.shieldActivationFraction)))
             let pulse = 0.98 + Float(sin(session.elapsed * 3.2)) * 0.025
             shieldField.scale = [pulse, pulse * 0.92, pulse]
         }

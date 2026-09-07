@@ -508,6 +508,17 @@ struct MobileTankControls: View {
             HStack(alignment: .bottom, spacing: 4) {
                 TreadJoystick(title: "RIGHT", compact: compact, demand: updateRight)
                 VStack(spacing: 5) {
+                    HUDActionButton(
+                        systemImage: session.isShieldActive ? "shield.fill" : "shield",
+                        tint: .cyan,
+                        size: actionSize,
+                        accessibilityLabel: session.isShieldActive
+                            ? "Bubble shield active, \(session.shieldTimeRemaining.formatted(.number.precision(.fractionLength(1)))) seconds remaining"
+                            : "Activate bubble shield",
+                        disabled: !session.isRunning || session.shields == 0,
+                        progress: session.isShieldActive ? session.shieldActivationFraction : nil,
+                        action: { _ = session.activateShield() }
+                    )
                     if session.hasFlipperHackTargets {
                         HUDActionButton(
                             systemImage: "dot.radiowaves.left.and.right",
@@ -562,6 +573,7 @@ private struct HUDActionButton: View {
     let size: CGFloat
     let accessibilityLabel: String
     let disabled: Bool
+    var progress: Double? = nil
     let action: () -> Void
 
     var body: some View {
@@ -572,6 +584,14 @@ private struct HUDActionButton: View {
                 .foregroundStyle(tint)
                 .background(.black.opacity(0.32), in: Circle())
                 .overlay(Circle().stroke(tint.opacity(0.6), lineWidth: 1))
+                .overlay {
+                    if let progress {
+                        Circle()
+                            .trim(from: 0, to: progress)
+                            .stroke(tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                    }
+                }
         }
         .buttonStyle(.plain)
         .disabled(disabled)

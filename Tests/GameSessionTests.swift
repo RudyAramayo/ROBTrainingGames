@@ -295,6 +295,7 @@ final class GameSessionTests: XCTestCase {
     func testROBShieldAbsorbsDamageWithoutRestartingMissionProgress() {
         let game = GameSession(audioEnabled: false)
         game.begin()
+        XCTAssertTrue(game.activateShield())
         game.collectedCells = 1
         let enemyShields = game.enemies.map(\.shields)
 
@@ -311,15 +312,59 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.health, game.maxHealth)
     }
 
+    func testBubbleShieldRequiresActivationAndFadesAfterItsDefensiveWindow() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        let robot = RobotFactory.makeROB()
+
+        RobotFactory.applyWeapons(to: robot, session: game)
+        XCTAssertFalse(game.isShieldActive)
+        XCTAssertEqual(game.shieldActivationFraction, 0)
+        XCTAssertFalse(robot.findEntity(named: "ROB Shield Field")?.isEnabled ?? true)
+
+        XCTAssertTrue(game.activateShield())
+        XCTAssertTrue(game.pause())
+        XCTAssertFalse(game.isShieldActive)
+        XCTAssertEqual(game.shieldTimeRemaining, 0)
+        XCTAssertTrue(game.resume())
+
+        XCTAssertTrue(game.enemyContact("Unshielded impact", damage: 6))
+        XCTAssertEqual(game.shields, game.maxShields)
+        XCTAssertEqual(game.health, game.maxHealth - 6)
+
+        game.tick(0.8)
+        XCTAssertTrue(game.activateShield())
+        XCTAssertFalse(game.activateShield(), "An active shield cannot be extended by repeated taps")
+        RobotFactory.applyWeapons(to: robot, session: game)
+        XCTAssertTrue(game.isShieldActive)
+        XCTAssertEqual(game.shieldActivationFraction, 1, accuracy: 0.001)
+        XCTAssertTrue(robot.findEntity(named: "ROB Shield Field")?.isEnabled ?? false)
+
+        XCTAssertTrue(game.enemyContact("Shielded impact", damage: 6))
+        XCTAssertEqual(game.shields, game.maxShields - 6)
+        XCTAssertEqual(game.health, game.maxHealth - 6)
+
+        game.tick(GameSession.shieldActivationDuration / 2)
+        XCTAssertEqual(game.shieldActivationFraction, 0.5, accuracy: 0.001)
+        game.tick(GameSession.shieldActivationDuration / 2 + 0.01)
+        RobotFactory.applyWeapons(to: robot, session: game)
+        XCTAssertFalse(game.isShieldActive)
+        XCTAssertEqual(game.shieldActivationFraction, 0)
+        XCTAssertFalse(robot.findEntity(named: "ROB Shield Field")?.isEnabled ?? true)
+    }
+
     func testDamageSpillsThroughAnEmptyShieldIntoHealth() {
         let game = GameSession(audioEnabled: false)
         game.begin()
+        XCTAssertTrue(game.activateShield())
 
         XCTAssertTrue(game.enemyContact("Heavy laser", damage: game.maxShields + 6))
 
         XCTAssertEqual(game.shields, 0)
         XCTAssertEqual(game.health, 94)
         XCTAssertTrue(game.message.contains("6 hull damage"))
+        XCTAssertFalse(game.activateShield(), "An empty shield capacitor cannot create a bubble")
     }
 
     func testDepletedHealthRestartsOnlyTheCurrentLevel() {
@@ -385,6 +430,7 @@ final class GameSessionTests: XCTestCase {
         }
 
         guard let boss = game.activeBoss else { return XCTFail("Level 15 needs a boss") }
+        XCTAssertTrue(game.activateShield())
         game.enemyContact(boss.displayName, damage: boss.contactDamage)
         XCTAssertEqual(game.shields, 30)
         XCTAssertEqual(game.health, game.maxHealth)
@@ -768,6 +814,7 @@ final class GameSessionTests: XCTestCase {
     func testShieldAndRepairPickupsRestoreDamageAndDisappear() {
         let game = GameSession(audioEnabled: false)
         game.begin()
+        XCTAssertTrue(game.activateShield())
         for index in game.enemies.indices { game.enemies[index].isActive = false }
         let room = RobotFactory.makeTrainingRoom(level: game.levelIndex, puzzle: game.puzzle)
 

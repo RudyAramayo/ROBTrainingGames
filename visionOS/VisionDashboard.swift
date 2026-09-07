@@ -306,6 +306,19 @@ private struct VisionControlDeck: View {
                     VStack(spacing: 10) {
                         HStack(spacing: 8) {
                             LaserChargeButton(session: session, title: session.rangedWeapon.displayName, compact: true)
+                            Button {
+                                session.activateShield()
+                            } label: {
+                                Label(
+                                    session.isShieldActive
+                                        ? "Shield \(session.shieldTimeRemaining.formatted(.number.precision(.fractionLength(1))))s"
+                                        : "Bubble Shield",
+                                    systemImage: session.isShieldActive ? "shield.fill" : "shield"
+                                )
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.cyan)
+                            .disabled(!session.isRunning || session.shields == 0)
                             Button(session.meleeWeapon.displayName, systemImage: "bolt.fill") { session.saberAttack() }
                                 .buttonStyle(.borderedProminent)
                                 .tint(.pink)
