@@ -102,18 +102,37 @@ struct LaserChargeButton: View {
     @Bindable var session: GameSession
     var title = "Shoulder laser"
     var compact = false
+    var iconOnly = false
     @State private var pressing = false
 
     var body: some View {
-        Label(pressing ? "Charge \(Int(session.laserCharge * 100))%" : title, systemImage: session.lockedEnemy == nil ? "scope" : "scope")
-            .font(compact ? .caption.bold() : .body.bold())
-            .lineLimit(1)
-            .padding(.horizontal, compact ? 10 : 14)
-            .padding(.vertical, compact ? 8 : 11)
-            .foregroundStyle(.white)
-            .background(backgroundColor, in: Capsule())
-            .overlay(Capsule().stroke(session.lockedEnemy == nil ? Color.white.opacity(0.25) : Color.red, lineWidth: session.lockedEnemy == nil ? 1 : 2))
-            .contentShape(Capsule())
+        Group {
+            if iconOnly {
+                Image(systemName: "scope")
+                    .font(.system(size: 18, weight: .bold))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .foregroundStyle(session.lockedEnemy == nil ? .white : .red)
+                    .background(.black.opacity(0.32), in: Circle())
+                    .overlay(Circle().stroke(session.lockedEnemy == nil ? Color.white.opacity(0.35) : Color.red, lineWidth: session.lockedEnemy == nil ? 1 : 2))
+                    .overlay {
+                        Circle()
+                            .trim(from: 0, to: pressing ? session.laserCharge : 0)
+                            .stroke(.red, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                    }
+                    .contentShape(Circle())
+            } else {
+                Label(pressing ? "Charge \(Int(session.laserCharge * 100))%" : title, systemImage: "scope")
+                    .font(compact ? .caption.bold() : .body.bold())
+                    .lineLimit(1)
+                    .padding(.horizontal, compact ? 10 : 14)
+                    .padding(.vertical, compact ? 8 : 11)
+                    .foregroundStyle(.white)
+                    .background(backgroundColor, in: Capsule())
+                    .overlay(Capsule().stroke(session.lockedEnemy == nil ? Color.white.opacity(0.25) : Color.red, lineWidth: session.lockedEnemy == nil ? 1 : 2))
+                    .contentShape(Capsule())
+            }
+        }
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in

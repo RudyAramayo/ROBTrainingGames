@@ -250,14 +250,14 @@ private struct ExperienceHero: View {
 struct MissionView: View {
     @Bindable var session: GameSession
     let onExit: () -> Void
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
     @AppStorage("robLocalHighScore") private var highScore = 0
-    private var compactPhoneLayout: Bool { horizontalSizeClass == .compact }
+    @AppStorage("robShowMissionText") private var showsMissionText = false
+    private var isLandscape: Bool { verticalSizeClass == .compact }
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottom) {
+            ZStack {
                 RealityView { content in
                     content.add(RobotFactory.makeTrainingRoom(level: session.levelIndex, puzzle: session.puzzle))
                     let rob = RobotFactory.makeROB(); rob.position = session.presentationPosition; content.add(rob)
@@ -274,73 +274,46 @@ struct MissionView: View {
                     else { content.entities.filter { $0.name.hasPrefix("Combat Layer-") }.forEach { $0.removeFromParent() }; content.add(RobotFactory.makeCombatLayer(session: session)) }
                 }
                     .ignoresSafeArea().background(.black)
-                VStack(spacing: verticalSizeClass == .compact ? 4 : 10) {
-                    if compactPhoneLayout {
-                        CompactMissionStats(session: session, onExit: onExit).padding(.horizontal, 8)
-                    } else {
-                        VStack(spacing: 7) {
-                            HStack { Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered"); Spacer(); MissionKeyStatus(session: session); Text("Cells \(session.collectedCells)/\(session.level.cellCount)").monospacedDigit(); Text("Targets \(session.remainingEnemies)").monospacedDigit(); Text("Score \(session.score)").monospacedDigit(); Text("Best \(highScore)").foregroundStyle(.cyan).monospacedDigit() }.font(.headline)
-                            CombatHealthBars(session: session).frame(maxWidth: 460)
-                        }
-                        .padding(10)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-                        .padding(.horizontal)
+                VStack(spacing: 6) {
+                    HStack(alignment: .top) {
+                        MissionCornerHUD(
+                            session: session,
+                            highScore: highScore,
+                            showsMissionText: $showsMissionText,
+                            onExit: onExit
+                        )
+                        .frame(width: isLandscape ? 204 : 220)
+                        Spacer(minLength: 0)
                     }
                     Spacer()
-                    Text(session.message).font(.subheadline.bold()).lineLimit(compactPhoneLayout ? 1 : 2).padding(.horizontal, 14).padding(.vertical, 8).background(.black.opacity(0.65), in: Capsule())
-                    if !compactPhoneLayout && verticalSizeClass != .compact {
-                        Text("Move: WASD/arrows · Flipper: F forward, B rear · Slash: Space · Laser: Q").font(.caption2.bold()).foregroundStyle(.cyan).padding(.horizontal, 12).padding(.vertical, 6).background(.black.opacity(0.65), in: Capsule())
+                    if showsMissionText {
+                        Text(session.message)
+                            .font(.caption.bold())
+                            .lineLimit(isLandscape ? 1 : 2)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(.black.opacity(0.58), in: Capsule())
+                            .frame(maxWidth: isLandscape ? 440 : 520)
                     }
-                    if compactPhoneLayout {
-                        MobileTankControls(session: session).padding(.horizontal, 8)
-                    } else {
-                        VStack(spacing: 6) {
-                            MobileTankControls(session: session)
-                            if verticalSizeClass != .compact {
-                                Text("Independent treads · sweep left, sweep right, then spin · hold laser to charge").font(.caption.bold()).foregroundStyle(.cyan)
-                                Text("Drive onto keys, doors, and cells while enemies fight back").font(.caption2)
-                            }
-                        }
-                        .padding(verticalSizeClass == .compact ? 6 : 16)
-                    }
+                    MobileTankControls(session: session, compact: isLandscape)
                 }
-                .padding(.bottom, compactPhoneLayout ? 54 : 0)
+                .padding(.horizontal, isLandscape ? 8 : 10)
+                .padding(.vertical, isLandscape ? 5 : 10)
             }
             .overlay {
                 if session.isUpgradeIntermission {
                     ZStack {
                         Color.black.opacity(0.72).ignoresSafeArea()
                         MissionUpgradeIntermission(session: session)
-                            .padding(compactPhoneLayout ? 12 : 28)
+                            .padding(isLandscape ? 12 : 28)
                     }
                 }
             }
-            .navigationTitle(compactPhoneLayout ? "" : session.level.name).navigationBarTitleDisplayMode(.inline)
-            .toolbar(compactPhoneLayout ? .hidden : .visible, for: .navigationBar)
+            .navigationTitle("")
+            .toolbar(.hidden, for: .navigationBar)
             .robGameKeyboardControls(session: session)
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button { session.toggleMusic() } label: { Label(session.musicEnabled ? "Techno on" : "Music off", systemImage: session.musicEnabled ? "music.note" : "speaker.slash") }
-                    Button(missionActionTitle) { performMissionAction() }
-                }
-                ToolbarItemGroup(placement: .topBarLeading) {
-                    Button(action: onExit) { Label("Menu", systemImage: "xmark.circle.fill") }
-                    if session.canFinish && !session.isUpgradeIntermission { Button(session.levelIndex == session.levels.count - 1 ? "Finish" : "Complete Level") { session.nextLevel() } }
-                }
-            }
             .onReceive(timer) { _ in session.tick(1.0 / 30.0); highScore = max(highScore, session.score) }
         }
-    }
-
-    private var missionActionTitle: String {
-        session.isUpgradeIntermission ? "Deploy Level \(session.level.id + 1)" : session.isRunning ? "Reset" : session.isPaused ? "Resume" : "Start"
-    }
-
-    private func performMissionAction() {
-        if session.isUpgradeIntermission { session.continueAfterUpgradeIntermission() }
-        else if session.isRunning { session.reset() }
-        else if session.isPaused { session.resume() }
-        else { session.begin() }
     }
 }
 
@@ -385,63 +358,101 @@ struct MissionUpgradeIntermission: View {
     }
 }
 
-private struct CompactMissionStats: View {
+struct MissionCornerHUD: View {
     @Bindable var session: GameSession
+    let highScore: Int
+    @Binding var showsMissionText: Bool
     let onExit: () -> Void
 
     var body: some View {
-        VStack(spacing: 7) {
-            HStack(spacing: 8) {
-                Button(action: onExit) {
-                    Image(systemName: "xmark.circle.fill")
-                }
-                .accessibilityLabel("Exit mission to menu")
-                Text("Level \(session.level.id) · \(session.level.name)").font(.subheadline.bold()).lineLimit(1)
-                Spacer(minLength: 2)
-                Button { session.toggleMusic() } label: {
-                    Image(systemName: session.musicEnabled ? "music.note" : "speaker.slash")
-                }
-                Button(missionActionTitle) { performMissionAction() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.cyan)
-            }
-            HStack(spacing: 12) {
-                Label("\(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered")
+        VStack(spacing: 5) {
+            HStack(spacing: 7) {
+                Button(action: onExit) { Image(systemName: "xmark.circle.fill") }
+                    .accessibilityLabel("Exit mission to menu")
+                Label("L\(session.level.id)", systemImage: "flag.checkered")
+                    .font(.caption.bold())
+                Label("\(session.lives)", systemImage: "heart.fill")
+                    .foregroundStyle(session.lives == 1 ? .red : .orange)
+                    .font(.caption.bold())
                 Spacer(minLength: 0)
-                MissionKeyStatus(session: session, compact: true)
+                if session.canFinish && !session.isUpgradeIntermission {
+                    Button { session.nextLevel() } label: { Image(systemName: "flag.checkered.circle.fill") }
+                        .foregroundStyle(.green)
+                        .accessibilityLabel(session.levelIndex == session.levels.count - 1 ? "Finish campaign" : "Complete level")
+                }
+                Button(action: toggleMission) {
+                    Image(systemName: session.isRunning ? "pause.circle.fill" : "play.circle.fill")
+                }
+                .accessibilityLabel(session.isRunning ? "Pause mission" : session.isPaused ? "Resume mission" : "Start mission")
+                displayMenu
+            }
+            HStack(spacing: 9) {
                 Label("\(session.collectedCells)/\(session.level.cellCount)", systemImage: "bolt.fill")
                 Label("\(session.remainingEnemies)", systemImage: "scope")
                 Label("\(session.score)", systemImage: "star.fill")
+                Label("\(highScore)", systemImage: "trophy.fill").foregroundStyle(.cyan)
             }
-            .font(.caption.bold())
+            .font(.caption2.bold())
             .monospacedDigit()
-            CombatHealthBars(session: session, compact: true)
+            miniMeter(icon: "heart.fill", value: Double(session.health), maximum: Double(session.maxHealth), color: healthColor, label: "ROB health")
+            miniMeter(icon: "shield.fill", value: Double(session.shields), maximum: Double(session.maxShields), color: .cyan, label: "ROB shields")
+            miniMeter(icon: "bolt.batteryblock.fill", value: session.energy, maximum: session.maxEnergy, color: session.energyFraction < 0.2 ? .orange : .mint, label: "System energy")
+            if session.level.requiresKey {
+                HStack(spacing: 4) {
+                    Image(systemName: session.hasKey ? "key.fill" : "key")
+                    Text(session.hasKey ? "KEY SECURED" : "FIND KEY")
+                    Spacer(minLength: 0)
+                }
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(session.hasKey ? .green : .yellow)
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .padding(8)
+        .background(.black.opacity(0.34), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.14), lineWidth: 1))
     }
 
-    private var missionActionTitle: String {
-        session.isRunning ? "Reset" : session.isPaused ? "Resume" : "Start"
+    private var displayMenu: some View {
+        Menu {
+            Toggle("Show mission text", isOn: $showsMissionText)
+            Button { session.toggleMusic() } label: {
+                Label(session.musicEnabled ? "Turn techno off" : "Turn techno on", systemImage: session.musicEnabled ? "speaker.slash" : "music.note")
+            }
+            Button(role: .destructive) { session.begin() } label: {
+                Label("Restart level", systemImage: "arrow.counterclockwise")
+            }
+        } label: {
+            Image(systemName: "slider.horizontal.3")
+        }
+        .accessibilityLabel("Game display preferences")
     }
 
-    private func performMissionAction() {
-        if session.isRunning { session.reset() }
+    private func toggleMission() {
+        if session.isRunning { session.pause() }
         else if session.isPaused { session.resume() }
         else { session.begin() }
     }
-}
 
-private struct MissionKeyStatus: View {
-    @Bindable var session: GameSession
-    var compact = false
+    private func miniMeter(icon: String, value: Double, maximum: Double, color: Color, label: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon).foregroundStyle(color).frame(width: 12)
+            ProgressView(value: value, total: maximum)
+                .progressViewStyle(.linear)
+                .tint(color)
+            Text("\(Int(value))")
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .frame(width: 24, alignment: .trailing)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue("\(Int(value)) of \(Int(maximum))")
+    }
 
-    var body: some View {
-        if !session.level.requiresKey {
-            Label(compact ? "Key N/A" : "Key not required", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-        } else {
-            Label(session.hasKey ? "Key" : "Find key", systemImage: session.hasKey ? "key.fill" : "key")
+    private var healthColor: Color {
+        switch session.healthFraction {
+        case ..<0.25: .red
+        case ..<0.55: .orange
+        default: .green
         }
     }
 }
@@ -463,62 +474,70 @@ private struct RobotVoiceScreen: View {
 
 struct MobileTankControls: View {
     @Bindable var session: GameSession
+    var compact = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var leftDemand = 0.0
     @State private var rightDemand = 0.0
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            TreadJoystick(title: "LEFT", demand: updateLeft)
-            VStack(spacing: 5) {
-                HStack(spacing: 4) {
-                    Button { session.moveBaseFlipperForward() } label: {
-                        Label("FWD", systemImage: "arrow.forward.circle.fill")
-                            .font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.orange)
-                    .disabled(!session.isRunning || session.baseFlipperTarget == .forward)
-                    Button { session.moveBaseFlipperBackward() } label: {
-                        Label("REAR", systemImage: "arrow.backward.circle.fill")
-                            .font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.yellow)
-                    .disabled(!session.isRunning || session.baseFlipperTarget == .rear)
+        HStack(alignment: .bottom, spacing: 0) {
+            HStack(alignment: .bottom, spacing: 4) {
+                VStack(spacing: 5) {
+                    HUDActionButton(
+                        systemImage: "arrowshape.forward.circle.fill",
+                        tint: .orange,
+                        size: actionSize,
+                        accessibilityLabel: "Move base flipper forward",
+                        disabled: !session.isRunning || session.baseFlipperTarget == .forward,
+                        action: { _ = session.moveBaseFlipperForward() }
+                    )
+                    HUDActionButton(
+                        systemImage: "arrowshape.backward.circle.fill",
+                        tint: .yellow,
+                        size: actionSize,
+                        accessibilityLabel: "Move base flipper rearward",
+                        disabled: !session.isRunning || session.baseFlipperTarget == .rear,
+                        action: { _ = session.moveBaseFlipperBackward() }
+                    )
                 }
-                Text(session.baseFlipperDescription)
-                    .font(.caption2.bold())
-                    .foregroundStyle(session.isLedgeStabilized ? .green : .orange)
-                if session.hasFlipperHackTargets {
-                    Button { session.startFlipperHack() } label: {
-                        Label(session.flipperHackDescription, systemImage: "dot.radiowaves.left.and.right")
-                            .font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(session.isHackingCamera || session.isHackingDoor ? .yellow : session.canStartCameraHack ? .cyan : session.canStartDoorHack ? .orange : .gray)
-                    .disabled(!session.canStartFlipperHack)
-                }
-                LaserChargeButton(session: session, title: session.rangedWeapon.shortName, compact: true)
-                Button { session.saberAttack() } label: {
-                    Label(session.meleeWeapon.shortName, systemImage: session.meleeWeapon == .dualSabers ? "sparkles" : "hammer.fill").font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.75)
-                }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.pink)
-                Text(session.laserLockDescription)
-                    .font(.caption2.bold())
-                    .lineLimit(1)
-                    .foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
+                TreadJoystick(title: "LEFT", compact: compact, demand: updateLeft)
             }
-            .frame(maxWidth: .infinity)
-            TreadJoystick(title: "RIGHT", demand: updateRight)
+
+            Spacer(minLength: 12)
+
+            HStack(alignment: .bottom, spacing: 4) {
+                TreadJoystick(title: "RIGHT", compact: compact, demand: updateRight)
+                VStack(spacing: 5) {
+                    if session.hasFlipperHackTargets {
+                        HUDActionButton(
+                            systemImage: "dot.radiowaves.left.and.right",
+                            tint: session.isHackingCamera || session.isHackingDoor ? .yellow : session.canStartCameraHack ? .cyan : session.canStartDoorHack ? .orange : .gray,
+                            size: actionSize,
+                            accessibilityLabel: session.flipperHackDescription,
+                            disabled: !session.canStartFlipperHack,
+                            action: session.startFlipperHack
+                        )
+                    }
+                    LaserChargeButton(session: session, title: session.rangedWeapon.shortName, compact: true, iconOnly: true)
+                        .frame(width: actionSize, height: actionSize)
+                        .allowsHitTesting(session.isRunning)
+                    HUDActionButton(
+                        systemImage: session.meleeWeapon == .dualSabers ? "sparkles" : "hammer.fill",
+                        tint: .pink,
+                        size: actionSize,
+                        accessibilityLabel: "Attack with \(session.meleeWeapon.displayName)",
+                        disabled: !session.isRunning,
+                        action: session.saberAttack
+                    )
+                }
+            }
         }
-        .padding(8)
-        .background(.black.opacity(0.68), in: RoundedRectangle(cornerRadius: 20))
-        .frame(maxWidth: 720)
+        .frame(maxWidth: .infinity)
         .onChange(of: scenePhase) { _, phase in if phase != .active { stop() } }
         .onDisappear(perform: stop)
     }
+
+    private var actionSize: CGFloat { compact ? 38 : 44 }
 
     private func updateLeft(_ value: Double) {
         leftDemand = value
@@ -537,32 +556,63 @@ struct MobileTankControls: View {
     }
 }
 
-private struct TreadJoystick: View {
-    let title: String
-    let demand: (Double) -> Void
-    @State private var knobOffset: CGFloat = 0
-    private let travel: CGFloat = 28
+private struct HUDActionButton: View {
+    let systemImage: String
+    let tint: Color
+    let size: CGFloat
+    let accessibilityLabel: String
+    let disabled: Bool
+    let action: () -> Void
 
     var body: some View {
-        VStack(spacing: 3) {
-            ZStack {
-                Circle().fill(.cyan.opacity(0.2)).overlay(Circle().stroke(.cyan.opacity(0.8), lineWidth: 2))
-                Capsule().fill(.cyan.opacity(0.25)).frame(width: 5, height: 54)
-                Circle().fill(.cyan).frame(width: 34, height: 34).shadow(color: .cyan.opacity(0.8), radius: 6).offset(y: knobOffset)
-            }
-            .frame(width: 82, height: 82)
-            .contentShape(Circle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { gesture in
-                        let value = max(-1, min(1, Double(-gesture.translation.height / travel)))
-                        knobOffset = -CGFloat(value) * travel
-                        demand(value)
-                    }
-                    .onEnded { _ in release() }
-            )
-            Text("\(title) TREAD").font(.caption2.bold()).foregroundStyle(.cyan)
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: size * 0.42, weight: .bold))
+                .frame(width: size, height: size)
+                .foregroundStyle(tint)
+                .background(.black.opacity(0.32), in: Circle())
+                .overlay(Circle().stroke(tint.opacity(0.6), lineWidth: 1))
         }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.38 : 1)
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+private struct TreadJoystick: View {
+    let title: String
+    var compact = false
+    let demand: (Double) -> Void
+    @State private var knobOffset: CGFloat = 0
+    private var diameter: CGFloat { compact ? 76 : 94 }
+    private var travel: CGFloat { diameter * 0.3 }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(.black.opacity(0.12))
+                .overlay(Circle().stroke(.cyan.opacity(0.55), lineWidth: 1.5))
+            Capsule().fill(.cyan.opacity(0.16)).frame(width: 4, height: diameter * 0.64)
+            Circle()
+                .fill(.cyan.opacity(0.38))
+                .frame(width: diameter * 0.42, height: diameter * 0.42)
+                .overlay(Circle().stroke(.cyan.opacity(0.8), lineWidth: 1))
+                .shadow(color: .cyan.opacity(0.35), radius: 4)
+                .overlay(Text(String(title.prefix(1))).font(.caption2.bold()).foregroundStyle(.white.opacity(0.85)))
+                .offset(y: knobOffset)
+        }
+        .frame(width: diameter, height: diameter)
+        .contentShape(Circle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { gesture in
+                    let value = max(-1, min(1, Double(-gesture.translation.height / travel)))
+                    knobOffset = -CGFloat(value) * travel
+                    demand(value)
+                }
+                .onEnded { _ in release() }
+        )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title.capitalized) tread joystick")
         .accessibilityValue(knobOffset == 0 ? "Stopped" : knobOffset < 0 ? "Forward" : "Reverse")

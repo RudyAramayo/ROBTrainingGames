@@ -17,6 +17,10 @@ struct ARLabView: View {
     @State private var isActive = false
     @State private var placementID = UUID()
     @State private var timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
+    @AppStorage("robLocalHighScore") private var highScore = 0
+    @AppStorage("robShowMissionText") private var showsMissionText = false
+
+    private var isLandscape: Bool { verticalSizeClass == .compact }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -57,28 +61,18 @@ struct ARLabView: View {
                 }
             }
         }
-        .overlay(alignment: .top) {
-            HStack {
+        .overlay(alignment: .topLeading) {
+            if cameraAccess != .authorized {
                 Button(action: onExit) {
-                    Label("Menu", systemImage: "xmark.circle.fill")
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .frame(width: 44, height: 44)
+                        .background(.black.opacity(0.34), in: Circle())
                 }
-                .accessibilityLabel("Pause AR mission and return to menu")
-
-                Spacer()
-
-                if cameraAccess == .authorized {
-                    Button { placementID = UUID() } label: {
-                        Label("Place Again", systemImage: "viewfinder")
-                    }
-                    .accessibilityHint("Scans for a new horizontal surface and places the arena again")
-                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Return to menu")
+                .padding(10)
             }
-            .font(.headline)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial, in: Capsule())
-            .buttonStyle(.plain)
-            .padding()
         }
         .background {
             LinearGradient(colors: [.indigo.opacity(0.8), .black], startPoint: .top, endPoint: .bottom)
@@ -105,35 +99,51 @@ struct ARLabView: View {
         .onReceive(timer) { _ in
             guard cameraAccess == .authorized, isActive else { return }
             session.tick(1.0 / 30.0)
+            highScore = max(highScore, session.score)
         }
     }
 
     private var missionControls: some View {
-        VStack(spacing: verticalSizeClass == .compact ? 5 : 9) {
-            ARMissionStats(session: session, compact: verticalSizeClass == .compact)
+        VStack(spacing: 6) {
+            HStack(alignment: .top) {
+                MissionCornerHUD(
+                    session: session,
+                    highScore: highScore,
+                    showsMissionText: $showsMissionText,
+                    onExit: onExit
+                )
+                .frame(width: isLandscape ? 204 : 220)
 
-            Spacer(minLength: 8)
+                Spacer(minLength: 0)
 
-            if session.canFinish && !session.isUpgradeIntermission {
-                Button(session.levelIndex == session.levels.count - 1 ? "Finish Campaign" : "Complete Level") {
-                    session.nextLevel()
+                Button { placementID = UUID() } label: {
+                    Image(systemName: "viewfinder")
+                        .font(.headline.bold())
+                        .frame(width: isLandscape ? 38 : 44, height: isLandscape ? 38 : 44)
+                        .background(.black.opacity(0.34), in: Circle())
+                        .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 1))
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Place arena again")
+                .accessibilityHint("Scans for a new horizontal surface and places the arena again")
             }
 
-            Text(session.message)
-                .font(.caption.bold())
-                .lineLimit(verticalSizeClass == .compact ? 1 : 2)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(.black.opacity(0.72), in: Capsule())
+            Spacer(minLength: 0)
 
-            MobileTankControls(session: session)
+            if showsMissionText {
+                Text(session.message)
+                    .font(.caption.bold())
+                    .lineLimit(isLandscape ? 1 : 2)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(.black.opacity(0.58), in: Capsule())
+                    .frame(maxWidth: isLandscape ? 440 : 520)
+            }
+
+            MobileTankControls(session: session, compact: isLandscape)
         }
-        .padding(.horizontal, 8)
-        .padding(.top, verticalSizeClass == .compact ? 54 : 68)
-        .padding(.bottom, 8)
+        .padding(.horizontal, isLandscape ? 8 : 10)
+        .padding(.vertical, isLandscape ? 5 : 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -172,65 +182,6 @@ struct ARLabView: View {
     private func openSettings() {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
-    }
-}
-
-private struct ARMissionStats: View {
-    @Bindable var session: GameSession
-    let compact: Bool
-
-    var body: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 8) {
-                Label("L\(session.level.id)", systemImage: "flag.checkered")
-                if !compact {
-                    Text(session.level.name).lineLimit(1)
-                }
-                Spacer(minLength: 2)
-                Button { session.toggleMusic() } label: {
-                    Image(systemName: session.musicEnabled ? "music.note" : "speaker.slash")
-                }
-                Button {
-                    if session.isRunning { session.pause() }
-                    else { startOrResume() }
-                } label: {
-                    Image(systemName: session.isRunning ? "pause.fill" : "play.fill")
-                }
-                Button { session.begin() } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                }
-                .accessibilityLabel("Restart current level")
-            }
-            .font(.subheadline.bold())
-
-            HStack(spacing: compact ? 8 : 14) {
-                keyStatus
-                Spacer(minLength: 0)
-                Label("\(session.collectedCells)/\(session.level.cellCount)", systemImage: "bolt.fill")
-                Label("\(session.remainingEnemies)", systemImage: "scope")
-                Label("\(session.score)", systemImage: "star.fill")
-            }
-            .font(.caption.bold())
-            .monospacedDigit()
-
-            CombatHealthBars(session: session, compact: true)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-    }
-
-    @ViewBuilder private var keyStatus: some View {
-        if !session.level.requiresKey {
-            Label("No key", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-        } else {
-            Label(session.hasKey ? "Key" : "Find key", systemImage: session.hasKey ? "key.fill" : "key")
-        }
-    }
-
-    private func startOrResume() {
-        if session.isPaused { session.resume() }
-        else { session.begin() }
     }
 }
 
