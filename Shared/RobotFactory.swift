@@ -84,7 +84,6 @@ import UIKit
         let driveBase = Entity(); driveBase.name = "Drive Base Assembly"; driveBase.position = [0, 0, 0.35]; root.addChild(driveBase)
         part("Tri-Wheel Chassis", [0.6, 0.2, 0.68], [0, 0.48, -0.35], .black, parent: driveBase)
         let baseFlipper = Entity(); baseFlipper.name = "Base Lift Flipper Assembly"; baseFlipper.position = [0, 0.22, 0]; baseFlipper.orientation = simd_quatf(angle: GameSession.baseFlipperRearAngle, axis: [1, 0, 0]); driveBase.addChild(baseFlipper)
-        cylinder("Base Lift Flipper Motor", radius: 0.115, height: 0.82, position: .zero, color: .systemOrange, sideways: true, parent: baseFlipper)
         for side: Float in [-1, 1] {
             part(
                 side < 0 ? "Left Base Lift Flipper Arm" : "Right Base Lift Flipper Arm",
@@ -94,8 +93,6 @@ import UIKit
                 parent: baseFlipper
             )
         }
-        part("Base Lift Flipper Blade", [0.75, 0.09, 0.12], [0, 0, -1.04], .darkGray, parent: baseFlipper)
-        cylinder("Base Lift Flipper Floor Roller", radius: 0.105, height: 0.8, position: [0, 0, -1.08], color: .systemOrange, sideways: true, parent: baseFlipper)
         for side: Float in [-1, 1] {
             let prefix = side < 0 ? "Left" : "Right"
             let tread = Entity(); tread.name = "\(prefix) Tri-Wheel Tread"; tread.position = [side * 0.39, 0, -0.35]; driveBase.addChild(tread)

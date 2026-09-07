@@ -332,7 +332,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.14"
+    static let gameplayRulesetVersion = "2026.09.15"
     static let robotCollisionRadius: Float = 0.54
     static let baseDriveSpeed: Float = 1.2
     static let securityCameraHalfAngle: Float = .pi / 5
@@ -341,8 +341,8 @@ final class GameSession {
     static let flipperHackReward = 300
     static let baseFlipperEnergyCost = 4.0
     static let baseFlipperForwardAngle: Float = -0.72
-    static let baseFlipperRearAngle: Float = -2.42
-    static let baseFlipperMotorSpeed: Float = 2.15
+    static let baseFlipperRearAngle: Float = -.pi
+    static let baseFlipperMotorSpeed: Float = 3.05
     static let baseFlipperDuration = TimeInterval(abs(baseFlipperRearAngle - baseFlipperForwardAngle) / baseFlipperMotorSpeed)
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
@@ -371,7 +371,7 @@ final class GameSession {
     ]
     let components = [
         ROBComponent(id: "base", name: "Tri-Wheel Tracked Base", summary: "Three-wheel triangular tread pods expose the road wheels while a drive mixer preserves independent left and right tread speeds.", color: 0x263746),
-        ROBComponent(id: "baseFlipper", name: "LT-2-Style Rear Flipper", summary: "Twin arms pivot on the rear drive shaft, reach along the treads to lift ROB onto a ledge, and rotate behind the base to stabilize travel while the linear actuator keeps the torso level.", color: 0xFF8B2F),
+        ROBComponent(id: "baseFlipper", name: "LT-2-Style Rear Flipper", summary: "Two independent poles pivot on the rear drive shaft, rest flat behind ROB without a crossbar, reach along the treads to lift ROB onto a ledge, and rotate rearward while the linear actuator levels the torso.", color: 0xFF8B2F),
         ROBComponent(id: "power", name: "Power System", summary: "Batteries, protection, disconnects, and motor electronics form ROB’s energy path.", color: 0xF1B93A),
         ROBComponent(id: "cerebro", name: "Cerebro", summary: "The Mac-based control layer coordinates operator intent, cameras, networking, and diagnostics.", color: 0x36DFFF),
         ROBComponent(id: "sensors", name: "Sensors", summary: "Cameras, lidar, inertial sensing, and infrared observations help ROB describe its environment.", color: 0x55DD88),
@@ -473,8 +473,8 @@ final class GameSession {
     var isBaseFlipperRearward: Bool { baseFlipperPhase <= 0.1 }
     var isOnLedge: Bool { puzzle.surfaceHeight(at: [robotPosition.x, robotPosition.z]) > 0 }
     var isLedgeStabilized: Bool { isOnLedge && isBaseFlipperRearward && !isBaseFlipperActive }
-    var baseLiftHeight: Float { isLedgeStabilized ? 0 : 0.1 * baseFlipperPhase }
-    var baseLiftPitch: Float { isLedgeStabilized ? 0 : 0.19 * baseFlipperPhase }
+    var baseLiftHeight: Float { isLedgeStabilized ? 0 : 0.13 * baseFlipperPhase }
+    var baseLiftPitch: Float { isLedgeStabilized ? 0 : 0.23 * baseFlipperPhase }
     var baseFlipperDescription: String {
         if isBaseFlipperActive { return baseFlipperTarget == .forward ? "Moving forward" : "Moving rearward" }
         if isLedgeStabilized { return "Rear · stable" }

@@ -1616,7 +1616,8 @@ final class GameSessionTests: XCTestCase {
         XCTAssertFalse(game.isBaseFlipperActive)
         XCTAssertEqual(game.baseFlipperPhase, 1, accuracy: 0.0001)
         XCTAssertLessThan(game.baseFlipperAngle, 0)
-        XCTAssertGreaterThan(game.baseLiftPitch, 0)
+        XCTAssertEqual(game.baseLiftPitch, 0.23, accuracy: 0.0001)
+        XCTAssertEqual(game.baseLiftHeight, 0.13, accuracy: 0.0001)
 
         game.setDrive(forward: 1, steering: 0)
         game.tick(0.45)
@@ -1643,18 +1644,24 @@ final class GameSessionTests: XCTestCase {
         }
     }
 
-    func testRobotModelIncludesDistinctBaseLiftSpeakersAndConferenceMicrophone() {
+    func testRobotModelIncludesTwoFlatFlipperPolesSpeakersAndConferenceMicrophone() {
         let game = GameSession(audioEnabled: false)
         let robot = RobotFactory.makeROB()
         for name in [
-            "Base Lift Flipper Assembly", "Base Lift Flipper Motor", "Base Lift Flipper Blade",
-            "Left Base Lift Flipper Arm", "Right Base Lift Flipper Arm", "Base Lift Flipper Floor Roller",
+            "Base Lift Flipper Assembly", "Left Base Lift Flipper Arm", "Right Base Lift Flipper Arm",
             "Drive Base Assembly", "Torso Linear Actuator", "Left ROB Speaker Cone", "Right ROB Speaker Cone", "Conference Microphone",
         ] {
             XCTAssertNotNil(robot.findEntity(named: name), "Missing \(name)")
         }
+        for removedCrossbar in ["Base Lift Flipper Motor", "Base Lift Flipper Blade", "Base Lift Flipper Floor Roller"] {
+            XCTAssertNil(robot.findEntity(named: removedCrossbar), "Flipper poles must not be joined by \(removedCrossbar)")
+        }
         XCTAssertNotNil(robot.findEntity(named: "Flipper Zero Hacker"))
-        XCTAssertEqual(robot.findEntity(named: "Base Lift Flipper Assembly")?.parent?.name, "Drive Base Assembly")
+        let flipperAssembly = robot.findEntity(named: "Base Lift Flipper Assembly")
+        XCTAssertEqual(flipperAssembly?.parent?.name, "Drive Base Assembly")
+        XCTAssertEqual(flipperAssembly?.children.map(\.name).sorted(), ["Left Base Lift Flipper Arm", "Right Base Lift Flipper Arm"])
+        XCTAssertEqual(flipperAssembly?.position.y ?? 0, 0.22, accuracy: 0.0001)
+        XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: -.pi, axis: [1, 0, 0]))
         XCTAssertEqual(robot.findEntity(named: "Left Tri-Wheel Tread")?.position.x ?? 0, -0.39, accuracy: 0.0001)
         XCTAssertEqual(robot.findEntity(named: "Right Tri-Wheel Tread")?.position.x ?? 0, 0.39, accuracy: 0.0001)
 
