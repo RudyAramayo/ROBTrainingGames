@@ -608,7 +608,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertGreaterThan(simd_dot(movement, conveyor.direction), 0.08)
     }
 
-    func testConveyorArrowsAnimateAndWrapAlongTheTravelDirection() {
+    func testConveyorArrowsPointAnimateAndWrapAlongTheTravelDirection() {
         XCTAssertEqual(
             RobotFactory.conveyorArrowOffset(baseOffset: 0, elapsed: 1, speed: 0.5, span: 2, direction: 1),
             0.5,
@@ -620,18 +620,37 @@ final class GameSessionTests: XCTestCase {
             accuracy: 0.001
         )
 
-        let game = GameSession(audioEnabled: false)
-        game.levelIndex = 1
-        game.begin()
-        let room = RobotFactory.makeTrainingRoom(level: game.levelIndex, puzzle: game.puzzle)
-        guard let arrow = room.findEntity(named: "Conveyor Arrow 0 0 0") else {
-            return XCTFail("Missing animated conveyor arrow")
-        }
-        let initialOffset = arrow.position.z
-        game.elapsed = 1
-        RobotFactory.applyPuzzleState(to: room, session: game)
+        for levelIndex in [1, 2] {
+            let game = GameSession(audioEnabled: false)
+            game.levelIndex = levelIndex
+            game.begin()
+            guard let conveyor = game.puzzle.conveyors.first else {
+                return XCTFail("Level \(levelIndex + 1) needs a conveyor")
+            }
+            let room = RobotFactory.makeTrainingRoom(level: game.levelIndex, puzzle: game.puzzle)
+            guard let zone = room.findEntity(named: "Conveyor 0"),
+                  let leftStripe = room.findEntity(named: "Conveyor Arrow 0 0 0"),
+                  let rightStripe = room.findEntity(named: "Conveyor Arrow 0 0 1") else {
+                return XCTFail("Missing animated conveyor arrows")
+            }
 
-        XCTAssertNotEqual(arrow.position.z, initialOffset, accuracy: 0.001)
+            let worldDirection = SIMD3<Float>(conveyor.direction.x, 0, conveyor.direction.y)
+            let localDirection = zone.orientation.inverse.act(worldDirection)
+            let travelDirection: Float = localDirection.z < 0 ? -1 : 1
+            for stripe in [leftStripe, rightStripe] {
+                let stripeTowardTip = stripe.orientation.act(SIMD3<Float>(0, 0, travelDirection))
+                XCTAssertLessThan(
+                    stripeTowardTip.x * stripe.position.x,
+                    0,
+                    "Each arrow stroke should converge into a tip facing the conveyor travel direction"
+                )
+            }
+
+            let initialOffset = leftStripe.position.z
+            game.elapsed = 1
+            RobotFactory.applyPuzzleState(to: room, session: game)
+            XCTAssertNotEqual(leftStripe.position.z, initialOffset, accuracy: 0.001)
+        }
     }
 
     func testSecurityCameraAlertsEnemiesButShadowsBreakDetection() {

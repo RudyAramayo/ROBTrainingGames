@@ -725,6 +725,9 @@ import UIKit
         for conveyor in puzzle.conveyors {
             let zone = Entity(); zone.name = "Conveyor \(conveyor.id)"; zone.position = [conveyor.center.x, puzzle.surfaceHeight(at: conveyor.center) + 0.025, conveyor.center.y]
             zone.orientation = simd_quatf(angle: atan2(conveyor.direction.x, -conveyor.direction.y), axis: [0, 1, 0])
+            let worldDirection = SIMD3<Float>(conveyor.direction.x, 0, conveyor.direction.y)
+            let localDirection = zone.orientation.inverse.act(worldDirection)
+            let travelDirection: Float = localDirection.z < 0 ? -1 : 1
             let base = ModelEntity(mesh: .generateBox(size: [conveyor.size.x, 0.045, conveyor.size.y], cornerRadius: 0.035), materials: [SimpleMaterial(color: .darkGray, isMetallic: true)]); zone.addChild(base)
             let span = conveyor.direction.x == 0 ? conveyor.size.y : conveyor.size.x
             for index in -3...3 {
@@ -733,7 +736,7 @@ import UIKit
                     let stripe = ModelEntity(mesh: .generateBox(size: [0.08, 0.018, min(0.62, conveyor.size.x * 0.38)], cornerRadius: 0.01), materials: [UnlitMaterial(color: index.isMultiple(of: 2) ? .systemYellow : .lightGray)])
                     stripe.name = "Conveyor Arrow \(conveyor.id) \(index) \(sideIndex)"
                     stripe.position = [side * 0.18, 0.032, offset]
-                    stripe.orientation = simd_quatf(angle: side * 0.62, axis: [0, 1, 0])
+                    stripe.orientation = simd_quatf(angle: -side * 0.62 * travelDirection, axis: [0, 1, 0])
                     zone.addChild(stripe)
                 }
             }
