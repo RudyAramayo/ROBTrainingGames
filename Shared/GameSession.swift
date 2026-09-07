@@ -64,6 +64,7 @@ struct TrainingEnemy: Identifiable, Sendable {
     var nextAttack: TimeInterval
     var nextSkitterSound: TimeInterval = 0
     var lungeRemaining = 0.0
+    var travelDistance: Float = 0
 
     var displayName: String { isMiniBoss ? "Mini Boss \(kind.displayName)" : isBoss ? "Boss \(kind.displayName)" : kind.displayName }
     var contactDamage: Int { isMiniBoss ? 4 : isBoss ? 10 : (kind == .spider ? 6 : 5) }
@@ -331,7 +332,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.12"
+    static let gameplayRulesetVersion = "2026.09.13"
     static let robotCollisionRadius: Float = 0.54
     static let baseDriveSpeed: Float = 1.2
     static let securityCameraHalfAngle: Float = .pi / 5
@@ -1577,6 +1578,10 @@ final class GameSession {
         let step = min(distance, speed * Float(delta))
         let start = enemy.position
         enemy.position = resolveEnemyMovement(from: start, to: start + direction * step, enemy: enemy)
+        enemy.travelDistance += simd_distance(
+            SIMD2<Float>(start.x, start.z),
+            SIMD2<Float>(enemy.position.x, enemy.position.z)
+        )
     }
     private func updateEnemies(_ delta: TimeInterval) {
         for index in enemies.indices where enemies[index].isActive {

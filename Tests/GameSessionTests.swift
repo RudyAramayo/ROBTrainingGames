@@ -284,6 +284,7 @@ final class GameSessionTests: XCTestCase {
         for _ in 0..<30 { game.tick(1.0 / 30.0) }
 
         XCTAssertTrue(zip(startingPositions, game.enemies.map(\.position)).contains { simd_distance($0, $1) > 0.01 })
+        XCTAssertTrue(game.enemies.contains { $0.travelDistance > 0 })
 
         for _ in 0..<600 where game.enemyAttackCount == 0 { game.tick(1.0 / 30.0) }
 
@@ -864,6 +865,40 @@ final class GameSessionTests: XCTestCase {
 
         guard let bolt = game.enemyBolts.first else { return XCTFail("Fax robot did not create a projectile") }
         XCTAssertNotNil(layer.findEntity(named: "Enemy Bolt \(bolt.id)"))
+    }
+
+    func testEnemyModelsExposeAnimatedCrawlAndShooterDriveParts() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        let layer = RobotFactory.makeCombatLayer(session: game)
+        guard
+            let spiderIndex = game.enemies.firstIndex(where: { $0.kind == .spider }),
+            let shooterIndex = game.enemies.firstIndex(where: { $0.kind == .fax }),
+            let spider = layer.findEntity(named: "Training Enemy \(game.enemies[spiderIndex].id)"),
+            let shooter = layer.findEntity(named: "Training Enemy \(game.enemies[shooterIndex].id)"),
+            let spiderHip = spider.findEntity(named: "Spider Left Leg 1 Hip"),
+            let shooterWheel = shooter.findEntity(named: "Shooter Left Wheel 1")
+        else { return XCTFail("Missing articulated enemy model parts") }
+
+        for side in ["Left", "Right"] {
+            for legIndex in 1...4 {
+                XCTAssertNotNil(spider.findEntity(named: "Spider \(side) Leg \(legIndex) Hip"))
+                XCTAssertNotNil(spider.findEntity(named: "Spider \(side) Leg \(legIndex) Knee"))
+            }
+            for wheelIndex in 1...3 {
+                XCTAssertNotNil(shooter.findEntity(named: "Shooter \(side) Wheel \(wheelIndex)"))
+            }
+        }
+        XCTAssertNotNil(shooter.findEntity(named: "Shooter Turret Assembly"))
+
+        let startingHipOrientation = spiderHip.orientation.vector
+        let startingWheelOrientation = shooterWheel.orientation.vector
+        game.enemies[spiderIndex].travelDistance += 0.35
+        game.enemies[shooterIndex].travelDistance += 0.35
+        RobotFactory.applyCombatState(to: layer, session: game)
+
+        XCTAssertNotEqual(spiderHip.orientation.vector, startingHipOrientation)
+        XCTAssertNotEqual(shooterWheel.orientation.vector, startingWheelOrientation)
     }
 
     func testFaxProtrudingFrontFacesROB() {

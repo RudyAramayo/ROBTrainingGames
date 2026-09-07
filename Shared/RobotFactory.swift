@@ -270,18 +270,70 @@ import UIKit
 
     private static func makeEnemy(_ enemy: TrainingEnemy) -> Entity {
         let root = Entity(); root.name = "Training Enemy \(enemy.id)"
-        func box(_ size: SIMD3<Float>, _ position: SIMD3<Float>, _ color: UIColor) { let part = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.02), materials: [SimpleMaterial(color: color, isMetallic: true)]); part.position = position; root.addChild(part) }
-        func cylinder(radius: Float, height: Float, position: SIMD3<Float>, color: UIColor) { let part = ModelEntity(mesh: .generateCylinder(height: height, radius: radius), materials: [SimpleMaterial(color: color, isMetallic: true)]); part.position = position; root.addChild(part) }
+        @discardableResult func box(
+            _ name: String,
+            _ size: SIMD3<Float>,
+            _ position: SIMD3<Float>,
+            _ color: UIColor,
+            parent: Entity? = nil
+        ) -> ModelEntity {
+            let part = ModelEntity(
+                mesh: .generateBox(size: size, cornerRadius: 0.02),
+                materials: [SimpleMaterial(color: color, isMetallic: true)]
+            )
+            part.name = name; part.position = position; (parent ?? root).addChild(part)
+            return part
+        }
+        @discardableResult func cylinder(
+            _ name: String,
+            radius: Float,
+            height: Float,
+            position: SIMD3<Float>,
+            color: UIColor,
+            sideways: Bool = false,
+            parent: Entity? = nil
+        ) -> ModelEntity {
+            let part = ModelEntity(
+                mesh: .generateCylinder(height: height, radius: radius),
+                materials: [SimpleMaterial(color: color, isMetallic: true)]
+            )
+            part.name = name; part.position = position
+            if sideways { part.orientation = simd_quatf(angle: .pi / 2, axis: [0, 0, 1]) }
+            (parent ?? root).addChild(part)
+            return part
+        }
         if enemy.kind == .spider {
-            box([0.62, 0.2, 0.5], [0, 0.3, 0], .darkGray)
+            box("Spider Body", [0.62, 0.2, 0.5], [0, 0.3, 0], .darkGray)
             let skull = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: UIColor(red: 0.88, green: 0.84, blue: 0.7, alpha: 1), isMetallic: false)]); skull.position = [0, 0.5, -0.18]; skull.scale.z = 1.25; root.addChild(skull)
-            for side: Float in [-1, 1] { for row: Float in [-1, 1] { box([0.46, 0.07, 0.09], [side * 0.43, 0.24, row * 0.2], .gray); box([0.08, 0.32, 0.1], [side * 0.68, 0.12, row * 0.2], UIColor(white: 0.82, alpha: 1)) } }
+            for side: Float in [-1, 1] {
+                for (legIndex, z) in [Float(-0.21), -0.07, 0.07, 0.21].enumerated() {
+                    let sideName = side < 0 ? "Left" : "Right"
+                    let hip = Entity(); hip.name = "Spider \(sideName) Leg \(legIndex + 1) Hip"; hip.position = [side * 0.24, 0.28, z]; root.addChild(hip)
+                    box("Spider \(sideName) Leg \(legIndex + 1) Upper", [0.4, 0.06, 0.07], [side * 0.2, 0, 0], .gray, parent: hip)
+                    let knee = Entity(); knee.name = "Spider \(sideName) Leg \(legIndex + 1) Knee"; knee.position = [side * 0.4, 0, 0]; hip.addChild(knee)
+                    box("Spider \(sideName) Leg \(legIndex + 1) Lower", [0.08, 0.32, 0.08], [side * 0.05, -0.14, 0], UIColor(white: 0.82, alpha: 1), parent: knee)
+                }
+            }
         } else {
-            cylinder(radius: 0.38, height: 0.64, position: [0, 0.34, 0], color: .lightGray)
-            cylinder(radius: 0.27, height: 0.24, position: [0, 0.78, 0], color: .darkGray)
-            let dome = ModelEntity(mesh: .generateSphere(radius: 0.28), materials: [SimpleMaterial(color: .lightGray, isMetallic: true)]); dome.position = [0, 0.94, 0]; dome.scale.y = 0.55; root.addChild(dome)
-            let eye = ModelEntity(mesh: .generateBox(size: [0.08, 0.08, 0.48], cornerRadius: 0.02), materials: [SimpleMaterial(color: .systemCyan, isMetallic: true)]); eye.position = [0, 0.96, -0.37]; root.addChild(eye)
-            for y: Float in [0.18, 0.38, 0.58] { for x: Float in [-0.22, 0, 0.22] { let light = ModelEntity(mesh: .generateSphere(radius: 0.055), materials: [SimpleMaterial(color: .systemBlue, isMetallic: true)]); light.position = [x, y, -0.31]; root.addChild(light) } }
+            cylinder("Shooter Chassis", radius: 0.38, height: 0.64, position: [0, 0.34, 0], color: .lightGray)
+            for y: Float in [0.18, 0.38, 0.58] {
+                for x: Float in [-0.22, 0, 0.22] {
+                    let light = ModelEntity(mesh: .generateSphere(radius: 0.055), materials: [SimpleMaterial(color: .systemBlue, isMetallic: true)]); light.position = [x, y, -0.31]; root.addChild(light)
+                }
+            }
+            for side: Float in [-1, 1] {
+                for (wheelIndex, z) in [Float(-0.24), 0, 0.24].enumerated() {
+                    let sideName = side < 0 ? "Left" : "Right"
+                    let wheel = Entity(); wheel.name = "Shooter \(sideName) Wheel \(wheelIndex + 1)"; wheel.position = [side * 0.46, 0.2, z]; root.addChild(wheel)
+                    cylinder("Shooter Wheel Tire", radius: 0.15, height: 0.13, position: .zero, color: UIColor(white: 0.025, alpha: 1), sideways: true, parent: wheel)
+                    cylinder("Shooter Wheel Hub", radius: 0.09, height: 0.15, position: .zero, color: .systemOrange, sideways: true, parent: wheel)
+                    box("Shooter Wheel Spoke", [0.025, 0.22, 0.03], [side * 0.085, 0, 0], .systemOrange, parent: wheel)
+                }
+            }
+            let turret = Entity(); turret.name = "Shooter Turret Assembly"; root.addChild(turret)
+            cylinder("Shooter Turret Collar", radius: 0.27, height: 0.24, position: [0, 0.78, 0], color: .darkGray, parent: turret)
+            let dome = ModelEntity(mesh: .generateSphere(radius: 0.28), materials: [SimpleMaterial(color: .lightGray, isMetallic: true)]); dome.position = [0, 0.94, 0]; dome.scale.y = 0.55; turret.addChild(dome)
+            let eye = ModelEntity(mesh: .generateBox(size: [0.08, 0.08, 0.48], cornerRadius: 0.02), materials: [SimpleMaterial(color: .systemCyan, isMetallic: true)]); eye.position = [0, 0.96, -0.37]; turret.addChild(eye)
         }
         if enemy.isBoss {
             root.scale = .init(repeating: enemy.combatScale)
@@ -306,6 +358,31 @@ import UIKit
             entity.isEnabled = enemy.isActive
             entity.position = enemy.position + SIMD3<Float>(0, enemy.kind == .spider ? Float(sin(session.elapsed * 10 + Double(enemy.id))) * 0.025 : Float(sin(session.elapsed * 2.4 + Double(enemy.id))) * 0.015, 0)
             entity.orientation = simd_quatf(angle: enemy.heading, axis: [0, 1, 0])
+            if enemy.kind == .spider {
+                for side: Float in [-1, 1] {
+                    for legIndex in 0..<4 {
+                        let sideName = side < 0 ? "Left" : "Right"
+                        let phase = enemy.travelDistance * 8 + Float(session.elapsed) * 1.15 + Float(legIndex) * .pi / 2 + (side < 0 ? .pi : 0)
+                        let effort: Float = enemy.lungeRemaining > 0 ? 1.35 : 1
+                        let lift = max(0, cos(phase)) * 0.24 * effort
+                        let swing = sin(phase) * 0.42 * effort
+                        entity.findEntity(named: "Spider \(sideName) Leg \(legIndex + 1) Hip")?.orientation =
+                            simd_quatf(angle: swing, axis: [0, 1, 0]) * simd_quatf(angle: side * (-0.34 + lift), axis: [0, 0, 1])
+                        entity.findEntity(named: "Spider \(sideName) Leg \(legIndex + 1) Knee")?.orientation =
+                            simd_quatf(angle: side * (-0.28 + lift * 0.85), axis: [0, 0, 1])
+                    }
+                }
+            } else {
+                let wheelAngle = -enemy.travelDistance / 0.15
+                for sideName in ["Left", "Right"] {
+                    for wheelIndex in 1...3 {
+                        entity.findEntity(named: "Shooter \(sideName) Wheel \(wheelIndex)")?.orientation =
+                            simd_quatf(angle: wheelAngle, axis: [1, 0, 0])
+                    }
+                }
+                entity.findEntity(named: "Shooter Turret Assembly")?.orientation =
+                    simd_quatf(angle: Float(sin(session.elapsed * 1.7 + Double(enemy.id) * 0.73)) * 0.16, axis: [0, 1, 0])
+            }
         }
         let boltNames = Set(session.enemyBolts.map { "Enemy Bolt \($0.id)" })
         for child in Array(layer.children) where child.name.hasPrefix("Enemy Bolt ") && !boltNames.contains(child.name) { child.removeFromParent() }
