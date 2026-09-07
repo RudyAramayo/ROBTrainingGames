@@ -1524,6 +1524,187 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(battle.playerCount, ROBBattleCoordinator.maximumPlayers)
     }
 
+    func testBattleSpawnAssignmentsFaceEveryDroidTowardArenaCenter() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", audioEnabled: false)
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
+        battle.testReceive(.init(kind: .hello, sender: remote))
+        battle.vote(for: .orbitalRing)
+        battle.testReceive(.init(kind: .vote, sender: remote, vote: .orbitalRing))
+        battle.startMatch()
+
+        for robot in battle.allRobotStates {
+            let forward = SIMD2<Float>(-sin(robot.heading), -cos(robot.heading))
+            let towardCenter = simd_normalize(SIMD2<Float>(-robot.x, -robot.z))
+            XCTAssertGreaterThan(simd_dot(forward, towardCenter), 0.999)
+        }
+    }
+
+    func testBattleSaberAttackExtendsBladesAndAnimatesBothArms() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", audioEnabled: false)
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
+        battle.testReceive(.init(kind: .hello, sender: remote))
+        battle.vote(for: .neonFoundry)
+        battle.testReceive(.init(kind: .vote, sender: remote, vote: .neonFoundry))
+        battle.startMatch()
+        let robot = ROBBattleFactory.makeBattleRobot(identity: battle.localIdentity)
+
+        battle.saberAttack()
+        ROBBattleFactory.applyAnimation(to: robot, state: battle.animationState(for: localID))
+
+        XCTAssertEqual(robot.findEntity(named: "Left Lightsaber")?.scale.y ?? 0, 1, accuracy: 0.001)
+        XCTAssertEqual(robot.findEntity(named: "Right Lightsaber")?.scale.y ?? 0, 1, accuracy: 0.001)
+        XCTAssertNotEqual(
+            robot.findEntity(named: "Left Arm Assembly")?.orientation,
+            simd_quatf(angle: 0, axis: [0, 1, 0])
+        )
+        XCTAssertNotEqual(
+            robot.findEntity(named: "Right Arm Assembly")?.orientation,
+            simd_quatf(angle: 0, axis: [0, 1, 0])
+        )
+
+        for _ in 0..<6 {
+            battle.tick(0.1)
+        }
+        ROBBattleFactory.applyAnimation(to: robot, state: battle.animationState(for: localID))
+        XCTAssertEqual(robot.findEntity(named: "Left Lightsaber")?.scale.y ?? 0, 0.06, accuracy: 0.001)
+        XCTAssertEqual(
+            robot.findEntity(named: "Left Arm Assembly")?.orientation,
+            simd_quatf(angle: 0, axis: [0, 1, 0])
+        )
+
+        let remoteState = battle.remoteRobots[remoteID]!
+        let remoteSaber = ROBBattleMeleeEvent(
+            id: UUID(), attackerID: remoteID,
+            x: remoteState.x, z: remoteState.z, heading: remoteState.heading, damage: 38
+        )
+        battle.testReceive(.init(kind: .melee, sender: remote, melee: remoteSaber))
+        XCTAssertEqual(
+            battle.animationState(for: remoteID).saberRemaining,
+            ROBBattleRobotAnimationState.saberDuration,
+            accuracy: 0.001
+        )
+    }
+
+    func testBattleTreadsAnimateForLocalAndInterpolatedRemoteMovement() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", audioEnabled: false)
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
+        battle.testReceive(.init(kind: .hello, sender: remote))
+        battle.vote(for: .neonFoundry)
+        battle.testReceive(.init(kind: .vote, sender: remote, vote: .neonFoundry))
+        battle.startMatch()
+
+        battle.setTreads(left: 1, right: 0.4)
+        battle.tick(0.1)
+        let localAnimation = battle.animationState(for: localID)
+        XCTAssertNotEqual(localAnimation.leftTreadAngle, 0, accuracy: 0.001)
+        XCTAssertNotEqual(localAnimation.rightTreadAngle, 0, accuracy: 0.001)
+        XCTAssertNotEqual(localAnimation.leftTreadAngle, localAnimation.rightTreadAngle, accuracy: 0.001)
+
+        var remoteTarget = battle.remoteRobots[remoteID]!
+        remoteTarget.x -= sin(remoteTarget.heading) * 0.5
+        remoteTarget.z -= cos(remoteTarget.heading) * 0.5
+        battle.testReceive(.init(kind: .snapshot, sender: remote, snapshot: remoteTarget, snapshotSequence: 10))
+        battle.tick(ROBBattleCoordinator.remoteInterpolationDuration)
+        let remoteAnimation = battle.animationState(for: remoteID)
+        XCTAssertNotEqual(remoteAnimation.leftTreadAngle, 0, accuracy: 0.001)
+        XCTAssertNotEqual(remoteAnimation.rightTreadAngle, 0, accuracy: 0.001)
+    }
+
+    func testBattleCollisionClanksOnceAndPushesTheLocalDroidAway() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        var cues: [ROBBattleSoundCue] = []
+        let battle = ROBBattleCoordinator(
+            networkingEnabled: false,
+            playerID: localID,
+            playerName: "Alpha",
+            audioEnabled: false,
+            soundFeedback: { cues.append($0) }
+        )
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
+        battle.testReceive(.init(kind: .hello, sender: remote))
+        battle.vote(for: .reactorGrid)
+        battle.testReceive(.init(kind: .vote, sender: remote, vote: .reactorGrid))
+        battle.startMatch()
+
+        let localStart = battle.localRobot
+        let forward = SIMD2<Float>(-sin(localStart.heading), -cos(localStart.heading))
+        var nearbyRemote = battle.remoteRobots[remoteID]!
+        nearbyRemote.x = localStart.x + forward.x * 1.3
+        nearbyRemote.z = localStart.z + forward.y * 1.3
+        battle.testReceive(.init(
+            kind: .snapshot,
+            sender: remote,
+            snapshot: nearbyRemote,
+            snapshotSequence: 10
+        ))
+        cues.removeAll()
+
+        battle.setTreads(left: 1, right: 1)
+        battle.tick(0.1)
+
+        let distanceAfterPush = hypot(
+            battle.localRobot.x - nearbyRemote.x,
+            battle.localRobot.z - nearbyRemote.z
+        )
+        XCTAssertGreaterThan(distanceAfterPush, 1.3)
+        XCTAssertEqual(cues.filter { $0 == .collision }.count, 1)
+        XCTAssertGreaterThan(battle.animationState(for: localID).collisionRemaining, 0)
+
+        for _ in 0..<30 { battle.tick(0.01) }
+        XCTAssertEqual(cues.filter { $0 == .collision }.count, 1, "Continuous contact must not restart collision audio every frame")
+    }
+
+    func testReceivedBattleCollisionPushesTheOtherDroidAndDebouncesDuplicateContact() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        var cues: [ROBBattleSoundCue] = []
+        let battle = ROBBattleCoordinator(
+            networkingEnabled: false,
+            playerID: localID,
+            playerName: "Alpha",
+            audioEnabled: false,
+            soundFeedback: { cues.append($0) }
+        )
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
+        battle.testReceive(.init(kind: .hello, sender: remote))
+        battle.vote(for: .shadowYard)
+        battle.testReceive(.init(kind: .vote, sender: remote, vote: .shadowYard))
+        battle.startMatch()
+
+        let localStart = battle.localRobot
+        let towardRemote = SIMD2<Float>(-sin(localStart.heading), -cos(localStart.heading))
+        var nearbyRemote = battle.remoteRobots[remoteID]!
+        nearbyRemote.x = localStart.x + towardRemote.x * 1.3
+        nearbyRemote.z = localStart.z + towardRemote.y * 1.3
+        battle.testReceive(.init(kind: .snapshot, sender: remote, snapshot: nearbyRemote, snapshotSequence: 10))
+        cues.removeAll()
+
+        let first = ROBBattleCollisionEvent(
+            id: UUID(), initiatorID: remoteID, otherRobotID: localID,
+            normalX: towardRemote.x, normalZ: towardRemote.y,
+            impulse: ROBBattleCoordinator.collisionImpulse
+        )
+        battle.testReceive(.init(kind: .collision, sender: remote, collision: first))
+        let afterFirst = battle.localRobot.position
+        let duplicateContact = ROBBattleCollisionEvent(
+            id: UUID(), initiatorID: remoteID, otherRobotID: localID,
+            normalX: towardRemote.x, normalZ: towardRemote.y,
+            impulse: ROBBattleCoordinator.collisionImpulse
+        )
+        battle.testReceive(.init(kind: .collision, sender: remote, collision: duplicateContact))
+
+        XCTAssertGreaterThan(simd_distance(afterFirst, localStart.position), 0.3)
+        XCTAssertEqual(battle.localRobot.position, afterFirst)
+        XCTAssertEqual(cues.filter { $0 == .collision }.count, 1)
+    }
+
     func testDeathmatchProjectileKnockoutScoresAndRespawnsROB() {
         let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
@@ -1639,6 +1820,10 @@ final class GameSessionTests: XCTestCase {
         )
         XCTAssertEqual(
             ROBBattleNetwork.deliveryMode(for: .knockout).rawValue,
+            MCSessionSendDataMode.reliable.rawValue
+        )
+        XCTAssertEqual(
+            ROBBattleNetwork.deliveryMode(for: .collision).rawValue,
             MCSessionSendDataMode.reliable.rawValue
         )
     }

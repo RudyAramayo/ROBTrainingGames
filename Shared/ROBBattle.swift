@@ -149,6 +149,15 @@ struct ROBBattleKnockout: Codable, Equatable, Sendable {
     let victimID: UUID
 }
 
+struct ROBBattleCollisionEvent: Codable, Equatable, Sendable {
+    let id: UUID
+    let initiatorID: UUID
+    let otherRobotID: UUID
+    let normalX: Float
+    let normalZ: Float
+    let impulse: Float
+}
+
 struct ROBBattleSpawnAssignment: Codable, Equatable, Sendable {
     let playerID: UUID
     let spawnIndex: Int
@@ -163,7 +172,7 @@ struct ROBBattleMatchStart: Codable, Equatable, Sendable {
 }
 
 enum ROBBattlePacketKind: String, Codable, Sendable {
-    case hello, vote, matchStart, snapshot, projectile, projectileImpact, melee, knockout, matchEnd, nextVote
+    case hello, vote, matchStart, snapshot, projectile, projectileImpact, melee, knockout, collision, matchEnd, nextVote
 }
 
 struct ROBBattlePacket: Codable, Sendable {
@@ -176,6 +185,7 @@ struct ROBBattlePacket: Codable, Sendable {
     var projectileID: UUID?
     var melee: ROBBattleMeleeEvent?
     var knockout: ROBBattleKnockout?
+    var collision: ROBBattleCollisionEvent?
     var winnerID: UUID?
     var snapshotSequence: UInt64?
 }
@@ -213,7 +223,7 @@ final class ROBBattleNetwork: NSObject {
     )
     @ObservationIgnored private lazy var advertiser = MCNearbyServiceAdvertiser(
         peer: localPeer,
-        discoveryInfo: ["game": "deathmatch", "version": "1"],
+        discoveryInfo: ["game": "deathmatch", "version": "2"],
         serviceType: Self.serviceType
     )
     @ObservationIgnored private lazy var browser = MCNearbyServiceBrowser(peer: localPeer, serviceType: Self.serviceType)
@@ -307,7 +317,7 @@ extension ROBBattleNetwork: MCSessionDelegate {
 
 extension ROBBattleNetwork: MCNearbyServiceBrowserDelegate {
     nonisolated func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String: String]?) {
-        guard info?["game"] == "deathmatch", info?["version"] == "1" else { return }
+        guard info?["game"] == "deathmatch", info?["version"] == "2" else { return }
         let box = ROBBattlePeerBox(peer: peerID)
         Task { @MainActor [weak self] in self?.found(box.peer) }
     }
@@ -337,6 +347,18 @@ private struct ROBBattleRemoteInterpolation {
     var elapsed = 0.0
 }
 
+struct ROBBattleRobotAnimationState: Equatable, Sendable {
+    static let saberDuration = 0.48
+    static let laserDuration = 0.24
+    static let collisionDuration = 0.32
+
+    var leftTreadAngle: Float = 0
+    var rightTreadAngle: Float = 0
+    var saberRemaining = 0.0
+    var laserRemaining = 0.0
+    var collisionRemaining = 0.0
+}
+
 @MainActor
 @Observable
 final class ROBBattleCoordinator {
@@ -347,6 +369,9 @@ final class ROBBattleCoordinator {
     static let robotRadius: Float = 0.64
     static let remoteInterpolationDuration = 0.1
     static let remoteSnapDistance: Float = 3
+    static let collisionImpulse: Float = 0.38
+    static let collisionEventCooldown = 0.75
+    static let collisionSoundCooldown = 0.9
 
     private(set) var localIdentity: ROBBattlePlayerIdentity
     private(set) var players: [UUID: ROBBattlePlayerIdentity]
@@ -358,6 +383,7 @@ final class ROBBattleCoordinator {
     private(set) var localRobot: ROBBattleRobotState
     private(set) var remoteRobots: [UUID: ROBBattleRobotState] = [:]
     private(set) var projectiles: [ROBBattleProjectile] = []
+    private(set) var robotAnimations: [UUID: ROBBattleRobotAnimationState] = [:]
     private(set) var scores: [UUID: Int] = [:]
     private(set) var deaths: [UUID: Int] = [:]
     private(set) var winnerID: UUID?
@@ -365,7 +391,7 @@ final class ROBBattleCoordinator {
     private(set) var connectedControllerName: String?
 
     @ObservationIgnored private let network: ROBBattleNetwork?
-    @ObservationIgnored private let audioEnabled: Bool
+    @ObservationIgnored private let soundFeedback: @MainActor (ROBBattleSoundCue) -> Void
     @ObservationIgnored private var leftTread = 0.0
     @ObservationIgnored private var rightTread = 0.0
     @ObservationIgnored private var lastSnapshotSent = -Double.infinity
@@ -375,6 +401,8 @@ final class ROBBattleCoordinator {
     @ObservationIgnored private var outgoingSnapshotSequence: UInt64 = 0
     @ObservationIgnored private var lastRemoteSnapshotSequences: [UUID: UInt64] = [:]
     @ObservationIgnored private var remoteInterpolations: [UUID: ROBBattleRemoteInterpolation] = [:]
+    @ObservationIgnored private var lastCollisionTimes: [UUID: Double] = [:]
+    @ObservationIgnored private var lastCollisionSoundTime = -Double.infinity
 
     var orderedPlayers: [ROBBattlePlayerIdentity] {
         players.values.sorted { lhs, rhs in
@@ -396,12 +424,17 @@ final class ROBBattleCoordinator {
     var winnerName: String? { winnerID.flatMap { players[$0]?.name } }
     var networkPlayerDescription: String { "\(playerCount)/\(Self.maximumPlayers) players" }
 
+    func animationState(for robotID: UUID) -> ROBBattleRobotAnimationState {
+        robotAnimations[robotID, default: .init()]
+    }
+
     init(
         networkingEnabled: Bool = true,
         playerID: UUID? = nil,
         playerName: String? = nil,
         droidProfile: ROBDroidProfile = ROBDroidProfile(),
-        audioEnabled: Bool = true
+        audioEnabled: Bool = true,
+        soundFeedback: (@MainActor (ROBBattleSoundCue) -> Void)? = nil
     ) {
         let id = playerID ?? Self.installationID()
         let name = playerName ?? Self.defaultPlayerName()
@@ -415,10 +448,22 @@ final class ROBBattleCoordinator {
         )
         localIdentity = identity
         players = [id: identity]
-        localRobot = .init(id: id, x: -6.4, z: -6.4, heading: -.pi / 4, health: 100, shields: 50, isAlive: true, respawnRemaining: 0)
+        let initialSpawn = SIMD3<Float>(-6.4, 0, -6.4)
+        localRobot = .init(
+            id: id, x: initialSpawn.x, z: initialSpawn.z,
+            heading: Self.headingTowardArenaCenter(from: initialSpawn),
+            health: 100, shields: 50, isAlive: true, respawnRemaining: 0
+        )
+        robotAnimations = [id: .init()]
         scores = [id: 0]
         deaths = [id: 0]
-        self.audioEnabled = audioEnabled
+        if let soundFeedback {
+            self.soundFeedback = soundFeedback
+        } else if audioEnabled {
+            self.soundFeedback = { SoundPlayer.shared.playBattle($0) }
+        } else {
+            self.soundFeedback = { _ in }
+        }
         network = networkingEnabled ? ROBBattleNetwork(transportName: transportName) : nil
         network?.onPacket = { [weak self] packet in self?.receive(packet) }
         network?.onPeerConnected = { [weak self] in self?.broadcastHello() }
@@ -493,6 +538,7 @@ final class ROBBattleCoordinator {
         }
         updateProjectiles(step)
         updateRemoteInterpolation(step)
+        updateRobotAnimationTimers(step)
 
         let matchElapsed = Self.matchDuration - remainingTime
         if matchElapsed - lastSnapshotSent >= 1.0 / 15.0 {
@@ -521,6 +567,7 @@ final class ROBBattleCoordinator {
             damage: 28
         )
         projectiles.append(projectile)
+        startLaserAnimation(for: localIdentity.id)
         play(.laser)
         send(.init(kind: .projectile, sender: localIdentity, projectile: projectile))
     }
@@ -533,6 +580,7 @@ final class ROBBattleCoordinator {
             id: UUID(), attackerID: localIdentity.id,
             x: localRobot.x, z: localRobot.z, heading: localRobot.heading, damage: 38
         )
+        startSaberAnimation(for: localIdentity.id)
         play(.saber)
         send(.init(kind: .melee, sender: localIdentity, melee: event))
     }
@@ -542,6 +590,11 @@ final class ROBBattleCoordinator {
     private func updateMovement(_ delta: Double) {
         let forward = Float((leftTread + rightTread) * 0.5)
         let turn = Float((rightTread - leftTread) * 0.5)
+        advanceTreads(
+            for: localIdentity.id,
+            leftDistance: Float(leftTread * delta * 3.35),
+            rightDistance: Float(rightTread * delta * 3.35)
+        )
         localRobot.heading += turn * Float(delta) * 2.25
         let distance = forward * Float(delta) * 3.35
         let candidate = SIMD2<Float>(
@@ -555,6 +608,9 @@ final class ROBBattleCoordinator {
     }
 
     private func resolvedPosition(from current: SIMD2<Float>, to candidate: SIMD2<Float>) -> SIMD2<Float> {
+        if let remote = collidingRemote(at: candidate) {
+            return resolveRobotCollision(from: current, attempted: candidate, with: remote)
+        }
         if isClear(candidate) { return candidate }
         let xOnly = SIMD2<Float>(candidate.x, current.y)
         if isClear(xOnly) { return xOnly }
@@ -563,16 +619,112 @@ final class ROBBattleCoordinator {
     }
 
     private func isClear(_ point: SIMD2<Float>) -> Bool {
+        isStaticClear(point) && collidingRemote(at: point) == nil
+    }
+
+    private func isStaticClear(_ point: SIMD2<Float>) -> Bool {
         let limit = Self.arenaHalfExtent - Self.robotRadius
         guard abs(point.x) <= limit, abs(point.y) <= limit else { return false }
-        guard !arena.barriers.contains(where: {
+        return !arena.barriers.contains(where: {
             abs(point.x - $0.x) < $0.width / 2 + Self.robotRadius &&
             abs(point.y - $0.z) < $0.depth / 2 + Self.robotRadius
-        }) else { return false }
-        return !remoteRobots.values.contains { rendered in
+        })
+    }
+
+    private func collidingRemote(at point: SIMD2<Float>, excluding excludedID: UUID? = nil) -> ROBBattleRobotState? {
+        remoteRobots.values.first { rendered in
             let state = remoteInterpolations[rendered.id]?.target ?? rendered
-            return state.isAlive && hypot(point.x - state.x, point.y - state.z) < Self.robotRadius * 1.8
+            return state.id != excludedID && state.isAlive &&
+                hypot(point.x - state.x, point.y - state.z) < Self.robotRadius * 2
         }
+    }
+
+    private func resolveRobotCollision(
+        from current: SIMD2<Float>,
+        attempted: SIMD2<Float>,
+        with remote: ROBBattleRobotState
+    ) -> SIMD2<Float> {
+        let now = Self.matchDuration - remainingTime
+        guard now - lastCollisionTimes[remote.id, default: -.infinity] >= Self.collisionEventCooldown else {
+            return current
+        }
+        var away = current - SIMD2<Float>(remote.x, remote.z)
+        let distance = simd_length(away)
+        if distance < 0.001 {
+            away = current - attempted
+            if simd_length(away) < 0.001 {
+                away = SIMD2<Float>(sin(localRobot.heading), cos(localRobot.heading))
+            }
+        }
+        let normal = simd_normalize(away)
+        let overlapCorrection = max(0, Self.robotRadius * 2 - distance)
+        let impulse = min(1.2, max(Self.collisionImpulse, overlapCorrection * 0.5 + Self.collisionImpulse))
+        let event = ROBBattleCollisionEvent(
+            id: UUID(),
+            initiatorID: localIdentity.id,
+            otherRobotID: remote.id,
+            normalX: normal.x,
+            normalZ: normal.y,
+            impulse: impulse
+        )
+        lastCollisionTimes[remote.id] = now
+        processedEvents.insert(event.id)
+        startCollisionAnimation(for: localIdentity.id)
+        startCollisionAnimation(for: remote.id)
+        playCollisionSound(at: now)
+        statusMessage = "Metal-to-metal contact — separating the droids."
+        send(.init(kind: .collision, sender: localIdentity, collision: event))
+        return pushedPosition(from: current, direction: normal, distance: impulse, excluding: remote.id)
+    }
+
+    private func applyCollision(_ event: ROBBattleCollisionEvent, senderID: UUID) {
+        guard processedEvents.insert(event.id).inserted,
+              phase == .playing,
+              event.initiatorID == senderID,
+              event.otherRobotID == localIdentity.id,
+              localRobot.isAlive,
+              let remote = remoteRobots[event.initiatorID], remote.isAlive else { return }
+        let now = Self.matchDuration - remainingTime
+        guard now - lastCollisionTimes[event.initiatorID, default: -.infinity] >= Self.collisionEventCooldown,
+              hypot(localRobot.x - remote.x, localRobot.z - remote.z) <= Self.robotRadius * 3.25 else { return }
+        lastCollisionTimes[event.initiatorID] = now
+        var direction = SIMD2<Float>(-event.normalX, -event.normalZ)
+        if simd_length(direction) < 0.001 {
+            direction = SIMD2<Float>(localRobot.x - remote.x, localRobot.z - remote.z)
+        }
+        if simd_length(direction) < 0.001 {
+            direction = SIMD2<Float>(sin(localRobot.heading), cos(localRobot.heading))
+        }
+        direction = simd_normalize(direction)
+        let current = SIMD2<Float>(localRobot.x, localRobot.z)
+        let pushed = pushedPosition(
+            from: current,
+            direction: direction,
+            distance: min(1.2, max(0.15, event.impulse)),
+            excluding: event.initiatorID
+        )
+        localRobot.x = pushed.x
+        localRobot.z = pushed.y
+        startCollisionAnimation(for: localIdentity.id)
+        startCollisionAnimation(for: event.initiatorID)
+        playCollisionSound(at: now)
+        statusMessage = "Metal-to-metal contact — separating the droids."
+        broadcastSnapshot()
+    }
+
+    private func pushedPosition(
+        from current: SIMD2<Float>,
+        direction: SIMD2<Float>,
+        distance: Float,
+        excluding remoteID: UUID
+    ) -> SIMD2<Float> {
+        let candidate = current + direction * distance
+        if isStaticClear(candidate), collidingRemote(at: candidate, excluding: remoteID) == nil { return candidate }
+        let xOnly = SIMD2<Float>(candidate.x, current.y)
+        if isStaticClear(xOnly), collidingRemote(at: xOnly, excluding: remoteID) == nil { return xOnly }
+        let zOnly = SIMD2<Float>(current.x, candidate.y)
+        if isStaticClear(zOnly), collidingRemote(at: zOnly, excluding: remoteID) == nil { return zOnly }
+        return current
     }
 
     private func acceptRemoteSnapshot(_ snapshot: ROBBattleRobotState, sequence: UInt64?) {
@@ -611,6 +763,7 @@ final class ROBBattleCoordinator {
                 to: interpolation.target.heading,
                 progress: progress
             )
+            advanceRemoteTreads(for: id, from: remoteRobots[id], to: rendered)
             remoteRobots[id] = rendered
             if progress >= 1 {
                 remoteInterpolations.removeValue(forKey: id)
@@ -625,6 +778,66 @@ final class ROBBattleCoordinator {
         let shortestDelta = atan2(sin(target - start), cos(target - start))
         let heading = start + shortestDelta * amount
         return atan2(sin(heading), cos(heading))
+    }
+
+    static func headingTowardArenaCenter(from spawn: SIMD3<Float>) -> Float {
+        atan2(spawn.x, spawn.z)
+    }
+
+    private func updateRobotAnimationTimers(_ delta: Double) {
+        for id in Array(robotAnimations.keys) {
+            guard var animation = robotAnimations[id] else { continue }
+            animation.saberRemaining = max(0, animation.saberRemaining - delta)
+            animation.laserRemaining = max(0, animation.laserRemaining - delta)
+            animation.collisionRemaining = max(0, animation.collisionRemaining - delta)
+            robotAnimations[id] = animation
+        }
+    }
+
+    private func startSaberAnimation(for id: UUID) {
+        var animation = animationState(for: id)
+        animation.saberRemaining = ROBBattleRobotAnimationState.saberDuration
+        robotAnimations[id] = animation
+    }
+
+    private func startLaserAnimation(for id: UUID) {
+        var animation = animationState(for: id)
+        animation.laserRemaining = ROBBattleRobotAnimationState.laserDuration
+        robotAnimations[id] = animation
+    }
+
+    private func startCollisionAnimation(for id: UUID) {
+        var animation = animationState(for: id)
+        animation.collisionRemaining = ROBBattleRobotAnimationState.collisionDuration
+        robotAnimations[id] = animation
+    }
+
+    private func advanceTreads(for id: UUID, leftDistance: Float, rightDistance: Float) {
+        var animation = animationState(for: id)
+        let wheelRadius: Float = 0.16
+        animation.leftTreadAngle = (animation.leftTreadAngle + leftDistance / wheelRadius)
+            .truncatingRemainder(dividingBy: 2 * .pi)
+        animation.rightTreadAngle = (animation.rightTreadAngle + rightDistance / wheelRadius)
+            .truncatingRemainder(dividingBy: 2 * .pi)
+        robotAnimations[id] = animation
+    }
+
+    private func advanceRemoteTreads(
+        for id: UUID,
+        from previous: ROBBattleRobotState?,
+        to current: ROBBattleRobotState
+    ) {
+        guard let previous else { return }
+        let movement = SIMD2<Float>(current.x - previous.x, current.z - previous.z)
+        let forward = SIMD2<Float>(-sin(current.heading), -cos(current.heading))
+        let forwardDistance = simd_dot(movement, forward)
+        let turn = atan2(sin(current.heading - previous.heading), cos(current.heading - previous.heading))
+        let halfTrackWidth: Float = 0.39
+        advanceTreads(
+            for: id,
+            leftDistance: forwardDistance - turn * halfTrackWidth,
+            rightDistance: forwardDistance + turn * halfTrackWidth
+        )
     }
 
     private func updateProjectiles(_ delta: Double) {
@@ -699,9 +912,10 @@ final class ROBBattleCoordinator {
         let spawn = arena.spawnPoints[spawnIndex % arena.spawnPoints.count]
         localRobot = .init(
             id: localIdentity.id, x: spawn.x, z: spawn.z,
-            heading: atan2(-spawn.x, -spawn.z), health: 100, shields: 50,
+            heading: Self.headingTowardArenaCenter(from: spawn), health: 100, shields: 50,
             isAlive: true, respawnRemaining: 0
         )
+        robotAnimations[localIdentity.id] = .init()
         statusMessage = "ROB rebuilt. Re-enter the arena!"
         play(.respawn)
         broadcastSnapshot()
@@ -726,10 +940,13 @@ final class ROBBattleCoordinator {
         scores = Dictionary(uniqueKeysWithValues: players.keys.map { ($0, 0) })
         deaths = Dictionary(uniqueKeysWithValues: players.keys.map { ($0, 0) })
         projectiles = []
+        robotAnimations = Dictionary(uniqueKeysWithValues: players.keys.map { ($0, .init()) })
         processedEvents = []
         outgoingSnapshotSequence = 0
         lastRemoteSnapshotSequences = [:]
         remoteInterpolations = [:]
+        lastCollisionTimes = [:]
+        lastCollisionSoundTime = -.infinity
         lastSnapshotSent = -.infinity
         lastLaserTime = -.infinity
         lastMeleeTime = -.infinity
@@ -737,7 +954,7 @@ final class ROBBattleCoordinator {
         let spawn = arena.spawnPoints[spawnIndex % arena.spawnPoints.count]
         localRobot = .init(
             id: localIdentity.id, x: spawn.x, z: spawn.z,
-            heading: atan2(-spawn.x, -spawn.z), health: 100, shields: 50,
+            heading: Self.headingTowardArenaCenter(from: spawn), health: 100, shields: 50,
             isAlive: true, respawnRemaining: 0
         )
         remoteRobots = [:]
@@ -745,7 +962,7 @@ final class ROBBattleCoordinator {
             let remoteSpawn = arena.spawnPoints[assignment.spawnIndex % arena.spawnPoints.count]
             remoteRobots[assignment.playerID] = .init(
                 id: assignment.playerID, x: remoteSpawn.x, z: remoteSpawn.z,
-                heading: atan2(-remoteSpawn.x, -remoteSpawn.z), health: 100, shields: 50,
+                heading: Self.headingTowardArenaCenter(from: remoteSpawn), health: 100, shields: 50,
                 isAlive: true, respawnRemaining: 0
             )
         }
@@ -774,8 +991,10 @@ final class ROBBattleCoordinator {
         votes = [:]
         winnerID = nil
         remoteRobots = [:]
+        robotAnimations = [localIdentity.id: .init()]
         remoteInterpolations = [:]
         lastRemoteSnapshotSequences = [:]
+        lastCollisionTimes = [:]
         projectiles = []
         statusMessage = "Vote for the next deathmatch arena."
         network?.start()
@@ -823,17 +1042,21 @@ final class ROBBattleCoordinator {
             if phase == .playing, let projectile = packet.projectile,
                !projectiles.contains(where: { $0.id == projectile.id }) {
                 projectiles.append(projectile)
+                startLaserAnimation(for: projectile.ownerID)
                 play(.laser)
             }
         case .projectileImpact:
             if let projectileID = packet.projectileID { projectiles.removeAll { $0.id == projectileID } }
         case .melee:
             if phase == .playing, let melee = packet.melee {
+                startSaberAnimation(for: melee.attackerID)
                 play(.saber)
                 applyMelee(melee)
             }
         case .knockout:
             if let knockout = packet.knockout { applyKnockout(knockout) }
+        case .collision:
+            if let collision = packet.collision { applyCollision(collision, senderID: packet.sender.id) }
         case .matchEnd:
             guard packet.sender.id == hostID else { return }
             winnerID = packet.winnerID
@@ -854,8 +1077,10 @@ final class ROBBattleCoordinator {
         players.removeValue(forKey: peer.id)
         votes.removeValue(forKey: peer.id)
         remoteRobots.removeValue(forKey: peer.id)
+        robotAnimations.removeValue(forKey: peer.id)
         remoteInterpolations.removeValue(forKey: peer.id)
         lastRemoteSnapshotSequences.removeValue(forKey: peer.id)
+        lastCollisionTimes.removeValue(forKey: peer.id)
         statusMessage = "\(peer.name) left the battle."
         if phase == .playing, players.count < 2 {
             phase = .results
@@ -866,7 +1091,13 @@ final class ROBBattleCoordinator {
     }
 
     private func play(_ cue: ROBBattleSoundCue) {
-        if audioEnabled { SoundPlayer.shared.playBattle(cue) }
+        soundFeedback(cue)
+    }
+
+    private func playCollisionSound(at time: Double) {
+        guard time - lastCollisionSoundTime >= Self.collisionSoundCooldown else { return }
+        lastCollisionSoundTime = time
+        play(.collision)
     }
 
     private static func installationID() -> UUID {

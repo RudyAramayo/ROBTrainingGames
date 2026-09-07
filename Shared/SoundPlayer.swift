@@ -5,6 +5,7 @@ enum ROBBattleSoundCue: Equatable, Sendable {
     case laser
     case saber
     case impact
+    case collision
     case knockout
     case respawn
     case victory
@@ -55,7 +56,7 @@ enum ROBBattleSoundCue: Equatable, Sendable {
         case .matchStart: play("mission-start")
         case .laser: playLaser(charge: 0.32)
         case .victory: play("level-complete")
-        case .saber, .impact, .knockout, .respawn:
+        case .saber, .impact, .collision, .knockout, .respawn:
             guard let buffer = makeBattleBuffer(cue) else { return }
             playProceduralBuffer(buffer)
         }
@@ -145,6 +146,7 @@ enum ROBBattleSoundCue: Equatable, Sendable {
         let duration: Double = switch cue {
         case .saber: 0.32
         case .impact: 0.22
+        case .collision: 0.2
         case .knockout: 0.55
         case .respawn: 0.5
         case .matchStart, .laser, .victory: 0
@@ -172,6 +174,16 @@ enum ROBBattleSoundCue: Equatable, Sendable {
                 let clang = sin(2 * .pi * 470 * time)
                 let envelope = exp(-time * 16)
                 samples[frame] = Float((thud * 0.56 + clang * 0.18 + white * 0.26) * envelope * 0.44)
+            case .collision:
+                let lowRing = sin(2 * .pi * 238 * time)
+                let midRing = sin(2 * .pi * 617 * time)
+                let highRing = sin(2 * .pi * 1_493 * time)
+                let strike = white * exp(-time * 48)
+                let resonance = exp(-time * 18)
+                samples[frame] = Float(
+                    (lowRing * 0.42 + midRing * 0.29 + highRing * 0.13) * resonance * 0.38
+                    + strike * 0.18
+                )
             case .knockout:
                 let pitch = max(72, 620 - time * 950)
                 let carrier = sin(2 * .pi * pitch * time)

@@ -154,9 +154,15 @@ enum ROBBattleFactory {
             }
             if let identity = battle.players[id] { applyAppearance(to: robot, identity: identity, arPresentation: arPresentation) }
             robot.isEnabled = state.isAlive
-            robot.position = state.position
+            let animation = battle.animationState(for: id)
+            let collisionProgress = Float(
+                1 - animation.collisionRemaining / ROBBattleRobotAnimationState.collisionDuration
+            )
+            let collisionLift = animation.collisionRemaining > 0 ? sin(collisionProgress * .pi) * 0.1 : 0
+            robot.position = state.position + SIMD3<Float>(0, collisionLift, 0)
             robot.orientation = simd_quatf(angle: state.heading, axis: [0, 1, 0])
             robot.findEntity(named: "ROB Shield Field")?.isEnabled = state.shields > 0
+            applyAnimation(to: robot, state: animation)
             if let beacon = robot.findEntity(named: "Pilot Beacon") {
                 let healthPulse = 0.72 + Float(state.health) / 250
                 beacon.scale = .init(repeating: healthPulse)
@@ -189,6 +195,52 @@ enum ROBBattleFactory {
             }
             entity.position = projectile.position
         }
+    }
+
+    static func applyAnimation(to robot: Entity, state: ROBBattleRobotAnimationState) {
+        for (prefix, angle) in [("Left", state.leftTreadAngle), ("Right", state.rightTreadAngle)] {
+            for index in 1...3 {
+                robot.findEntity(named: "\(prefix) Tri-Wheel \(index)")?.orientation =
+                    simd_quatf(angle: angle, axis: [1, 0, 0])
+            }
+        }
+
+        let saberActive = state.saberRemaining > 0
+        let saberProgress = saberActive
+            ? Float(1 - state.saberRemaining / ROBBattleRobotAnimationState.saberDuration)
+            : 1
+        let saberArc = sin(saberProgress * .pi)
+        for (name, side) in [("Left Lightsaber", Float(-1)), ("Right Lightsaber", Float(1))] {
+            guard let blade = robot.findEntity(named: name) else { continue }
+            let bladeScale: Float = saberActive ? 1 : 0.06
+            blade.isEnabled = true
+            blade.scale = [1, bladeScale, 1]
+            blade.position = [side * 0.24, -0.64, -0.1 - 0.45 * bladeScale]
+        }
+
+        let torso = robot.findEntity(named: "Torso Assembly")
+        torso?.orientation = saberActive
+            ? simd_quatf(angle: -saberArc * 0.22, axis: [0, 1, 0])
+            : simd_quatf(angle: 0, axis: [0, 1, 0])
+        for (name, side) in [("Left Arm Assembly", Float(-1)), ("Right Arm Assembly", Float(1))] {
+            guard let arm = robot.findEntity(named: name) else { continue }
+            guard saberActive else {
+                arm.orientation = simd_quatf(angle: 0, axis: [0, 1, 0])
+                continue
+            }
+            let sweep = side * (-1.4 + saberProgress * 2.8)
+            arm.orientation = simd_quatf(angle: sweep, axis: [0, 1, 0])
+                * simd_quatf(angle: side * saberArc * 0.48, axis: [0, 0, 1])
+        }
+
+        let laserActive = state.laserRemaining > 0
+        let laserProgress = laserActive
+            ? Float(1 - state.laserRemaining / ROBBattleRobotAnimationState.laserDuration)
+            : 1
+        robot.findEntity(named: "Gatling Barrel Cluster")?.orientation =
+            simd_quatf(angle: laserProgress * 4 * .pi, axis: [0, 0, 1])
+        robot.findEntity(named: "Gatling Tilt Servo")?.orientation =
+            simd_quatf(angle: laserActive ? -sin(laserProgress * .pi) * 0.16 : 0, axis: [1, 0, 0])
     }
 
     static func robotName(_ id: UUID) -> String { "Battle ROB \(id.uuidString)" }
