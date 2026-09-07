@@ -151,7 +151,11 @@ final class GameSessionTests: XCTestCase {
             return XCTFail("Level 2 did not render its key")
         }
         XCTAssertEqual(renderedKey.position.y, RobotFactory.puzzleKeySurfaceOffset, accuracy: 0.0001)
-        XCTAssertNil(renderedKey.findEntity(named: "Puzzle Key Beacon"))
+        guard let beacon = renderedKey.findEntity(named: "Puzzle Key Beacon") else {
+            return XCTFail("Every training key needs a vertical visibility beacon")
+        }
+        XCTAssertGreaterThan(beacon.position.y, RobotFactory.puzzleKeyBeaconHeight / 2)
+        XCTAssertNotNil(renderedKey.findEntity(named: "Puzzle Key Beacon Tip"))
         XCTAssertNotNil(renderedKey.findEntity(named: "Puzzle Key Shaft"))
         XCTAssertNotNil(renderedKey.findEntity(named: "Puzzle Key Bow Segment 0"))
         XCTAssertNotNil(renderedKey.findEntity(named: "Puzzle Key Tooth 0"))
@@ -160,6 +164,21 @@ final class GameSessionTests: XCTestCase {
         game.robotPosition = [key.x, 0, key.y]
         game.tick(1.0 / 30.0)
         XCTAssertTrue(game.hasKey)
+    }
+
+    func testEveryKeyBearingLevelRendersTheVisibilityBeacon() {
+        let game = GameSession(audioEnabled: false)
+
+        for levelIndex in game.levels.indices where game.levels[levelIndex].requiresKey {
+            game.levelIndex = levelIndex
+            let room = RobotFactory.makeTrainingRoom(level: levelIndex, puzzle: game.puzzle)
+            let key = room.findEntity(named: "Puzzle Key")
+            XCTAssertNotNil(key, "Level \(game.level.id) did not render its key")
+            XCTAssertNotNil(
+                key?.findEntity(named: "Puzzle Key Beacon"),
+                "Level \(game.level.id) key is missing its visibility line"
+            )
+        }
     }
 
     func testVoiceRejectsInvalidMicrophoneFormatsBeforeInstallingATap() {

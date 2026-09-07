@@ -706,6 +706,7 @@ import UIKit
     }
 
     static let puzzleKeySurfaceOffset: Float = 0.001
+    static let puzzleKeyBeaconHeight: Float = 3.4
 
     static func makePuzzleKey() -> Entity {
         let root = Entity()
@@ -764,6 +765,25 @@ import UIKit
         tip.position = [0.415, restingHeight, 0.018]
         root.addChild(tip)
 
+        // Keep a bright vertical locator above every key. The key itself rests
+        // naturally on the floor, while this line remains visible over walls
+        // and props from the game's elevated camera.
+        let beacon = ModelEntity(
+            mesh: .generateCylinder(height: puzzleKeyBeaconHeight, radius: 0.035),
+            materials: [UnlitMaterial(color: UIColor.systemYellow.withAlphaComponent(0.82))]
+        )
+        beacon.name = "Puzzle Key Beacon"
+        beacon.position = [0, puzzleKeyBeaconHeight / 2 + 0.04, 0]
+        root.addChild(beacon)
+
+        let beaconTip = ModelEntity(
+            mesh: .generateSphere(radius: 0.105),
+            materials: [UnlitMaterial(color: .systemYellow)]
+        )
+        beaconTip.name = "Puzzle Key Beacon Tip"
+        beaconTip.position = [0, puzzleKeyBeaconHeight + 0.04, 0]
+        root.addChild(beaconTip)
+
         return root
     }
 
@@ -784,6 +804,9 @@ import UIKit
 
     static func applyPuzzleState(to room: Entity, session: GameSession) {
         room.findEntity(named: "Puzzle Key")?.isEnabled = !session.hasKey
+        let beaconPulse = 1 + max(0, Float(sin(session.elapsed * 4.4))) * 0.32
+        room.findEntity(named: "Puzzle Key Beacon")?.scale = [beaconPulse, 1, beaconPulse]
+        room.findEntity(named: "Puzzle Key Beacon Tip")?.scale = .init(repeating: beaconPulse)
         room.findEntity(named: "Puzzle Door")?.isEnabled = !session.doorOpen
         room.findEntity(named: "Hack Terminal")?.isEnabled = !session.doorOpen
         if let button = room.findEntity(named: "Hack Terminal Button") as? ModelEntity {
