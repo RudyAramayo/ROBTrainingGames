@@ -2,6 +2,7 @@ import XCTest
 import ARKit
 import AVFoundation
 import Dispatch
+@preconcurrency import MultipeerConnectivity
 import RealityKit
 import Speech
 import simd
@@ -1492,7 +1493,7 @@ final class GameSessionTests: XCTestCase {
     func testAutoNetBattleRequiresEveryPilotVoteAndResolvesTieDeterministically() {
         let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha")
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", audioEnabled: false)
         let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
 
         battle.testReceive(.init(kind: .hello, sender: remote))
@@ -1513,7 +1514,7 @@ final class GameSessionTests: XCTestCase {
 
     func testAutoNetBattleCapsLobbyAtFourPilots() {
         let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha")
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", audioEnabled: false)
         for index in 2...6 {
             let id = UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", index))!
             let peer = ROBBattlePlayerIdentity(id: id, name: "Pilot \(index)", transportName: "ROB-\(index)", colorIndex: index % 4)
@@ -1526,7 +1527,7 @@ final class GameSessionTests: XCTestCase {
     func testDeathmatchProjectileKnockoutScoresAndRespawnsROB() {
         let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha")
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", audioEnabled: false)
         let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
         battle.testReceive(.init(kind: .hello, sender: remote))
         battle.vote(for: .reactorGrid)
@@ -1576,12 +1577,78 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(decoded.projectile, projectile)
     }
 
+    func testBattleSnapshotsInterpolateRemoteMovementAndDiscardStaleUpdates() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", audioEnabled: false)
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
+        battle.testReceive(.init(kind: .hello, sender: remote))
+        battle.vote(for: .neonFoundry)
+        battle.testReceive(.init(kind: .vote, sender: remote, vote: .neonFoundry))
+        battle.startMatch()
+
+        let start = battle.remoteRobots[remoteID]!
+        var target = start
+        target.x -= 1.2
+        target.z -= 0.6
+        target.heading = -.pi + 0.04
+        battle.testReceive(.init(
+            kind: .snapshot,
+            sender: remote,
+            snapshot: target,
+            snapshotSequence: 2
+        ))
+
+        XCTAssertEqual(battle.remoteRobots[remoteID]?.x, start.x)
+        XCTAssertEqual(battle.remoteRobots[remoteID]?.z, start.z)
+        battle.tick(ROBBattleCoordinator.remoteInterpolationDuration / 2)
+        XCTAssertEqual(battle.remoteRobots[remoteID]?.x ?? 0, (start.x + target.x) / 2, accuracy: 0.001)
+        XCTAssertEqual(battle.remoteRobots[remoteID]?.z ?? 0, (start.z + target.z) / 2, accuracy: 0.001)
+
+        var stale = target
+        stale.x = start.x + 1
+        battle.testReceive(.init(
+            kind: .snapshot,
+            sender: remote,
+            snapshot: stale,
+            snapshotSequence: 1
+        ))
+        battle.tick(ROBBattleCoordinator.remoteInterpolationDuration / 2)
+        XCTAssertEqual(battle.remoteRobots[remoteID]?.x ?? 0, target.x, accuracy: 0.001)
+        XCTAssertEqual(battle.remoteRobots[remoteID]?.z ?? 0, target.z, accuracy: 0.001)
+    }
+
+    func testBattleHeadingInterpolationUsesShortestTurnAcrossPi() {
+        let halfway = ROBBattleCoordinator.interpolatedHeading(
+            from: .pi - 0.1,
+            to: -.pi + 0.1,
+            progress: 0.5
+        )
+
+        XCTAssertEqual(abs(halfway), .pi, accuracy: 0.001)
+    }
+
+    func testBattleUsesUnreliableDeliveryOnlyForFrequentSnapshots() {
+        XCTAssertEqual(
+            ROBBattleNetwork.deliveryMode(for: .snapshot).rawValue,
+            MCSessionSendDataMode.unreliable.rawValue
+        )
+        XCTAssertEqual(
+            ROBBattleNetwork.deliveryMode(for: .projectile).rawValue,
+            MCSessionSendDataMode.reliable.rawValue
+        )
+        XCTAssertEqual(
+            ROBBattleNetwork.deliveryMode(for: .knockout).rawValue,
+            MCSessionSendDataMode.reliable.rawValue
+        )
+    }
+
     func testNearbyBattleDownloadsAndRendersEachDroidProfile() {
         let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
         let localProfile = ROBDroidProfile(name: "Local", finish: .solarYellow, material: .brushedAluminum, housing: .fieldShell)
         let remoteProfile = ROBDroidProfile(name: "Remote", finish: .makerPink, faceColor: .cyan, material: .impactPolymer, housing: .openMakerFrame, sections: [.treads])
-        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", droidProfile: localProfile)
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", droidProfile: localProfile, audioEnabled: false)
         let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1, droidProfile: remoteProfile)
 
         battle.testReceive(.init(kind: .hello, sender: remote))
