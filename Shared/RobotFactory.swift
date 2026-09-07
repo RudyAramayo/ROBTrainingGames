@@ -78,14 +78,27 @@ import UIKit
             if sideways { entity.orientation = simd_quatf(angle: .pi / 2, axis: [0, 0, 1]) }
             (parent ?? root).addChild(entity)
         }
-        part("Tri-Wheel Chassis", [0.72, 0.2, 0.68], [0, 0.48, 0], .black)
-        let baseFlipper = Entity(); baseFlipper.name = "Base Lift Flipper Assembly"; baseFlipper.position = [0, 0.46, -0.38]; root.addChild(baseFlipper)
-        cylinder("Base Lift Flipper Motor", radius: 0.11, height: 0.62, position: .zero, color: .systemOrange, sideways: true, parent: baseFlipper)
-        part("Base Lift Flipper Blade", [0.58, 0.09, 0.88], [0, -0.04, -0.45], .darkGray, parent: baseFlipper)
-        part("Base Lift Flipper Floor Pad", [0.7, 0.12, 0.18], [0, -0.04, -0.92], .systemOrange, parent: baseFlipper)
+        // The LT-2-style base pitches around its rear axle while the torso remains
+        // level above it. Keeping the complete drive base under one pivot makes the
+        // ledge-climbing pose match ROB's physical linear-actuator geometry.
+        let driveBase = Entity(); driveBase.name = "Drive Base Assembly"; driveBase.position = [0, 0, 0.35]; root.addChild(driveBase)
+        part("Tri-Wheel Chassis", [0.6, 0.2, 0.68], [0, 0.48, -0.35], .black, parent: driveBase)
+        let baseFlipper = Entity(); baseFlipper.name = "Base Lift Flipper Assembly"; baseFlipper.position = [0, 0.22, 0]; baseFlipper.orientation = simd_quatf(angle: GameSession.baseFlipperRearAngle, axis: [1, 0, 0]); driveBase.addChild(baseFlipper)
+        cylinder("Base Lift Flipper Motor", radius: 0.115, height: 0.82, position: .zero, color: .systemOrange, sideways: true, parent: baseFlipper)
+        for side: Float in [-1, 1] {
+            part(
+                side < 0 ? "Left Base Lift Flipper Arm" : "Right Base Lift Flipper Arm",
+                [0.075, 0.075, 1.04],
+                [side * 0.34, 0, -0.52],
+                .darkGray,
+                parent: baseFlipper
+            )
+        }
+        part("Base Lift Flipper Blade", [0.75, 0.09, 0.12], [0, 0, -1.04], .darkGray, parent: baseFlipper)
+        cylinder("Base Lift Flipper Floor Roller", radius: 0.105, height: 0.8, position: [0, 0, -1.08], color: .systemOrange, sideways: true, parent: baseFlipper)
         for side: Float in [-1, 1] {
             let prefix = side < 0 ? "Left" : "Right"
-            let tread = Entity(); tread.name = "\(prefix) Tri-Wheel Tread"; tread.position = [side * 0.47, 0, 0]; root.addChild(tread)
+            let tread = Entity(); tread.name = "\(prefix) Tri-Wheel Tread"; tread.position = [side * 0.39, 0, -0.35]; driveBase.addChild(tread)
 
             // ROB's physical base uses a continuous cleated belt wrapped around a
             // triangular three-wheel bogie. Build the belt from tangent rails and
@@ -137,7 +150,9 @@ import UIKit
         }
 
         let torso = Entity(); torso.name = "Torso Assembly"; root.addChild(torso)
-        part("Cerebro Torso", [0.68, 0.64, 0.54], [0, 0.72, 0], UIColor(red: 0.08, green: 0.12, blue: 0.16, alpha: 1), parent: torso)
+        part("Torso Linear Actuator", [0.16, 0.5, 0.16], [0, 0.47, 0.08], .gray, parent: torso)
+        part("Torso Linear Actuator Collar", [0.24, 0.1, 0.24], [0, 0.54, 0.08], .systemOrange, parent: torso)
+        part("Cerebro Torso", [0.58, 0.64, 0.54], [0, 0.72, 0], UIColor(red: 0.08, green: 0.12, blue: 0.16, alpha: 1), parent: torso)
         for x: Float in [-0.19, 0.19] {
             let prefix = x < 0 ? "Left" : "Right"
             let color: UIColor = x < 0 ? .systemBlue : .systemCyan
@@ -151,7 +166,7 @@ import UIKit
         for side: Float in [-1, 1] {
             let armColor: UIColor = componentMode ? (side < 0 ? .systemGreen : .systemBlue) : .gray
             let prefix = side < 0 ? "Left" : "Right"
-            let arm = Entity(); arm.name = "\(prefix) Arm Assembly"; arm.position = [side * 0.51, 0.93, 0]; torso.addChild(arm)
+            let arm = Entity(); arm.name = "\(prefix) Arm Assembly"; arm.position = [side * 0.45, 0.93, 0]; torso.addChild(arm)
             cylinder("\(prefix) Shoulder Joint", radius: 0.095, height: 0.15, position: [0, 0, 0], color: .darkGray, sideways: true, parent: arm)
             part("\(prefix) Upper Arm", [0.12, 0.32, 0.13], [side * 0.05, -0.18, 0], armColor, parent: arm)
             cylinder("\(prefix) Elbow Joint", radius: 0.075, height: 0.13, position: [side * 0.08, -0.36, -0.01], color: .darkGray, sideways: true, parent: arm)
@@ -169,7 +184,7 @@ import UIKit
             part("Power Hammer Head", [0.42, 0.2, 0.2], [0.2, -0.64, -0.83], .systemOrange, parent: hammer)
         }
 
-        let gatling = Entity(); gatling.name = "Right Shoulder Gatling"; gatling.position = [0.5, 1.08, -0.05]; torso.addChild(gatling)
+        let gatling = Entity(); gatling.name = "Right Shoulder Gatling"; gatling.position = [0.43, 1.08, -0.05]; torso.addChild(gatling)
         cylinder("Gatling Pan Servo", radius: 0.13, height: 0.1, position: [0, -0.14, 0.02], color: .darkGray, parent: gatling)
         let tilt = Entity(); tilt.name = "Gatling Tilt Servo"; gatling.addChild(tilt)
         cylinder("Gatling Tilt Axle", radius: 0.08, height: 0.3, position: [0, 0, 0], color: .gray, sideways: true, parent: tilt)
@@ -182,7 +197,7 @@ import UIKit
         let twinBlasters = Entity(); twinBlasters.name = "Twin Blasters"; twinBlasters.position = [0, 0.98, -0.04]; torso.addChild(twinBlasters)
         for side: Float in [-1, 1] {
             let prefix = side < 0 ? "Left" : "Right"
-            let mount = Entity(); mount.name = "\(prefix) Blaster Mount"; mount.position = [side * 0.47, 0, 0]; twinBlasters.addChild(mount)
+            let mount = Entity(); mount.name = "\(prefix) Blaster Mount"; mount.position = [side * 0.4, 0, 0]; twinBlasters.addChild(mount)
             part("\(prefix) Blaster Housing", [0.2, 0.15, 0.28], [0, 0, -0.08], .systemBlue, parent: mount)
             for x: Float in [-0.035, 0.035] {
                 cylinder("\(prefix) Blaster Barrel", radius: 0.018, height: 0.46, position: [x, 0, -0.34], color: .black, faceForward: true, parent: mount)
@@ -196,11 +211,11 @@ import UIKit
         }
         let arcCore = ModelEntity(mesh: .generateSphere(radius: 0.08), materials: [UnlitMaterial(color: .systemCyan)]); arcCore.name = "Arc Cannon Core"; arcCore.position = [0, 0.02, -0.34]; arcCannon.addChild(arcCore)
 
-        let shot = Entity(); shot.name = "Shoulder Laser Shot"; shot.position = [0.5, 1.08, -0.28]; torso.addChild(shot)
+        let shot = Entity(); shot.name = "Shoulder Laser Shot"; shot.position = [0.43, 1.08, -0.28]; torso.addChild(shot)
         let beam = ModelEntity(mesh: .generateBox(size: [1, 1, 0.55], cornerRadius: 0.04), materials: [UnlitMaterial(color: .systemBlue)]); beam.name = "Shoulder Laser Beam"; beam.isEnabled = false; shot.addChild(beam)
         for side: Float in [-1, 1] {
             let prefix = side < 0 ? "Left" : "Right"
-            let twinShot = Entity(); twinShot.name = "\(prefix) Blaster Laser Shot"; twinShot.position = [side * 0.47, 0.98, -0.32]; torso.addChild(twinShot)
+            let twinShot = Entity(); twinShot.name = "\(prefix) Blaster Laser Shot"; twinShot.position = [side * 0.4, 0.98, -0.32]; torso.addChild(twinShot)
             let twinBeam = ModelEntity(mesh: .generateBox(size: [1, 1, 0.55], cornerRadius: 0.035), materials: [UnlitMaterial(color: .systemBlue)])
             twinBeam.name = "\(prefix) Blaster Laser Beam"; twinBeam.isEnabled = false; twinShot.addChild(twinBeam)
         }
@@ -231,7 +246,7 @@ import UIKit
         root.components.set(InputTargetComponent())
         root.generateCollisionShapes(recursive: true)
         root.collision = CollisionComponent(shapes: [
-            .generateBox(size: [1.6, 1.85, 1.6]).offsetBy(translation: [0, 0.86, -0.28]),
+            .generateBox(size: [1.18, 1.85, 1.35]).offsetBy(translation: [0, 0.86, -0.18]),
         ])
         let shieldField = ModelEntity(
             mesh: .generateSphere(radius: 1.05),
@@ -357,6 +372,7 @@ import UIKit
             for index in 1...3 { robot.findEntity(named: "\(prefix) Tri-Wheel \(index)")?.orientation = simd_quatf(angle: angle, axis: [1, 0, 0]) }
         }
         robot.findEntity(named: "Base Lift Flipper Assembly")?.orientation = simd_quatf(angle: session.baseFlipperAngle, axis: [1, 0, 0])
+        robot.findEntity(named: "Drive Base Assembly")?.orientation = simd_quatf(angle: session.baseLiftPitch, axis: [1, 0, 0])
         let speakerPulse: Float = session.musicEnabled && session.isRunning
             ? 1 + max(0, Float(sin(session.elapsed * .pi * 8))) * 0.13
             : 1
@@ -364,6 +380,7 @@ import UIKit
         robot.findEntity(named: "Right ROB Speaker Cone")?.scale = [1 + (speakerPulse - 1) * 0.78, 1, 1 + (speakerPulse - 1) * 0.78]
         let progress = Float(1 - session.saberAnimation), arc = sin(progress * .pi)
         let torso = robot.findEntity(named: "Torso Assembly")
+        torso?.position.y = session.baseLiftHeight
         var torsoYaw: Float = 0
         if let style = session.saberStyle, session.saberAnimation > 0 {
             switch style {
@@ -567,6 +584,31 @@ import UIKit
         let floor = ModelEntity(mesh: .generatePlane(width: size, depth: size), materials: [arenaFloorMaterial(arPresentation: arPresentation)])
         floor.name = "Training Floor"
         room.addChild(floor)
+        for ledge in puzzle.ledges {
+            let platform = ModelEntity(
+                mesh: .generateBox(size: [ledge.size.x, ledge.height, ledge.size.y], cornerRadius: 0.025),
+                materials: [arenaWallMaterial(arPresentation: arPresentation)]
+            )
+            platform.name = "Ledge Platform \(ledge.id)"
+            platform.position = [ledge.center.x, ledge.height / 2, ledge.center.y]
+            room.addChild(platform)
+
+            let deck = ModelEntity(
+                mesh: .generateBox(size: [ledge.size.x, 0.025, ledge.size.y], cornerRadius: 0.02),
+                materials: [arenaFloorMaterial(arPresentation: arPresentation)]
+            )
+            deck.name = "Ledge Deck \(ledge.id)"
+            deck.position = [ledge.center.x, ledge.height + 0.0125, ledge.center.y]
+            room.addChild(deck)
+
+            let lip = ModelEntity(
+                mesh: .generateBox(size: [ledge.size.x, 0.055, 0.11], cornerRadius: 0.018),
+                materials: [SimpleMaterial(color: .systemOrange, isMetallic: true)]
+            )
+            lip.name = "Ledge Lip \(ledge.id)"
+            lip.position = [ledge.center.x, ledge.height + 0.04, ledge.approachEdgeZ]
+            room.addChild(lip)
+        }
         let walls: [(String, SIMD3<Float>, SIMD3<Float>)] = [
             ("North Training Wall", [0, 0.55, -puzzle.arenaHalfExtent], [size, 1.1, 0.18]),
             ("South Training Wall", [0, 0.55, puzzle.arenaHalfExtent], [size, 1.1, 0.18]),
@@ -588,23 +630,23 @@ import UIKit
                 materials: [arenaWallMaterial(arPresentation: arPresentation)]
             )
             block.name = "Training Barrier \(index)"
-            block.position = [barrier.center.x, 0.375, barrier.center.y]
+            block.position = [barrier.center.x, puzzle.surfaceHeight(at: barrier.center) + 0.375, barrier.center.y]
             room.addChild(block)
         }
         if !arPresentation { room.addChild(makeArenaLightRig(halfExtent: puzzle.arenaHalfExtent)) }
-        if let door = puzzle.door { let entity = ModelEntity(mesh: .generateBox(size: [door.size.x, 0.9, door.size.y], cornerRadius: 0.025), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); entity.name = "Puzzle Door"; entity.position = [door.center.x, 0.45, door.center.y]; room.addChild(entity) }
+        if let door = puzzle.door { let entity = ModelEntity(mesh: .generateBox(size: [door.size.x, 0.9, door.size.y], cornerRadius: 0.025), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); entity.name = "Puzzle Door"; entity.position = [door.center.x, puzzle.surfaceHeight(at: door.center) + 0.45, door.center.y]; room.addChild(entity) }
         if let terminal = puzzle.hackTerminal {
-            let root = Entity(); root.name = "Hack Terminal"; root.position = [terminal.x, 0, terminal.y]; room.addChild(root)
+            let root = Entity(); root.name = "Hack Terminal"; root.position = [terminal.x, puzzle.surfaceHeight(at: terminal), terminal.y]; room.addChild(root)
             let post = ModelEntity(mesh: .generateBox(size: [0.18, 0.62, 0.18], cornerRadius: 0.025), materials: [SimpleMaterial(color: .darkGray, isMetallic: true)]); post.position.y = 0.31; root.addChild(post)
             let panel = ModelEntity(mesh: .generateBox(size: [0.34, 0.32, 0.12], cornerRadius: 0.035), materials: [SimpleMaterial(color: .systemOrange, isMetallic: true)]); panel.name = "Hack Terminal Panel"; panel.position = [0, 0.65, 0]; root.addChild(panel)
             let button = ModelEntity(mesh: .generateSphere(radius: 0.055), materials: [UnlitMaterial(color: .systemGreen)]); button.name = "Hack Terminal Button"; button.position = [0, 0.66, -0.075]; root.addChild(button)
         }
         for shadow in puzzle.shadowZones {
             let zone = ModelEntity(mesh: .generateBox(size: [shadow.size.x, 0.018, shadow.size.y], cornerRadius: 0.08), materials: [SimpleMaterial(color: UIColor(white: 0.015, alpha: arPresentation ? 0.68 : 0.88), isMetallic: false)])
-            zone.name = "Shadow Zone"; zone.position = [shadow.center.x, 0.012, shadow.center.y]; room.addChild(zone)
+            zone.name = "Shadow Zone"; zone.position = [shadow.center.x, puzzle.surfaceHeight(at: shadow.center) + 0.025, shadow.center.y]; room.addChild(zone)
         }
         for conveyor in puzzle.conveyors {
-            let zone = Entity(); zone.name = "Conveyor \(conveyor.id)"; zone.position = [conveyor.center.x, 0.018, conveyor.center.y]
+            let zone = Entity(); zone.name = "Conveyor \(conveyor.id)"; zone.position = [conveyor.center.x, puzzle.surfaceHeight(at: conveyor.center) + 0.025, conveyor.center.y]
             zone.orientation = simd_quatf(angle: atan2(conveyor.direction.x, -conveyor.direction.y), axis: [0, 1, 0])
             let base = ModelEntity(mesh: .generateBox(size: [conveyor.size.x, 0.045, conveyor.size.y], cornerRadius: 0.035), materials: [SimpleMaterial(color: .darkGray, isMetallic: true)]); zone.addChild(base)
             let span = conveyor.direction.x == 0 ? conveyor.size.y : conveyor.size.x
@@ -622,7 +664,7 @@ import UIKit
         }
         let initialCameraBlockers = initialSecurityCameraBlockers(for: puzzle)
         for camera in puzzle.securityCameras {
-            let root = Entity(); root.name = "Security Camera \(camera.id)"; root.position = [camera.position.x, 0, camera.position.y]; root.orientation = simd_quatf(angle: camera.heading, axis: [0, 1, 0])
+            let root = Entity(); root.name = "Security Camera \(camera.id)"; root.position = [camera.position.x, puzzle.surfaceHeight(at: camera.position), camera.position.y]; root.orientation = simd_quatf(angle: camera.heading, axis: [0, 1, 0])
             let post = ModelEntity(mesh: .generateCylinder(height: 1.25, radius: 0.055), materials: [SimpleMaterial(color: .darkGray, isMetallic: true)]); post.position.y = 0.625; root.addChild(post)
             let housing = ModelEntity(mesh: .generateBox(size: [0.34, 0.22, 0.46], cornerRadius: 0.04), materials: [SimpleMaterial(color: .lightGray, isMetallic: true)]); housing.position = [0, 1.2, -0.18]; root.addChild(housing)
             let lens = ModelEntity(mesh: .generateSphere(radius: 0.07), materials: [UnlitMaterial(color: .systemRed)]); lens.name = "Security Camera Lens \(camera.id)"; lens.position = [0, 1.2, -0.43]; root.addChild(lens)
@@ -640,26 +682,26 @@ import UIKit
         }
         if let key = puzzle.key {
             let entity = makePuzzleKey()
-            entity.position = [key.x, puzzleKeySurfaceOffset, key.y]
+            entity.position = [key.x, puzzle.surfaceHeight(at: key) + puzzleKeySurfaceOffset, key.y]
             entity.orientation = simd_quatf(angle: -0.32, axis: [0, 1, 0])
             room.addChild(entity)
         }
-        for (index, cell) in puzzle.cells.enumerated() { let entity = ModelEntity(mesh: .generateCylinder(height: 0.28, radius: 0.11), materials: [SimpleMaterial(color: .systemYellow, isMetallic: true)]); entity.name = "Puzzle Cell \(index)"; entity.position = [cell.x, 0.2, cell.y]; room.addChild(entity) }
+        for (index, cell) in puzzle.cells.enumerated() { let entity = ModelEntity(mesh: .generateCylinder(height: 0.28, radius: 0.11), materials: [SimpleMaterial(color: .systemYellow, isMetallic: true)]); entity.name = "Puzzle Cell \(index)"; entity.position = [cell.x, puzzle.surfaceHeight(at: cell) + 0.2, cell.y]; room.addChild(entity) }
         for (index, pickup) in puzzle.shieldPickups.enumerated() {
-            let root = Entity(); root.name = "Shield Pickup \(index)"; root.position = [pickup.x, 0.24, pickup.y]
+            let root = Entity(); root.name = "Shield Pickup \(index)"; root.position = [pickup.x, puzzle.surfaceHeight(at: pickup) + 0.24, pickup.y]
             let core = ModelEntity(mesh: .generateSphere(radius: 0.16), materials: [UnlitMaterial(color: .systemCyan)]); root.addChild(core)
             let halo = ModelEntity(mesh: .generateCylinder(height: 0.035, radius: 0.27), materials: [SimpleMaterial(color: UIColor.systemBlue.withAlphaComponent(0.58), isMetallic: true)]); halo.position.y = 0.02; root.addChild(halo)
             room.addChild(root)
         }
         for (index, pickup) in puzzle.repairPickups.enumerated() {
-            let root = Entity(); root.name = "Repair Pickup \(index)"; root.position = [pickup.x, 0.2, pickup.y]
+            let root = Entity(); root.name = "Repair Pickup \(index)"; root.position = [pickup.x, puzzle.surfaceHeight(at: pickup) + 0.2, pickup.y]
             let kit = ModelEntity(mesh: .generateBox(size: [0.34, 0.24, 0.26], cornerRadius: 0.045), materials: [SimpleMaterial(color: .systemRed, isMetallic: true)]); root.addChild(kit)
             for size in [SIMD3<Float>(0.2, 0.055, 0.025), SIMD3<Float>(0.055, 0.2, 0.025)] {
                 let cross = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.012), materials: [UnlitMaterial(color: .white)]); cross.position.z = -0.14; root.addChild(cross)
             }
             room.addChild(root)
         }
-        let dock = ModelEntity(mesh: .generateBox(size: [0.7, 0.025, 0.7], cornerRadius: 0.08), materials: [SimpleMaterial(color: .systemOrange, isMetallic: false)]); dock.name = "Puzzle Dock"; dock.position = [puzzle.dock.x, 0.02, puzzle.dock.y]; room.addChild(dock)
+        let dock = ModelEntity(mesh: .generateBox(size: [0.7, 0.025, 0.7], cornerRadius: 0.08), materials: [SimpleMaterial(color: .systemOrange, isMetallic: false)]); dock.name = "Puzzle Dock"; dock.position = [puzzle.dock.x, puzzle.surfaceHeight(at: puzzle.dock) + 0.03, puzzle.dock.y]; room.addChild(dock)
         return room
     }
 

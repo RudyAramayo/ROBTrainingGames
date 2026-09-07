@@ -6,6 +6,14 @@ struct CombatHealthBars: View {
 
     var body: some View {
         VStack(spacing: compact ? 4 : 6) {
+            HStack(spacing: 5) {
+                Image(systemName: "heart.circle.fill")
+                Text("TRIAL LIVES")
+                Spacer(minLength: 4)
+                Text("\(session.lives)/\(GameSession.maximumTrialLives)")
+            }
+            .font(compact ? .caption2.bold() : .caption.bold())
+            .foregroundStyle(session.lives == 1 ? .red : .orange)
             meter(
                 title: "ROB HEALTH",
                 value: session.health,

@@ -313,8 +313,40 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.level.id, 3)
         XCTAssertEqual(game.health, game.maxHealth)
         XCTAssertEqual(game.collectedCells, 0)
+        XCTAssertEqual(game.lives, 2)
         XCTAssertTrue(game.isRunning)
+        XCTAssertTrue(game.message.contains("2 remaining"))
         XCTAssertTrue(game.message.contains("Restarting level 3"))
+    }
+
+    func testThirdLifeLossWipesPointsAndUpgradesAndReturnsToLevelOne() {
+        let game = GameSession(audioEnabled: false)
+        game.begin()
+        for _ in 0..<game.level.cellCount { game.collectCell() }
+        game.purchaseUpgrade(.speedBoost)
+        XCTAssertEqual(game.speedUpgradeLevel, 1)
+        XCTAssertGreaterThan(game.upgradePoints, 0)
+
+        for expectedLives in [2, 1] {
+            XCTAssertTrue(game.enemyContact("Trial impact", damage: game.maxHealth + game.maxShields))
+            XCTAssertEqual(game.lives, expectedLives)
+            XCTAssertTrue(game.isRunning)
+            game.enemies = []
+            game.tick(1.05)
+        }
+        XCTAssertTrue(game.enemyContact("Final trial impact", damage: game.maxHealth + game.maxShields))
+
+        XCTAssertEqual(game.lives, 0)
+        XCTAssertEqual(game.level.id, 1)
+        XCTAssertEqual(game.score, 0)
+        XCTAssertEqual(game.upgradePoints, 0)
+        XCTAssertEqual(game.speedUpgradeLevel, 0)
+        XCTAssertFalse(game.isRunning)
+        XCTAssertTrue(game.message.contains("All points and installed upgrades were lost"))
+
+        game.begin()
+        XCTAssertEqual(game.lives, GameSession.maximumTrialLives)
+        XCTAssertTrue(game.isRunning)
     }
 
     func testEveryFifthLevelHasAnEscalatingReinforcedBossThatDealsTenDamage() {
@@ -1441,29 +1473,54 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNotNil(robot.findEntity(named: "Virtual Blue Balloon Beam Emitter"))
     }
 
-    func testBaseLiftFlipperNeutralizesTreadsConsumesEnergyAndReturnsToTravel() {
+    func testRearFlipperMountsLedgeThenRotatesBackToStabilize() {
         let game = GameSession(audioEnabled: false)
         game.begin()
+        game.enemies = []
+        let ledge = try! XCTUnwrap(game.puzzle.ledges.first)
+        game.robotPosition = [0, 0, ledge.approachEdgeZ + 0.18]
+
         game.setDrive(forward: 1, steering: 0)
-        game.tick(0.2)
-        XCTAssertGreaterThan(game.leftTread, 0)
+        game.tick(0.45)
+        XCTAssertFalse(game.isOnLedge)
+        XCTAssertEqual(game.robotPosition.y, 0, accuracy: 0.0001)
+
+        game.stopDrive()
+        game.robotPosition = [0, 0, ledge.approachEdgeZ + 0.18]
         let energyBeforeLift = game.energy
 
-        XCTAssertTrue(game.activateBaseFlipper())
+        XCTAssertTrue(game.moveBaseFlipperForward())
         XCTAssertTrue(game.isBaseFlipperActive)
-        XCTAssertEqual(game.leftTread, 0, accuracy: 0.0001)
-        XCTAssertEqual(game.rightTread, 0, accuracy: 0.0001)
         XCTAssertEqual(game.energy, energyBeforeLift - GameSession.baseFlipperEnergyCost, accuracy: 0.0001)
-
-        game.tick(0.6)
+        game.tick(GameSession.baseFlipperDuration + 0.05)
+        XCTAssertFalse(game.isBaseFlipperActive)
         XCTAssertEqual(game.baseFlipperPhase, 1, accuracy: 0.0001)
         XCTAssertLessThan(game.baseFlipperAngle, 0)
-        XCTAssertGreaterThan(game.presentationPosition.y, game.robotPosition.y)
+        XCTAssertGreaterThan(game.baseLiftPitch, 0)
 
-        game.tick(GameSession.baseFlipperDuration)
+        game.setDrive(forward: 1, steering: 0)
+        game.tick(0.45)
+        XCTAssertTrue(game.isOnLedge)
+        XCTAssertEqual(game.robotPosition.y, ledge.height, accuracy: 0.0001)
+        XCTAssertFalse(game.isLedgeStabilized)
+
+        XCTAssertTrue(game.moveBaseFlipperBackward())
+        game.tick(GameSession.baseFlipperDuration + 0.05)
         XCTAssertFalse(game.isBaseFlipperActive)
-        XCTAssertEqual(game.baseFlipperAngle, 0, accuracy: 0.0001)
-        XCTAssertEqual(game.presentationPosition.y, game.robotPosition.y, accuracy: 0.0001)
+        XCTAssertEqual(game.baseFlipperPhase, 0, accuracy: 0.0001)
+        XCTAssertTrue(game.isLedgeStabilized)
+        XCTAssertEqual(game.baseLiftPitch, 0, accuracy: 0.0001)
+        XCTAssertEqual(game.presentationPosition.y, ledge.height, accuracy: 0.0001)
+    }
+
+    func testEveryCampaignMapIncludesRaisedFlipperDeck() {
+        let game = GameSession(audioEnabled: false)
+        for index in game.levels.indices {
+            game.levelIndex = index
+            let ledge = try! XCTUnwrap(game.puzzle.ledges.first, "Level \(index + 1) is missing its ledge")
+            XCTAssertGreaterThan(ledge.height, 0)
+            XCTAssertTrue(ledge.contains(game.puzzle.dock), "Level \(index + 1) dock should require the raised deck")
+        }
     }
 
     func testRobotModelIncludesDistinctBaseLiftSpeakersAndConferenceMicrophone() {
@@ -1471,17 +1528,22 @@ final class GameSessionTests: XCTestCase {
         let robot = RobotFactory.makeROB()
         for name in [
             "Base Lift Flipper Assembly", "Base Lift Flipper Motor", "Base Lift Flipper Blade",
-            "Left ROB Speaker Cone", "Right ROB Speaker Cone", "Conference Microphone",
+            "Left Base Lift Flipper Arm", "Right Base Lift Flipper Arm", "Base Lift Flipper Floor Roller",
+            "Drive Base Assembly", "Torso Linear Actuator", "Left ROB Speaker Cone", "Right ROB Speaker Cone", "Conference Microphone",
         ] {
             XCTAssertNotNil(robot.findEntity(named: name), "Missing \(name)")
         }
         XCTAssertNotNil(robot.findEntity(named: "Flipper Zero Hacker"))
+        XCTAssertEqual(robot.findEntity(named: "Base Lift Flipper Assembly")?.parent?.name, "Drive Base Assembly")
+        XCTAssertEqual(robot.findEntity(named: "Left Tri-Wheel Tread")?.position.x ?? 0, -0.39, accuracy: 0.0001)
+        XCTAssertEqual(robot.findEntity(named: "Right Tri-Wheel Tread")?.position.x ?? 0, 0.39, accuracy: 0.0001)
 
         game.begin()
-        XCTAssertTrue(game.activateBaseFlipper())
-        game.tick(0.6)
+        XCTAssertTrue(game.moveBaseFlipperForward())
+        game.tick(GameSession.baseFlipperDuration + 0.05)
         RobotFactory.applyWeapons(to: robot, session: game)
-        XCTAssertNotEqual(robot.findEntity(named: "Base Lift Flipper Assembly")?.orientation, simd_quatf(angle: 0, axis: [1, 0, 0]))
+        XCTAssertNotEqual(robot.findEntity(named: "Drive Base Assembly")?.orientation, simd_quatf(angle: 0, axis: [1, 0, 0]))
+        XCTAssertEqual(robot.findEntity(named: "Torso Assembly")?.orientation, simd_quatf(angle: 0, axis: [0, 1, 0]))
     }
 
     func testBookBridgeDroidSectionsRoundTripAndStayOrdered() throws {

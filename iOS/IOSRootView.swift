@@ -289,7 +289,7 @@ struct MissionView: View {
                     Spacer()
                     Text(session.message).font(.subheadline.bold()).lineLimit(compactPhoneLayout ? 1 : 2).padding(.horizontal, 14).padding(.vertical, 8).background(.black.opacity(0.65), in: Capsule())
                     if !compactPhoneLayout && verticalSizeClass != .compact {
-                        Text("Move: WASD or arrows · Slash: Space · Laser: Q").font(.caption2.bold()).foregroundStyle(.cyan).padding(.horizontal, 12).padding(.vertical, 6).background(.black.opacity(0.65), in: Capsule())
+                        Text("Move: WASD/arrows · Flipper: F forward, B rear · Slash: Space · Laser: Q").font(.caption2.bold()).foregroundStyle(.cyan).padding(.horizontal, 12).padding(.vertical, 6).background(.black.opacity(0.65), in: Capsule())
                     }
                     if compactPhoneLayout {
                         MobileTankControls(session: session).padding(.horizontal, 8)
@@ -471,13 +471,25 @@ struct MobileTankControls: View {
         HStack(alignment: .bottom, spacing: 8) {
             TreadJoystick(title: "LEFT", demand: updateLeft)
             VStack(spacing: 5) {
-                Button { session.activateBaseFlipper() } label: {
-                    Label(session.isBaseFlipperActive ? "Lifting…" : "Base Lift", systemImage: "arrow.up.and.down.circle.fill")
-                        .font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
+                HStack(spacing: 4) {
+                    Button { session.moveBaseFlipperForward() } label: {
+                        Label("FWD", systemImage: "arrow.forward.circle.fill")
+                            .font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+                    .disabled(!session.isRunning || session.baseFlipperTarget == .forward)
+                    Button { session.moveBaseFlipperBackward() } label: {
+                        Label("REAR", systemImage: "arrow.backward.circle.fill")
+                            .font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.yellow)
+                    .disabled(!session.isRunning || session.baseFlipperTarget == .rear)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(session.isBaseFlipperActive ? .yellow : .orange)
-                .disabled(!session.isRunning || session.isBaseFlipperActive)
+                Text(session.baseFlipperDescription)
+                    .font(.caption2.bold())
+                    .foregroundStyle(session.isLedgeStabilized ? .green : .orange)
                 if session.hasFlipperHackTargets {
                     Button { session.startFlipperHack() } label: {
                         Label(session.flipperHackDescription, systemImage: "dot.radiowaves.left.and.right")

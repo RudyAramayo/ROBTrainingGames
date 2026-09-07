@@ -310,12 +310,21 @@ private struct VisionControlDeck: View {
                                 .buttonStyle(.borderedProminent)
                                 .tint(.pink)
                         }
-                        Button(session.isBaseFlipperActive ? "Base lifting…" : "Base Lift", systemImage: "arrow.up.and.down.circle.fill") {
-                            session.activateBaseFlipper()
+                        HStack(spacing: 8) {
+                            Button("Flipper Forward", systemImage: "arrow.forward.circle.fill") {
+                                session.moveBaseFlipperForward()
+                            }
+                            .disabled(!session.isRunning || session.baseFlipperTarget == .forward)
+                            Button("Flipper Rear", systemImage: "arrow.backward.circle.fill") {
+                                session.moveBaseFlipperBackward()
+                            }
+                            .disabled(!session.isRunning || session.baseFlipperTarget == .rear)
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(session.isBaseFlipperActive ? .yellow : .orange)
-                        .disabled(!session.isRunning || session.isBaseFlipperActive)
+                        .tint(session.isLedgeStabilized ? .green : .orange)
+                        Text(session.baseFlipperDescription)
+                            .font(.caption.bold())
+                            .foregroundStyle(session.isLedgeStabilized ? .green : .orange)
                         if session.hasFlipperHackTargets {
                             Button(session.flipperHackDescription, systemImage: "dot.radiowaves.left.and.right") {
                                 session.startFlipperHack()
