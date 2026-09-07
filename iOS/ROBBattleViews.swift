@@ -235,50 +235,68 @@ struct ROBBattleView: View {
 private struct ROBBattlePlayOverlay: View {
     @Bindable var battle: ROBBattleCoordinator
     let onExit: () -> Void
+    @State private var showsBattleDetails = false
+    @State private var selectedPlayerID: UUID?
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Button(action: onExit) { Label("Lobby", systemImage: "xmark.circle.fill") }
-                Spacer()
-                Text("\(battle.mode.name) · \(battle.arena.name)").font(.headline).lineLimit(1)
-                Spacer()
-                Label(timeText, systemImage: "timer").monospacedDigit()
+        GeometryReader { geometry in
+            let landscape = geometry.size.width > geometry.size.height
+            ZStack {
+                VStack(spacing: 6) {
+                    HStack(alignment: .top, spacing: 8) {
+                        Button(action: onExit) {
+                            Image(systemName: "xmark")
+                                .font(.caption.bold())
+                                .frame(width: 34, height: 34)
+                                .foregroundStyle(.white)
+                                .background(.black.opacity(0.16), in: Circle())
+                                .overlay(Circle().stroke(.white.opacity(0.3)))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Return to battle lobby")
+
+                        ROBBattleCompactScores(battle: battle) { playerID in
+                            selectedPlayerID = playerID
+                            showsBattleDetails = true
+                        }
+
+                        Spacer(minLength: 2)
+                        ROBBattleVitals(battle: battle, timeText: timeText)
+                    }
+
+                    if let objective = battle.localFlagObjectiveText {
+                        Label(objective, systemImage: "flag.fill")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.yellow)
+                            .lineLimit(1)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(.black.opacity(0.14), in: Capsule())
+                    }
+
+                    Spacer(minLength: 0)
+
+                    if !battle.localRobot.isAlive {
+                        Text("REBUILDING \(Int(ceil(battle.localRobot.respawnRemaining)))")
+                            .font(.title2.bold())
+                            .foregroundStyle(.orange)
+                            .monospacedDigit()
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(.black.opacity(0.2), in: Capsule())
+                    }
+
+                    ROBBattleTankControls(battle: battle, compact: landscape)
+                }
+                .padding(.horizontal, landscape ? 10 : 8)
+                .padding(.top, 4)
+                .padding(.bottom, landscape ? 2 : 6)
+
+                ROBBattleFightIntro(
+                    mode: battle.mode,
+                    elapsed: ROBBattleCoordinator.matchDuration - battle.remainingTime
+                )
             }
-            .padding(10)
-            .background(.ultraThinMaterial, in: Capsule())
-            .padding(.horizontal)
-            Spacer()
-            VStack(spacing: 6) {
-                HStack {
-                    ProgressView(value: battle.localHealthFraction).tint(.red)
-                    Text("H \(battle.localRobot.health)").monospacedDigit()
-                    ProgressView(value: battle.localShieldFraction).tint(.cyan)
-                    Text("S \(battle.localRobot.shields)").monospacedDigit()
-                    Text(
-                        battle.mode == .captureTheFlag
-                            ? "\(battle.localScore) captures"
-                            : "\(battle.localScore) KOs"
-                    )
-                    .foregroundStyle(.yellow).monospacedDigit()
-                }
-                .font(.caption.bold())
-                ROBBattleScoreboard(battle: battle)
-                if let objective = battle.localFlagObjectiveText {
-                    Label(objective, systemImage: "flag.fill")
-                        .font(.caption.bold()).foregroundStyle(.yellow).lineLimit(2)
-                }
-                if !battle.localRobot.isAlive {
-                    Text("REBUILDING \(Int(ceil(battle.localRobot.respawnRemaining)))")
-                        .font(.title2.bold()).foregroundStyle(.orange).monospacedDigit()
-                }
-                Text(battle.statusMessage).font(.caption.bold()).foregroundStyle(.cyan).lineLimit(2)
-                ROBBattleTankControls(battle: battle)
-            }
-            .padding(8)
-            .background(.black.opacity(0.68), in: RoundedRectangle(cornerRadius: 20))
-            .padding(.horizontal, 8)
-            .padding(.bottom, 6)
         }
         .overlay {
             if battle.phase == .results {
@@ -292,6 +310,9 @@ private struct ROBBattlePlayOverlay: View {
                 .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 28))
             }
         }
+        .fullScreenCover(isPresented: $showsBattleDetails) {
+            ROBBattleDetailsView(battle: battle, selectedPlayerID: selectedPlayerID)
+        }
     }
 
     private var timeText: String {
@@ -300,58 +321,416 @@ private struct ROBBattlePlayOverlay: View {
     }
 }
 
+private struct ROBBattleCompactScores: View {
+    @Bindable var battle: ROBBattleCoordinator
+    let selected: (UUID) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 5) {
+                ForEach(battle.orderedPlayers) { player in
+                    Button { selected(player.id) } label: {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(robBattlePlayerColor(player.colorIndex))
+                                .frame(width: 7, height: 7)
+                            Text(player.name)
+                                .lineLimit(1)
+                            Text("\(battle.matchScore(for: player.id))")
+                                .foregroundStyle(.yellow)
+                                .monospacedDigit()
+                        }
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 7)
+                        .frame(height: 28)
+                        .background(.black.opacity(0.13), in: Capsule())
+                        .overlay(Capsule().stroke(.white.opacity(0.18)))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(player.name), score \(battle.matchScore(for: player.id)). Show battle details")
+                }
+            }
+        }
+        .scrollIndicators(.hidden)
+        .frame(maxWidth: 460, alignment: .leading)
+    }
+}
+
+private struct ROBBattleVitals: View {
+    @Bindable var battle: ROBBattleCoordinator
+    let timeText: String
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 3) {
+            Label(timeText, systemImage: "timer")
+                .font(.caption2.bold())
+                .monospacedDigit()
+            vitalRow(value: battle.localHealthFraction, tint: .red, label: "H \(battle.localRobot.health)")
+            vitalRow(value: battle.localShieldFraction, tint: .cyan, label: "S \(battle.localRobot.shields)")
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
+        .background(.black.opacity(0.13), in: RoundedRectangle(cornerRadius: 9))
+        .overlay(RoundedRectangle(cornerRadius: 9).stroke(.white.opacity(0.16)))
+    }
+
+    private func vitalRow(value: Double, tint: Color, label: String) -> some View {
+        HStack(spacing: 5) {
+            ProgressView(value: value)
+                .tint(tint)
+                .frame(width: 76)
+            Text(label)
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .frame(width: 32, alignment: .trailing)
+        }
+    }
+}
+
+private struct ROBBattleFightIntro: View {
+    let mode: ROBBattleMode
+    let elapsed: Double
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        if let title {
+            ZStack {
+                if let flashColor, !reduceMotion {
+                    flashColor
+                        .opacity(0.14)
+                        .ignoresSafeArea()
+                        .blendMode(.screen)
+                }
+                VStack(spacing: 8) {
+                    Text(title)
+                        .font(.system(size: title == "FIGHT!" ? 72 : 86, weight: .black, design: .rounded))
+                        .italic()
+                        .foregroundStyle(
+                            LinearGradient(colors: [.yellow, .orange, .red], startPoint: .top, endPoint: .bottom)
+                        )
+                        .shadow(color: .red.opacity(0.9), radius: 12)
+                        .scaleEffect(scale)
+                        .accessibilityAddTraits(.isHeader)
+                    Text(mode == .captureTheFlag ? "FIRST TO 3 CAPTURES WINS" : "FIRST TO 5 KNOCKOUTS WINS")
+                        .font(.caption.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(.black.opacity(0.18), in: Capsule())
+                }
+                .opacity(opacity)
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
+    private var title: String? {
+        switch elapsed {
+        case 0..<1: "3"
+        case 1..<2: "2"
+        case 2..<3: "1"
+        case 3..<4.5: "FIGHT!"
+        default: nil
+        }
+    }
+
+    private var flashColor: Color? {
+        switch elapsed {
+        case 3..<3.12: .red
+        case 3.3..<3.42: .orange
+        default: nil
+        }
+    }
+
+    private var scale: Double {
+        guard !reduceMotion else { return 1 }
+        if elapsed < 3 {
+            let fraction = elapsed.truncatingRemainder(dividingBy: 1)
+            return 1.32 - fraction * 0.32
+        }
+        let fightElapsed = elapsed - 3
+        return 1 + abs(sin(fightElapsed * .pi * 4)) * max(0, 0.22 - fightElapsed * 0.1)
+    }
+
+    private var opacity: Double {
+        if elapsed < 3 { return max(0.2, 1 - elapsed.truncatingRemainder(dividingBy: 1) * 0.45) }
+        return min(1, max(0, (4.5 - elapsed) * 2))
+    }
+}
+
 private struct ROBBattleTankControls: View {
     @Bindable var battle: ROBBattleCoordinator
+    let compact: Bool
     @State private var left = 0.0
     @State private var right = 0.0
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            ROBBattleTreadPad(title: "LEFT") { left = $0; publish() }
-            VStack(spacing: 8) {
-                Button { battle.fireLaser() } label: { Label("FIRE", systemImage: "scope") }
-                    .buttonStyle(.borderedProminent).tint(.cyan)
-                Button { battle.saberAttack() } label: { Label("SLASH", systemImage: "bolt.fill") }
-                    .buttonStyle(.borderedProminent).tint(.pink)
-                if let controller = battle.connectedControllerName {
-                    Label(controller, systemImage: "gamecontroller.fill").font(.caption2).lineLimit(1)
+        HStack(alignment: .bottom, spacing: 4) {
+            HStack(alignment: .bottom, spacing: 5) {
+                ROBBattleTreadPad(title: "LEFT", compact: compact) { left = $0; publish() }
+                ROBBattleActionButton(title: "SLASH", systemImage: "bolt.fill", tint: .pink, compact: compact) {
+                    battle.saberAttack()
                 }
             }
-            .frame(maxWidth: .infinity)
-            ROBBattleTreadPad(title: "RIGHT") { right = $0; publish() }
+            Spacer(minLength: 24)
+            HStack(alignment: .bottom, spacing: 5) {
+                ROBBattleActionButton(title: "FIRE", systemImage: "scope", tint: .cyan, compact: compact) {
+                    battle.fireLaser()
+                }
+                ROBBattleTreadPad(title: "RIGHT", compact: compact) { right = $0; publish() }
+            }
         }
-        .frame(maxWidth: 720)
+        .frame(maxWidth: .infinity)
+        .overlay(alignment: .bottom) {
+            if let controller = battle.connectedControllerName {
+                Label(controller, systemImage: "gamecontroller.fill")
+                    .font(.system(size: 8, weight: .semibold))
+                    .lineLimit(1)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(.black.opacity(0.12), in: Capsule())
+            }
+        }
         .onDisappear { left = 0; right = 0; battle.stopDrive() }
     }
 
     private func publish() { battle.setTreads(left: left, right: right) }
 }
 
+private struct ROBBattleActionButton: View {
+    let title: String
+    let systemImage: String
+    let tint: Color
+    let compact: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Image(systemName: systemImage)
+                    .font(.system(size: compact ? 18 : 21, weight: .bold))
+                    .frame(width: compact ? 42 : 48, height: compact ? 42 : 48)
+                    .background(.black.opacity(0.14), in: Circle())
+                    .overlay(Circle().stroke(tint.opacity(0.7), lineWidth: 1.5))
+                    .shadow(color: tint.opacity(0.35), radius: 4)
+                Text(title).font(.system(size: 8, weight: .black))
+            }
+            .foregroundStyle(tint)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title.capitalized)
+    }
+}
+
 private struct ROBBattleTreadPad: View {
     let title: String
+    let compact: Bool
     let changed: (Double) -> Void
     @State private var offset: CGFloat = 0
+
+    private var diameter: CGFloat { compact ? 72 : 84 }
+    private var travel: CGFloat { diameter * 0.34 }
 
     var body: some View {
         VStack(spacing: 3) {
             ZStack {
-                Circle().fill(.cyan.opacity(0.2)).overlay(Circle().stroke(.cyan, lineWidth: 2))
-                Capsule().fill(.cyan.opacity(0.25)).frame(width: 5, height: 54)
-                Circle().fill(.cyan).frame(width: 34, height: 34).offset(y: offset).shadow(color: .cyan, radius: 7)
+                Circle().fill(.black.opacity(0.07)).overlay(Circle().stroke(.cyan.opacity(0.62), lineWidth: 1.5))
+                Capsule().fill(.cyan.opacity(0.14)).frame(width: 4, height: diameter * 0.64)
+                Circle()
+                    .fill(.cyan.opacity(0.36))
+                    .frame(width: diameter * 0.4, height: diameter * 0.4)
+                    .overlay(Circle().stroke(.cyan.opacity(0.85)))
+                    .offset(y: offset)
+                    .shadow(color: .cyan.opacity(0.45), radius: 5)
             }
-            .frame(width: 82, height: 82)
+            .frame(width: diameter, height: diameter)
             .contentShape(Circle())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        let demand = max(-1, min(1, Double(-value.translation.height / 28)))
-                        offset = -CGFloat(demand) * 28
+                        let demand = max(-1, min(1, Double(-value.translation.height / travel)))
+                        offset = -CGFloat(demand) * travel
                         changed(demand)
                     }
                     .onEnded { _ in offset = 0; changed(0) }
             )
-            Text(title).font(.caption2.bold())
+            Text(title).font(.system(size: 8, weight: .black))
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title.capitalized) tread joystick")
+    }
+}
+
+private struct ROBBattleDetailsView: View {
+    @Bindable var battle: ROBBattleCoordinator
+    let selectedPlayerID: UUID?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            GeometryReader { geometry in
+                if geometry.size.width > geometry.size.height {
+                    let mapSize = min(geometry.size.height - 28, geometry.size.width * 0.58, 560)
+                    HStack(spacing: 14) {
+                        ROBBattleTacticalMap(battle: battle, selectedPlayerID: selectedPlayerID)
+                            .frame(width: mapSize, height: mapSize)
+                        VStack(spacing: 12) {
+                            battleHeading
+                            playerScores
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .padding(14)
+                } else {
+                    let mapSize = min(geometry.size.width - 28, geometry.size.height * 0.58, 560)
+                    VStack(spacing: 12) {
+                        battleHeading
+                        ROBBattleTacticalMap(battle: battle, selectedPlayerID: selectedPlayerID)
+                            .frame(width: mapSize, height: mapSize)
+                        playerScores
+                        Spacer(minLength: 0)
+                    }
+                    .padding(14)
+                }
+            }
+            .background(Color.black.ignoresSafeArea())
+            .navigationTitle("Battle Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var battleHeading: some View {
+        HStack {
+            Label(battle.arena.name, systemImage: battle.arena.symbol)
+            Spacer()
+            Label(battle.mode.name, systemImage: battle.mode.symbol)
+        }
+        .font(.headline)
+        .foregroundStyle(.cyan)
+    }
+
+    private var playerScores: some View {
+        VStack(spacing: 7) {
+            ForEach(battle.orderedPlayers) { player in
+                HStack(spacing: 7) {
+                    Circle()
+                        .fill(robBattlePlayerColor(player.colorIndex))
+                        .frame(width: 10, height: 10)
+                    Text(player.name).fontWeight(player.id == selectedPlayerID ? .black : .semibold)
+                    if player.id == battle.localIdentity.id {
+                        Text("YOU").font(.caption2.bold()).foregroundStyle(.cyan)
+                    }
+                    Spacer()
+                    Text(scoreText(for: player.id)).foregroundStyle(.yellow)
+                    Text("\(battle.deaths[player.id, default: 0]) downs").foregroundStyle(.secondary)
+                }
+                .font(.caption)
+                .monospacedDigit()
+            }
+        }
+        .padding(10)
+        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func scoreText(for playerID: UUID) -> String {
+        battle.mode == .captureTheFlag
+            ? "\(battle.matchScore(for: playerID)) captures"
+            : "\(battle.matchScore(for: playerID)) KOs"
+    }
+}
+
+private struct ROBBattleTacticalMap: View {
+    @Bindable var battle: ROBBattleCoordinator
+    let selectedPlayerID: UUID?
+
+    var body: some View {
+        GeometryReader { geometry in
+            let size = geometry.size
+            ZStack {
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(.white.opacity(0.045))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(.cyan.opacity(0.55), lineWidth: 2))
+
+                ForEach(battle.arena.barriers.indices, id: \.self) { index in
+                    let barrier = battle.arena.barriers[index]
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(.cyan.opacity(0.2))
+                        .overlay(RoundedRectangle(cornerRadius: 3).stroke(.cyan.opacity(0.45)))
+                        .frame(
+                            width: mapLength(barrier.width, total: size.width),
+                            height: mapLength(barrier.depth, total: size.height)
+                        )
+                        .position(mapPoint(x: barrier.x, z: barrier.z, size: size))
+                }
+
+                ForEach(Array(battle.flags.values)) { flag in
+                    if let owner = battle.players[flag.ownerID] {
+                        Image(systemName: flag.disposition == .atBase ? "flag.fill" : "flag")
+                            .font(.caption.bold())
+                            .foregroundStyle(robBattlePlayerColor(owner.colorIndex))
+                            .position(mapPoint(for: flag, size: size))
+                    }
+                }
+
+                ForEach(battle.allRobotStates) { robot in
+                    let player = battle.players[robot.id]
+                    ZStack {
+                        Circle()
+                            .fill(robBattlePlayerColor(player?.colorIndex ?? 0))
+                            .overlay(
+                                Circle().stroke(
+                                    robot.id == selectedPlayerID ? Color.white : Color.black.opacity(0.65),
+                                    lineWidth: robot.id == selectedPlayerID ? 3 : 1
+                                )
+                            )
+                        Image(systemName: "arrowtriangle.up.fill")
+                            .font(.system(size: 7, weight: .black))
+                            .foregroundStyle(.black.opacity(0.75))
+                            .rotationEffect(.radians(Double(-robot.heading)))
+                    }
+                    .frame(width: robot.id == selectedPlayerID ? 25 : 20, height: robot.id == selectedPlayerID ? 25 : 20)
+                    .opacity(robot.isAlive ? 1 : 0.35)
+                    .position(mapPoint(x: robot.x, z: robot.z, size: size))
+                    .accessibilityLabel("\(player?.name ?? "Player") on arena map")
+                }
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .accessibilityLabel("Full arena map with all players")
+    }
+
+    private func mapPoint(for flag: ROBBattleFlagState, size: CGSize) -> CGPoint {
+        if let carrierID = flag.carrierID,
+           let carrier = battle.allRobotStates.first(where: { $0.id == carrierID }) {
+            return mapPoint(x: carrier.x, z: carrier.z, size: size)
+        }
+        return mapPoint(x: flag.x, z: flag.z, size: size)
+    }
+
+    private func mapPoint(x: Float, z: Float, size: CGSize) -> CGPoint {
+        let extent = CGFloat(ROBBattleCoordinator.arenaHalfExtent)
+        return CGPoint(
+            x: (CGFloat(x) + extent) / (extent * 2) * size.width,
+            y: (CGFloat(z) + extent) / (extent * 2) * size.height
+        )
+    }
+
+    private func mapLength(_ length: Float, total: CGFloat) -> CGFloat {
+        CGFloat(length) / (CGFloat(ROBBattleCoordinator.arenaHalfExtent) * 2) * total
+    }
+}
+
+private func robBattlePlayerColor(_ index: Int) -> Color {
+    switch index % 4 {
+    case 0: .cyan
+    case 1: .orange
+    case 2: .green
+    default: .pink
     }
 }
 
