@@ -1593,6 +1593,27 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNotNil(robot.findEntity(named: "Virtual Blue Balloon Beam Emitter"))
     }
 
+    func testPhoneBattleCameraTracksTheLocalDroidAtACloserStableOffset() {
+        let playerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let first = ROBBattleRobotState(
+            id: playerID, x: -6.4, z: -6.4, heading: 0,
+            health: 100, shields: 50, isAlive: true, respawnRemaining: 0
+        )
+        let moved = ROBBattleRobotState(
+            id: playerID, x: 2.1, z: -1.3, heading: .pi,
+            health: 100, shields: 50, isAlive: true, respawnRemaining: 0
+        )
+
+        let firstPose = ROBBattleFactory.phoneFollowCameraPose(for: first)
+        let movedPose = ROBBattleFactory.phoneFollowCameraPose(for: moved)
+
+        XCTAssertEqual(firstPose.target, first.position + [0, ROBBattleFactory.phoneFollowCameraTargetHeight, 0])
+        XCTAssertEqual(firstPose.position, first.position + ROBBattleFactory.phoneFollowCameraOffset)
+        XCTAssertEqual(movedPose.position - firstPose.position, moved.position - first.position)
+        XCTAssertEqual(movedPose.target - firstPose.target, moved.position - first.position)
+        XCTAssertLessThan(simd_distance(firstPose.position, firstPose.target), 9)
+    }
+
     func testRearFlipperMountsLedgeThenRotatesBackToStabilize() {
         let game = GameSession(audioEnabled: false)
         game.begin()
@@ -1612,10 +1633,14 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(game.moveBaseFlipperForward())
         XCTAssertTrue(game.isBaseFlipperActive)
         XCTAssertEqual(game.energy, energyBeforeLift - GameSession.baseFlipperEnergyCost, accuracy: 0.0001)
-        game.tick(GameSession.baseFlipperDuration + 0.05)
+        game.tick(GameSession.baseFlipperDuration / 2)
+        XCTAssertTrue(game.isBaseFlipperActive)
+        XCTAssertEqual(game.baseFlipperPhase, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(game.baseFlipperAngle, -.pi, accuracy: 0.0001)
+        game.tick(GameSession.baseFlipperDuration / 2 + 0.05)
         XCTAssertFalse(game.isBaseFlipperActive)
         XCTAssertEqual(game.baseFlipperPhase, 1, accuracy: 0.0001)
-        XCTAssertLessThan(game.baseFlipperAngle, 0)
+        XCTAssertEqual(game.baseFlipperAngle, -.pi * 2, accuracy: 0.0001)
         XCTAssertEqual(game.baseLiftPitch, 0.23, accuracy: 0.0001)
         XCTAssertEqual(game.baseLiftHeight, 0.13, accuracy: 0.0001)
 
@@ -1664,14 +1689,20 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(flipperAssembly?.parent?.name, "Drive Base Assembly")
         XCTAssertEqual(flipperAssembly?.children.map(\.name).sorted(), ["Left Base Lift Flipper Arm", "Right Base Lift Flipper Arm"])
         XCTAssertEqual(flipperAssembly?.position.y ?? 0, 0.22, accuracy: 0.0001)
-        XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: -.pi, axis: [1, 0, 0]))
+        XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: 0, axis: [1, 0, 0]))
+        XCTAssertLessThan(robot.findEntity(named: "Left Base Lift Flipper Arm")?.position.z ?? 0, 0)
+        XCTAssertLessThan(robot.findEntity(named: "Right Base Lift Flipper Arm")?.position.z ?? 0, 0)
         XCTAssertEqual(robot.findEntity(named: "Left Tri-Wheel Tread")?.position.x ?? 0, -0.39, accuracy: 0.0001)
         XCTAssertEqual(robot.findEntity(named: "Right Tri-Wheel Tread")?.position.x ?? 0, 0.39, accuracy: 0.0001)
 
         game.begin()
         XCTAssertTrue(game.moveBaseFlipperForward())
-        game.tick(GameSession.baseFlipperDuration + 0.05)
+        game.tick(GameSession.baseFlipperDuration / 2)
         RobotFactory.applyWeapons(to: robot, session: game)
+        XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: -.pi, axis: [1, 0, 0]))
+        game.tick(GameSession.baseFlipperDuration / 2 + 0.05)
+        RobotFactory.applyWeapons(to: robot, session: game)
+        XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: -.pi * 2, axis: [1, 0, 0]))
         XCTAssertNotEqual(robot.findEntity(named: "Drive Base Assembly")?.orientation, simd_quatf(angle: 0, axis: [1, 0, 0]))
         XCTAssertEqual(robot.findEntity(named: "Torso Assembly")?.orientation, simd_quatf(angle: 0, axis: [0, 1, 0]))
     }

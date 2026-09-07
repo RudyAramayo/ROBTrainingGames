@@ -487,7 +487,7 @@ struct MobileTankControls: View {
                         systemImage: "arrowshape.forward.circle.fill",
                         tint: .orange,
                         size: actionSize,
-                        accessibilityLabel: "Move base flipper forward",
+                        accessibilityLabel: "Spin base flipper forward 360 degrees",
                         disabled: !session.isRunning || session.baseFlipperTarget == .forward,
                         action: { _ = session.moveBaseFlipperForward() }
                     )
@@ -495,7 +495,7 @@ struct MobileTankControls: View {
                         systemImage: "arrowshape.backward.circle.fill",
                         tint: .yellow,
                         size: actionSize,
-                        accessibilityLabel: "Move base flipper rearward",
+                        accessibilityLabel: "Reverse base flipper 360 degrees",
                         disabled: !session.isRunning || session.baseFlipperTarget == .rear,
                         action: { _ = session.moveBaseFlipperBackward() }
                     )

@@ -332,7 +332,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.15"
+    static let gameplayRulesetVersion = "2026.09.16"
     static let robotCollisionRadius: Float = 0.54
     static let baseDriveSpeed: Float = 1.2
     static let securityCameraHalfAngle: Float = .pi / 5
@@ -340,9 +340,9 @@ final class GameSession {
     static let flipperHackDuration = 2.2
     static let flipperHackReward = 300
     static let baseFlipperEnergyCost = 4.0
-    static let baseFlipperForwardAngle: Float = -0.72
-    static let baseFlipperRearAngle: Float = -.pi
-    static let baseFlipperMotorSpeed: Float = 3.05
+    static let baseFlipperForwardAngle: Float = -.pi * 2
+    static let baseFlipperRearAngle: Float = 0
+    static let baseFlipperMotorSpeed: Float = 4.8
     static let baseFlipperDuration = TimeInterval(abs(baseFlipperRearAngle - baseFlipperForwardAngle) / baseFlipperMotorSpeed)
     static let doorwayWidth: Float = 2.1
     static let zigzagSpacing: Float = 1.9
@@ -353,7 +353,7 @@ final class GameSession {
     let shieldPickupStrength = 24
     let repairPickupStrength = 35
     let levels = [
-        ROBLevel(id: 1, name: "Calibration Ledge", lesson: "Drive toward a ledge with the rear-mounted flipper forward, then rotate it behind ROB to stabilize and level the torso.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 900, requiresKey: false, challenge: "Use the flipper to mount the raised deck, evade three active enemies, collect five cells, and reach the dock."),
+        ROBLevel(id: 1, name: "Calibration Ledge", lesson: "Spin the rear-mounted poles through one full turn to lift ROB, drive onto the ledge, then reverse the flipper cycle to stabilize and level the torso.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 900, requiresKey: false, challenge: "Use the flipper to mount the raised deck, evade three active enemies, collect five cells, and reach the dock."),
         ROBLevel(id: 2, name: "Key Workshop", lesson: "A key changes the state of a matching locked door.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 1_100, requiresKey: true, challenge: "Find the cyan key while a three-robot patrol guards the workshop door."),
         ROBLevel(id: 3, name: "Crossroads", lesson: "Plan a route before entering a narrow passage.", cellCount: 6, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 1_300, requiresKey: true, challenge: "Choose the safe branch, secure the key, then break through the center patrol."),
         ROBLevel(id: 4, name: "Sensor Hall", lesson: "Wide clearance is often faster than scraping along obstacles.", cellCount: 6, enemyKinds: [.spider, .fax, .spider, .fax], enemyShields: 2, timeBonus: 1_500, requiresKey: false, challenge: "Use the expanded hall to separate four sentries guarding the cells."),
@@ -371,7 +371,7 @@ final class GameSession {
     ]
     let components = [
         ROBComponent(id: "base", name: "Tri-Wheel Tracked Base", summary: "Three-wheel triangular tread pods expose the road wheels while a drive mixer preserves independent left and right tread speeds.", color: 0x263746),
-        ROBComponent(id: "baseFlipper", name: "LT-2-Style Rear Flipper", summary: "Two independent poles pivot on the rear drive shaft, rest flat behind ROB without a crossbar, reach along the treads to lift ROB onto a ledge, and rotate rearward while the linear actuator levels the torso.", color: 0xFF8B2F),
+        ROBComponent(id: "baseFlipper", name: "LT-2-Style Rear Flipper", summary: "Two independent poles point forward from the rear drive shaft along ROB’s base. A complete 360-degree rotation pushes the front upward for a ledge climb; reversing the cycle stabilizes ROB while the linear actuator levels the torso.", color: 0xFF8B2F),
         ROBComponent(id: "power", name: "Power System", summary: "Batteries, protection, disconnects, and motor electronics form ROB’s energy path.", color: 0xF1B93A),
         ROBComponent(id: "cerebro", name: "Cerebro", summary: "The Mac-based control layer coordinates operator intent, cameras, networking, and diagnostics.", color: 0x36DFFF),
         ROBComponent(id: "sensors", name: "Sensors", summary: "Cameras, lidar, inertial sensing, and infrared observations help ROB describe its environment.", color: 0x55DD88),
@@ -476,9 +476,9 @@ final class GameSession {
     var baseLiftHeight: Float { isLedgeStabilized ? 0 : 0.13 * baseFlipperPhase }
     var baseLiftPitch: Float { isLedgeStabilized ? 0 : 0.23 * baseFlipperPhase }
     var baseFlipperDescription: String {
-        if isBaseFlipperActive { return baseFlipperTarget == .forward ? "Moving forward" : "Moving rearward" }
-        if isLedgeStabilized { return "Rear · stable" }
-        return isBaseFlipperForward ? "Forward · climb" : "Rear · travel"
+        if isBaseFlipperActive { return baseFlipperTarget == .forward ? "Spinning 360° forward" : "Spinning 360° reverse" }
+        if isLedgeStabilized { return "Rest · stable" }
+        return isBaseFlipperForward ? "Lift cycle · climb" : "Rest · travel"
     }
     var presentationPosition: SIMD3<Float> { robotPosition }
     var presentationOrientation: simd_quatf { simd_quatf(angle: robotHeading, axis: [0, 1, 0]) }
@@ -989,8 +989,8 @@ final class GameSession {
         energy -= Self.baseFlipperEnergyCost
         baseFlipperTarget = target
         message = target == .forward
-            ? "Rear-shaft flipper moving forward. Keep it forward and drive into the orange ledge lip."
-            : "Flipper rotating behind ROB to stabilize the deck and level the torso."
+            ? "Rear-shaft poles spinning through 360°. Finish the lift cycle, then drive into the orange ledge lip."
+            : "Flipper reversing through 360° to stabilize the deck and level the torso."
         report(message)
         return true
     }
@@ -1047,7 +1047,7 @@ final class GameSession {
             }
             let slidAlongWall = simd_distance(oldPosition, resolvedPosition) > 0.000_1
             message = blockedByLedge
-                ? "Ledge too high for the treads. Rotate the rear flipper forward, then keep driving into the orange lip."
+                ? "Ledge too high for the treads. Complete the forward 360° flipper cycle, then keep driving into the orange lip."
                 : blockedByDoor
                 ? (hasKey ? "Use the orange hack panel beside the door." : "Route blocked. Find the access key before hacking the doorway.")
                 : blockedByRobot
@@ -1061,7 +1061,7 @@ final class GameSession {
         resolvedPosition.y = newSurfaceHeight
         robotPosition = resolvedPosition
         if newSurfaceHeight > oldSurfaceHeight {
-            message = "ROB mounted the ledge. Rotate the flipper backward to stabilize the rear and level the torso before full-speed travel."
+            message = "ROB mounted the ledge. Reverse the 360° flipper cycle to stabilize the rear and level the torso before full-speed travel."
             report(message)
         } else if newSurfaceHeight < oldSurfaceHeight {
             message = "ROB descended from the raised deck."

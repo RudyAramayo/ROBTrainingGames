@@ -324,11 +324,11 @@ private struct VisionControlDeck: View {
                                 .tint(.pink)
                         }
                         HStack(spacing: 8) {
-                            Button("Flipper Forward", systemImage: "arrow.forward.circle.fill") {
+                            Button("Spin Flipper 360°", systemImage: "arrow.clockwise.circle.fill") {
                                 session.moveBaseFlipperForward()
                             }
                             .disabled(!session.isRunning || session.baseFlipperTarget == .forward)
-                            Button("Flipper Rear", systemImage: "arrow.backward.circle.fill") {
+                            Button("Reverse Flipper", systemImage: "arrow.counterclockwise.circle.fill") {
                                 session.moveBaseFlipperBackward()
                             }
                             .disabled(!session.isRunning || session.baseFlipperTarget == .rear)

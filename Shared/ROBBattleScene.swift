@@ -5,6 +5,20 @@ import UIKit
 @MainActor
 enum ROBBattleFactory {
     static let playerColors: [UIColor] = [.systemCyan, .systemOrange, .systemGreen, .systemPink]
+    static let phoneFollowCameraOffset = SIMD3<Float>(0, 6.2, 5.1)
+    static let phoneFollowCameraTargetHeight: Float = 0.65
+
+    static func phoneFollowCameraPose(for robot: ROBBattleRobotState) -> (position: SIMD3<Float>, target: SIMD3<Float>) {
+        (
+            robot.position + phoneFollowCameraOffset,
+            robot.position + SIMD3<Float>(0, phoneFollowCameraTargetHeight, 0)
+        )
+    }
+
+    static func focusPhoneCamera(_ camera: PerspectiveCamera, on robot: ROBBattleRobotState) {
+        let pose = phoneFollowCameraPose(for: robot)
+        camera.look(at: pose.target, from: pose.position, relativeTo: nil)
+    }
 
     static func makeArena(_ arena: ROBBattleArena, arPresentation: Bool = false) -> Entity {
         let root = Entity()
@@ -188,6 +202,7 @@ struct ROBBattleRealityScene: View {
     var includesCamera = false
     var arPresentation = false
     @State private var root = Entity()
+    @State private var camera = PerspectiveCamera()
 
     var body: some View {
         RealityView { content in
@@ -198,15 +213,17 @@ struct ROBBattleRealityScene: View {
             ROBBattleFactory.synchronize(root: root, battle: battle, arPresentation: arPresentation)
             content.add(root)
             if includesCamera {
-                let camera = PerspectiveCamera()
                 camera.name = "Deathmatch Camera"
-                camera.look(at: [0, 0, 0], from: [0, 16.5, 13.5], relativeTo: nil)
+                ROBBattleFactory.focusPhoneCamera(camera, on: battle.localRobot)
                 content.add(camera)
             }
         } update: { _ in
             root.scale = .init(repeating: arenaScale)
             root.position = arenaPosition
             ROBBattleFactory.synchronize(root: root, battle: battle, arPresentation: arPresentation)
+            if includesCamera {
+                ROBBattleFactory.focusPhoneCamera(camera, on: battle.localRobot)
+            }
         }
         .id(battle.matchID)
     }
