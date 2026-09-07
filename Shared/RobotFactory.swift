@@ -219,10 +219,6 @@ import UIKit
 
         part("Sensor Mast", [0.1, 0.48, 0.1], [0, 1.2, 0], .gray, parent: torso)
         let head = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: .black, isMetallic: !arPresentation)]); head.name = "Camera Head"; head.position = [0, 1.52, 0]; head.scale.z = 0.82; torso.addChild(head)
-        let conferenceMicrophone = Entity(); conferenceMicrophone.name = "Conference Microphone"; conferenceMicrophone.position = [0, 1.82, 0.02]; torso.addChild(conferenceMicrophone)
-        cylinder("Conference Microphone Capsule", radius: 0.08, height: 0.19, position: .zero, color: .systemYellow, sideways: true, parent: conferenceMicrophone)
-        cylinder("Conference Microphone Stand", radius: 0.014, height: 0.16, position: [0, -0.1, 0], color: .gray, parent: conferenceMicrophone)
-        cylinder("Conference Microphone Base", radius: 0.1, height: 0.025, position: [0, -0.19, 0], color: .darkGray, parent: conferenceMicrophone)
         let smileMaterial = UnlitMaterial(color: faceColor(for: .lime))
         let smileParts: [(String, Float, Float, Float)] = [
             ("Face Smiley Left Eye", -0.075, 1.565, 0.026),

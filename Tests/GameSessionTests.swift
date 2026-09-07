@@ -1644,14 +1644,17 @@ final class GameSessionTests: XCTestCase {
         }
     }
 
-    func testRobotModelIncludesTwoFlatFlipperPolesSpeakersAndConferenceMicrophone() {
+    func testRobotModelIncludesTwoFlatFlipperPolesAndNoHeadTopCylinder() {
         let game = GameSession(audioEnabled: false)
         let robot = RobotFactory.makeROB()
         for name in [
             "Base Lift Flipper Assembly", "Left Base Lift Flipper Arm", "Right Base Lift Flipper Arm",
-            "Drive Base Assembly", "Torso Linear Actuator", "Left ROB Speaker Cone", "Right ROB Speaker Cone", "Conference Microphone",
+            "Drive Base Assembly", "Torso Linear Actuator", "Left ROB Speaker Cone", "Right ROB Speaker Cone",
         ] {
             XCTAssertNotNil(robot.findEntity(named: name), "Missing \(name)")
+        }
+        for removedHeadTopPart in ["Conference Microphone", "Conference Microphone Capsule", "Conference Microphone Stand", "Conference Microphone Base"] {
+            XCTAssertNil(robot.findEntity(named: removedHeadTopPart), "ROB's head must not include \(removedHeadTopPart)")
         }
         for removedCrossbar in ["Base Lift Flipper Motor", "Base Lift Flipper Blade", "Base Lift Flipper Floor Roller"] {
             XCTAssertNil(robot.findEntity(named: removedCrossbar), "Flipper poles must not be joined by \(removedCrossbar)")
