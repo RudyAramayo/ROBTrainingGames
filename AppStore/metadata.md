@@ -4,7 +4,7 @@
 
 - Seller-facing brand: Orbitus Robotics
 - Version: 1.0
-- iOS build prepared for submission: 2
+- iOS build submitted for review: 2
 - Price: Free
 - Primary language: English (U.S.)
 - Primary category: Education
@@ -44,7 +44,7 @@ ROB Training includes:
 • Original procedural techno music and robot effects
 • A RealityKit AR lab for placing ROB in your room
 • Encrypted AutoNet deathmatch and Capture the Flag for up to four nearby pilots, with arena voting and game or AR views
-• Circuit Quest: 90 interactive circuit builds across electronics topics
+• Learning guides and access to 90 online Circuit Quest builds (internet required for web activities)
 • A component explorer covering ROB's drive base, power, Cerebro, sensors, AMBER arms, and safety layer
 • Optional on-device ROB Voice using Apple speech recognition and Apple Intelligence when available
 
@@ -85,4 +85,4 @@ Explore the real ROB project at https://www.orbitusrobotics.com.
 
 ## Review notes
 
-No account or internet connection is required. Start the app, choose Start in the mission toolbar, and use the matching left and right tread joysticks to drive. Trigger three consecutive Saber attacks to see the fully extended spin. Hold Laser until the target indicator is red, then release to fire. The optional Battle tab requests local-network access so nearby copies of ROB Training can discover one another; traffic is limited to the local Multipeer Connectivity session and uses required encryption. The AR Lab uses the camera only after the reviewer opens that tab and accepts the system camera permission. ROB Voice is optional and requests microphone and speech-recognition permission only after the reviewer taps Talk to ROB.
+No account is required. Native missions work offline. On the Play tab, choose Start Full-Screen Mission and use the matching left and right tread joysticks to drive. The X button returns to the menu and pauses the mission. Trigger three consecutive Saber attacks to see the spin. Hold Laser to charge, then release to fire. The Learn tab includes a learning guide and opens our web-based Circuit Quest in Safari; the linked web activities require internet. The optional Battle tab requests local-network access so nearby copies of ROB Training can discover one another; traffic remains inside the encrypted local Multipeer Connectivity session. Battle supports deathmatch and Capture the Flag for up to four players. AR Lab uses the camera after opening that tab and accepting camera permission. ROB Voice is optional and requests microphone and speech-recognition permission only after Talk to ROB is selected. Scores are stored locally; no public leaderboard or account is required.

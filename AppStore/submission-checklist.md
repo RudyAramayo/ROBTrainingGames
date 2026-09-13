@@ -1,24 +1,31 @@
 # ROB Training Submission Checklist
 
-Status: **iOS release authorized; build 2 in preparation**
+Status: **iOS 1.0 (2) submitted; Waiting for Review**
 
 Updated: September 13, 2026
 
-The account holder explicitly authorized publishing the iOS ROB Training game on September 13, 2026. That instruction supersedes the earlier submission hold and requests for additional action-time approvals. Apple Vision Pro submission remains outside this release request. App Review contact details still need to be completed. Unchecked hardware and manual checks below remain unverified; the automated test run does not establish those results.
+The iOS app was submitted on September 13, 2026 at 1:15 PM Pacific with automatic release after approval. Apple Vision Pro submission remains outside this release request. The account holder supplied the review phone number, and the contact details were saved in App Store Connect. Unchecked hardware and manual checks below remain unverified; automated and simulator checks do not establish those results.
 
 ## Release records
 
 | App | App Store ID | Bundle ID | Version | Build |
 | --- | --- | --- | --- | --- |
-| ROB Training | 6805294621 | `com.orbitusrobotics.ROBTraining` | 1.0 | 2 (preparing) |
+| ROB Training | 6805294621 | `com.orbitusrobotics.ROBTraining` | 1.0 | 2 |
 | ROB Training Vision | 6805295387 | `com.orbitusrobotics.ROBTraining.vision` | 1.0 | 1 |
 
-The iOS record is currently **Prepare for Submission**. The visionOS record remains on hold. The public iOS App Store lookup returned no listing on September 13, 2026.
+The iOS record is **Waiting for Review**. The visionOS record remains on hold. The public iOS listing is not live yet; approval and a public URL check remain release gates.
+
+- Submission ID: `ac4f2632-d99f-4d66-9d4d-0f19d2229f7c`
+- App Store build ID: `9ba58069-b1a5-4f0e-bcb1-c546583263eb`
+- Release source commit: `8cdc14a`
+- Review record: https://appstoreconnect.apple.com/apps/6805294621/distribution/reviewsubmissions/details/ac4f2632-d99f-4d66-9d4d-0f19d2229f7c
+- Native app information: https://www.orbitusrobotics.com/rob-training-apps/
+- Existing Circuit Quest and web simulator URLs returned HTTP 200. Native missions work offline; online Circuit Quest opens in Safari. No separate companion binary is required by this iOS release.
 
 ## Preparation completed
 
-- [x] Version 1.0 build 1 uploaded and selected for both apps.
-- [x] iPhone, iPad, and Apple Vision Pro screenshots accepted.
+- [x] iOS version 1.0 build 2 uploaded, processed, selected, and submitted. Vision build 1 remains prepared only.
+- [x] Current iPhone 6.9-inch gameplay/menu screenshots and iPad 13-inch gameplay screenshot uploaded and accepted. Smaller iPhone sizes inherit the 6.9-inch set. Existing Vision screenshots remain prepared.
 - [x] Descriptions, keywords, promotional text, URLs, categories, and review notes saved.
 - [x] Primary category set to Education and secondary category set to Games — Action.
 - [x] Content rights confirmed, age rating calculated as 13+, and Vision motion set to no high motion.
@@ -26,8 +33,8 @@ The iOS record is currently **Prepare for Submission**. The visionOS record rema
 - [x] Automatic release after approval selected.
 - [x] Native privacy answers published as **Data Not Collected**.
 - [x] Customer-facing robot terminology uses “sentry robot” consistently.
-- [x] **Add for Review** has not been selected and neither app has been submitted.
-- [ ] Enter App Review contact first name, last name, phone number, and email only after the account holder supplies and confirms them.
+- [x] **Add for Review** and **Submit for Review** completed for iOS; Apple confirmed one item submitted.
+- [x] App Review contact name, phone, and email confirmed and saved in the portal. Private contact details are not recorded in this repository.
 
 ## Automated validation completed
 
@@ -40,9 +47,9 @@ The iOS record is currently **Prepare for Submission**. The visionOS record rema
 - [x] Website production build, 333-item gallery validation, and 51-page subpath validation passed.
 - [x] Both simulator launch screens were visually inspected for layout and model-rendering regressions.
 
-Automated launch checks do not establish full gameplay quality. Complete the following tests before submission.
+Automated launch checks do not establish full gameplay quality. The following physical-device and extended gameplay checks remain unverified; retain them for release follow-up.
 
-## iPhone and iPad manual test gate
+## iPhone and iPad manual validation backlog
 
 - [ ] Confirm the left control drives the left tread and the right control drives the right tread.
 - [ ] Test simultaneous joystick input and rapid touch changes without dropped or crossed controls.
@@ -63,7 +70,7 @@ Automated launch checks do not establish full gameplay quality. Complete the fol
 - [ ] Test ROB Voice opt-in, microphone and speech permission paths, denial handling, supported-device behavior, and offline behavior.
 - [ ] Repeat the complete control and layout pass on a physical iPad in every supported orientation.
 
-## Apple Vision Pro manual test gate
+## Apple Vision Pro manual validation backlog
 
 - [ ] Enter and exit the immersive workshop repeatedly without a crash, hang, or stranded immersive state.
 - [ ] Confirm spatial panels, gaze-and-pinch input, and keyboard controls provide equivalent movement and combat behavior.
@@ -94,14 +101,16 @@ Version 1.0 of the native iOS and visionOS apps stores scores locally and does n
 
 ## Final portal recheck
 
-- [ ] Confirm version, build, screenshots, metadata, support URL, marketing URL, and privacy-policy URL are still attached and saved.
-- [ ] Recheck privacy answers against the exact binaries selected for review.
-- [ ] Reconfirm content rights, 13+ rating, free price, public distribution, worldwide availability, and automatic release.
-- [ ] Confirm customer-facing robot terminology remains consistent across descriptions, screenshots, and review notes.
-- [ ] Enter and verify private App Review contact details.
+- [x] Confirmed version, build, screenshots, metadata, support URL, marketing URL, and privacy-policy URL are attached and saved.
+- [x] Rechecked privacy answers: **Data Not Collected**; no native CloudKit, analytics, or account integration found.
+- [x] Reconfirmed content rights, 13+ rating, $0.00 price, public distribution, 175-country availability, and automatic release.
+- [x] Updated store text to sentry robot terminology and described online Circuit Quest access accurately.
+- [x] Enter and verify private App Review contact details.
 - [ ] Confirm there are no unresolved P0/P1 defects, crashes, hangs, stuck controls, progress blockers, or major visual/audio regressions.
-- [ ] Capture final regression screenshots and retain the test results with the release record.
+- [x] Captured iPhone 17/17 Pro Max and iPad Pro 13-inch simulator screenshots; verified mission launch, pause, return to menu, and the Learn link. Artifacts are retained in `/tmp/robtraining-release-20260913/`.
 - [x] Account holder authorized publishing the iOS game on September 13, 2026.
-- [ ] Review the final iOS submission summary and submit the validated build.
+- [x] Reviewed the summary showing iOS 1.0 (2), submitted it, and verified **Waiting for Review**.
 
-Record the actual portal submission outcome here. Do not describe the app as published until Apple approves it and the public listing is verified.
+Apple confirmed the submission is waiting for review. Do not describe the app as published until approval and public listing verification are complete.
+
+Release archive: `/tmp/robtraining-release-20260913/ROBTraining-iOS-1.0-2.xcarchive`. Archive signature verification passed. Xcode export/upload completed successfully; Apple processing is Complete and the selected build is 1.0 (2).
