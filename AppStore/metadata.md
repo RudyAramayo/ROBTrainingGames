@@ -4,6 +4,7 @@
 
 - Seller-facing brand: Orbitus Robotics
 - Version: 1.0
+- iOS build prepared for submission: 2
 - Price: Free
 - Primary language: English (U.S.)
 - Primary category: Education
@@ -32,17 +33,18 @@
 
 Meet ROB, the Orbitus Robotics training robot, and master fifteen increasingly challenging missions built around driving, sensing, safety, combat timing, and route planning.
 
-Drive ROB's independent tri-wheel treads through expanded training rooms. Collect energy cells, find keys, open locked partitions, evade moving spider and Dalek-style sentries, and reach Mission Control. Chain wide dual-arm saber swings into a full spin attack, or wait for the virtual pan-tilt gatling to lock before charging a blue training shot.
+Drive ROB's independent tri-wheel treads through expanded training rooms. Collect energy cells, find keys, open locked partitions, evade moving spider and sentry robots, and reach Mission Control. Chain wide dual-arm saber swings into a full spin attack, or wait for the virtual pan-tilt gatling to lock before charging a blue training shot.
 
 ROB Training includes:
 
 • Fifteen progressively harder missions
 • Independent tread controls plus keyboard support
-• Active spider and Dalek-style sentries that move and fight back
+• Active spider and sentry robots that move and fight back
 • Dual-saber combos and a chargeable virtual pan-tilt training laser
 • Original procedural techno music and robot effects
 • A RealityKit AR lab for placing ROB in your room
-• Encrypted AutoNet local deathmatches for up to four nearby pilots, with arena voting and game or AR views
+• Encrypted AutoNet deathmatch and Capture the Flag for up to four nearby pilots, with arena voting and game or AR views
+• Circuit Quest: 90 interactive circuit builds across electronics topics
 • A component explorer covering ROB's drive base, power, Cerebro, sensors, AMBER arms, and safety layer
 • Optional on-device ROB Voice using Apple speech recognition and Apple Intelligence when available
 
@@ -63,7 +65,7 @@ Discover the real ROB project, books, videos, and engineering work at https://ww
 
 Bring ROB into your space with a dedicated Apple Vision Pro robotics workshop from Orbitus Robotics.
 
-Enter a full-scale immersive training room, command ROB through fifteen increasingly difficult missions, and inspect the systems that make the robot work. Drive independent tri-wheel treads, collect energy cells, unlock partitions, defend against moving spider and Dalek-style sentries, and combine dual-saber attacks with a scanning virtual pan-tilt training laser.
+Enter a full-scale immersive training room, command ROB through fifteen increasingly difficult missions, and inspect the systems that make the robot work. Drive independent tri-wheel treads, collect energy cells, unlock partitions, defend against moving spider and sentry robots, and combine dual-saber attacks with a scanning virtual pan-tilt training laser.
 
 ROB Training Vision includes:
 

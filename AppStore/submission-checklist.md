@@ -1,19 +1,19 @@
 # ROB Training Submission Checklist
 
-Status: **TABLED — DO NOT ADD FOR REVIEW OR SUBMIT**
+Status: **iOS release authorized; build 2 in preparation**
 
-Prepared: August 25, 2026
+Updated: September 13, 2026
 
-The App Store records are prepared, but submission is intentionally paused until the manual test gate below is complete and the account holder provides the private App Review contact details.
+The account holder explicitly authorized publishing the iOS ROB Training game on September 13, 2026. That instruction supersedes the earlier submission hold and requests for additional action-time approvals. Apple Vision Pro submission remains outside this release request. App Review contact details still need to be completed. Unchecked hardware and manual checks below remain unverified; the automated test run does not establish those results.
 
 ## Release records
 
 | App | App Store ID | Bundle ID | Version | Build |
 | --- | --- | --- | --- | --- |
-| ROB Training | 6805294621 | `com.orbitusrobotics.ROBTraining` | 1.0 | 1 |
+| ROB Training | 6805294621 | `com.orbitusrobotics.ROBTraining` | 1.0 | 2 (preparing) |
 | ROB Training Vision | 6805295387 | `com.orbitusrobotics.ROBTraining.vision` | 1.0 | 1 |
 
-Both records must remain in **Prepare for Submission** until every required item is checked.
+The iOS record is currently **Prepare for Submission**. The visionOS record remains on hold. The public iOS App Store lookup returned no listing on September 13, 2026.
 
 ## Preparation completed
 
@@ -30,6 +30,8 @@ Both records must remain in **Prepare for Submission** until every required item
 - [ ] Enter App Review contact first name, last name, phone number, and email only after the account holder supplies and confirms them.
 
 ## Automated validation completed
+
+- [x] September 13: current iOS source passed all 92 tests, with zero failures or skips, on the iPhone 17 simulator (iOS 26.5). Results retained at `/tmp/robtraining-release-20260913/Tests.xcresult`.
 
 - [x] iOS unit tests passed with the `ROBTrainingiOS` scheme on an iPhone 17 Pro Max simulator.
 - [x] Release simulator builds passed for the iOS and visionOS schemes.
@@ -99,7 +101,7 @@ Version 1.0 of the native iOS and visionOS apps stores scores locally and does n
 - [ ] Enter and verify private App Review contact details.
 - [ ] Confirm there are no unresolved P0/P1 defects, crashes, hangs, stuck controls, progress blockers, or major visual/audio regressions.
 - [ ] Capture final regression screenshots and retain the test results with the release record.
-- [ ] Obtain action-time approval from the account holder before selecting **Add for Review**.
-- [ ] Review the submission summary, then obtain separate action-time approval before the final **Submit for Review** action.
+- [x] Account holder authorized publishing the iOS game on September 13, 2026.
+- [ ] Review the final iOS submission summary and submit the validated build.
 
-Submission is ready only when all required manual checks pass and both approvals are explicit. A prior general confirmation does not authorize a future review or submission click after this test hold.
+Record the actual portal submission outcome here. Do not describe the app as published until Apple approves it and the public listing is verified.
