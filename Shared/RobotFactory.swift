@@ -326,11 +326,10 @@ import UIKit
             let pulse = 0.98 + Float(sin(session.elapsed * 3.2)) * 0.025
             shieldField.scale = [pulse, pulse * 0.92, pulse]
         }
-        let bladeScale: Float = session.meleeWeapon == .dualSabers && session.saberAnimation > 0 ? 1 : 0.06
         for (name, side) in [("Left Lightsaber", Float(-1)), ("Right Lightsaber", Float(1))] {
             guard let blade = robot.findEntity(named: name) else { continue }
-            blade.scale = [1, bladeScale, 1]
-            blade.position = [side * 0.24, -0.64, -0.1 - 0.45 * bladeScale]
+            blade.scale = [1, 1, 1]
+            blade.position = [side * 0.114, -0.77, -0.5]
         }
         for (prefix, angle) in [("Left", session.leftWheelAngle), ("Right", session.rightWheelAngle)] {
             for index in 1...3 { robot.findEntity(named: "\(prefix) Tri-Wheel \(index)")?.orientation = simd_quatf(angle: angle, axis: [1, 0, 0]) }
@@ -342,19 +341,11 @@ import UIKit
             : 1
         robot.findEntity(named: "Left ROB Speaker Cone")?.scale = [speakerPulse, 1, speakerPulse]
         robot.findEntity(named: "Right ROB Speaker Cone")?.scale = [1 + (speakerPulse - 1) * 0.78, 1, 1 + (speakerPulse - 1) * 0.78]
-        let progress = Float(1 - session.saberAnimation), arc = sin(progress * .pi)
+        let attack = ROBMeleeAnimation.pose(session.saberStyle, progress: Float(1 - session.saberAnimation))
         let torso = robot.findEntity(named: "Torso Assembly")
         let supportHeight = session.baseLiftHeight - session.robotPosition.y
         robot.findEntity(named: "Drive Base Assembly")?.position.y = supportHeight
-        var torsoYaw: Float = 0
-        if let style = session.saberStyle, session.saberAnimation > 0 {
-            switch style {
-            case .spin: torsoYaw = progress * 2 * .pi
-            case .leftSweep: torsoYaw = -arc * 0.24
-            case .rightSweep: torsoYaw = arc * 0.24
-            case .hammerSmash: torsoYaw = 0
-            }
-        }
+        let torsoYaw = attack.torsoYaw
         let bodyPose = ROBBodyKinematics.torsoPose(basePitch: session.baseLiftPitch, leanAngle: session.torsoLeanAngle,
                                                   rearHeight: session.baseLiftHeight, rootHeight: session.robotPosition.y,
                                                   scale: ROBScanVisualModel.presentationScale, yaw: torsoYaw)
@@ -366,18 +357,9 @@ import UIKit
         }
         for (name, side) in [("Left Arm Assembly", Float(-1)), ("Right Arm Assembly", Float(1))] {
             guard let arm = robot.findEntity(named: name) else { continue }
-            guard let style = session.saberStyle, session.saberAnimation > 0 else { arm.orientation = simd_quatf(angle: 0, axis: [0, 1, 0]); continue }
-            if style == .hammerSmash {
-                arm.orientation = name.hasPrefix("Right")
-                    ? simd_quatf(angle: -1.25 + progress * 2.35, axis: [1, 0, 0])
-                    : simd_quatf(angle: 0, axis: [0, 1, 0])
-            } else if style == .spin {
-                arm.orientation = simd_quatf(angle: side * .pi / 2, axis: [0, 0, 1])
-            } else {
-                let direction: Float = style == .leftSweep ? -1 : 1
-                let sweep = direction * (-1.3 + progress * 2.6)
-                arm.orientation = simd_quatf(angle: sweep, axis: [0, 1, 0]) * simd_quatf(angle: side * arc * 0.5, axis: [0, 0, 1])
-            }
+            arm.orientation = simd_quatf(angle: attack.armYaw, axis: [0, 1, 0])
+                * simd_quatf(angle: side * attack.armRoll, axis: [0, 0, 1])
+                * simd_quatf(angle: side > 0 ? attack.hammerPitch : 0, axis: [1, 0, 0])
         }
         let scanningHeading = Float(sin(session.elapsed * 0.85)) * 0.9
         let relativeHeading = session.laserLockHeading.map { $0 - session.robotHeading - torsoYaw } ?? scanningHeading

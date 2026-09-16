@@ -316,28 +316,20 @@ enum ROBBattleFactory {
         let saberProgress = saberActive
             ? Float(1 - state.saberRemaining / ROBBattleRobotAnimationState.saberDuration)
             : 1
-        let saberArc = sin(saberProgress * .pi)
+        let attack = ROBMeleeAnimation.pose(.leftSweep, progress: saberProgress)
         for (name, side) in [("Left Lightsaber", Float(-1)), ("Right Lightsaber", Float(1))] {
             guard let blade = robot.findEntity(named: name) else { continue }
-            let bladeScale: Float = saberActive ? 1 : 0.06
             blade.isEnabled = true
-            blade.scale = [1, bladeScale, 1]
-            blade.position = [side * 0.24, -0.64, -0.1 - 0.45 * bladeScale]
+            blade.scale = [1, 1, 1]
+            blade.position = [side * 0.114, -0.77, -0.5]
         }
 
         let torso = robot.findEntity(named: "Torso Assembly")
-        torso?.orientation = saberActive
-            ? simd_quatf(angle: -saberArc * 0.22, axis: [0, 1, 0])
-            : simd_quatf(angle: 0, axis: [0, 1, 0])
+        torso?.orientation = simd_quatf(angle: attack.torsoYaw, axis: [0, 1, 0])
         for (name, side) in [("Left Arm Assembly", Float(-1)), ("Right Arm Assembly", Float(1))] {
             guard let arm = robot.findEntity(named: name) else { continue }
-            guard saberActive else {
-                arm.orientation = simd_quatf(angle: 0, axis: [0, 1, 0])
-                continue
-            }
-            let sweep = side * (-1.4 + saberProgress * 2.8)
-            arm.orientation = simd_quatf(angle: sweep, axis: [0, 1, 0])
-                * simd_quatf(angle: side * saberArc * 0.48, axis: [0, 0, 1])
+            arm.orientation = simd_quatf(angle: attack.armYaw, axis: [0, 1, 0])
+                * simd_quatf(angle: side * attack.armRoll, axis: [0, 0, 1])
         }
 
         let laserActive = state.laserRemaining > 0

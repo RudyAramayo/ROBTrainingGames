@@ -438,7 +438,7 @@ private struct ROBBattleRemoteInterpolation {
 }
 
 struct ROBBattleRobotAnimationState: Equatable, Sendable {
-    static let saberDuration = 0.48
+    static let saberDuration = ROBMeleeAnimation.duration(.leftSweep)
     static let laserDuration = 0.24
     static let collisionDuration = 0.32
 

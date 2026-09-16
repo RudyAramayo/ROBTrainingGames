@@ -993,6 +993,7 @@ final class GameSessionTests: XCTestCase {
         game.saberAttack()
         XCTAssertEqual(game.enemies[spiderIndex].shields, shields)
 
+        game.tick(0.5)
         game.robotPosition = [0, 0, -2.2]
         game.enemies[spiderIndex].position = [0, 0, -3.2]
         game.robotHeading = 0
@@ -1034,8 +1035,8 @@ final class GameSessionTests: XCTestCase {
         game.enemies[targetIndex].shields = 10
         let shields = game.enemies[targetIndex].shields
 
-        game.saberAttack()
-        game.saberAttack()
+        game.saberAttack(); game.tick(0.5)
+        game.saberAttack(); game.tick(0.5)
         game.saberAttack()
 
         XCTAssertEqual(game.saberStyle, .spin)
@@ -1089,14 +1090,14 @@ final class GameSessionTests: XCTestCase {
         }
     }
 
-    func testSaberBladesStayRetractedUntilAValidAttack() {
+    func testSaberBladesStayVisibleBeforeDuringAndAfterAttack() {
         let game = GameSession(audioEnabled: false)
         let robot = RobotFactory.makeROB()
         game.begin()
 
         RobotFactory.applyWeapons(to: robot, session: game)
         guard let blade = robot.findEntity(named: "Left Lightsaber") else { return XCTFail("Missing saber") }
-        XCTAssertLessThan(blade.scale.y, 0.1)
+        XCTAssertEqual(blade.scale.y, 1, accuracy: 0.001)
 
         game.robotPosition = [0, 0, -2.2]
         game.robotHeading = 0
@@ -1104,6 +1105,47 @@ final class GameSessionTests: XCTestCase {
         RobotFactory.applyWeapons(to: robot, session: game)
 
         XCTAssertEqual(blade.scale.y, 1, accuracy: 0.001)
+        game.tick(0.6)
+        RobotFactory.applyWeapons(to: robot, session: game)
+        XCTAssertEqual(blade.scale.y, 1, accuracy: 0.001)
+        XCTAssertTrue(blade.isEnabled)
+    }
+
+    func testSaberRecoveryIsContinuousAndCannotRepeatDamage() {
+        let game = GameSession(audioEnabled: false)
+        let robot = RobotFactory.makeROB()
+        game.begin()
+        game.enemies = [game.enemies[0]]
+        game.enemies[0].position = game.robotPosition + [0, 0, -1]
+        game.enemies[0].shields = 10
+        game.saberAttack()
+        let shieldsAfterStrike = game.enemies[0].shields
+        XCTAssertEqual(shieldsAfterStrike, 9)
+        game.tick(0.25)
+        let remaining = game.saberAnimation
+        game.saberAttack()
+        XCTAssertEqual(game.saberAnimation, remaining, "Repeated input cannot restart a swing mid-pose")
+        game.tick(0.25)
+        XCTAssertEqual(game.enemies[0].shields, shieldsAfterStrike, "Recovery is visual, not a second hit")
+        RobotFactory.applyWeapons(to: robot, session: game)
+        XCTAssertEqual(robot.findEntity(named: "Left Arm Assembly")?.orientation, simd_quatf(angle: 0, axis: [0, 1, 0]))
+
+        for style: SaberAttackStyle in [.leftSweep, .rightSweep, .spin, .hammerSmash] {
+            var previous = simd_quatf(angle: 0, axis: [0, 1, 0])
+            for frame in 0...120 {
+                let pose = ROBMeleeAnimation.pose(style, progress: Float(frame) / 120)
+                let orientation = simd_quatf(angle: pose.torsoYaw + pose.armYaw, axis: [0, 1, 0])
+                    * simd_quatf(angle: pose.armRoll, axis: [0, 0, 1])
+                    * simd_quatf(angle: pose.hammerPitch, axis: [1, 0, 0])
+                XCTAssertGreaterThan(abs(simd_dot(previous.vector, orientation.vector)), 0.998, "No snap at start, turnaround, or finish")
+                previous = orientation
+            }
+            XCTAssertEqual(abs(previous.real), 1, accuracy: 0.00001)
+        }
+        let strike = ROBMeleeAnimation.pose(.leftSweep, progress: 0.45)
+        let recovery = ROBMeleeAnimation.pose(.leftSweep, progress: 0.75)
+        XCTAssertLessThan(abs(recovery.armYaw), abs(strike.armYaw))
+        XCTAssertLessThan(recovery.armYaw, 0, "Recovery retraces the sweep")
     }
 
     func testThirdSaberPressTriggersSpinAndHitsBehindROB() {
@@ -1114,8 +1156,8 @@ final class GameSessionTests: XCTestCase {
         game.enemies[index].position = game.robotPosition + SIMD3<Float>(0, 0, 1.25)
         let shields = game.enemies[index].shields
 
-        game.saberAttack()
-        game.saberAttack()
+        game.saberAttack(); game.tick(0.5)
+        game.saberAttack(); game.tick(0.5)
         XCTAssertEqual(game.enemies[index].shields, shields)
         game.saberAttack()
 
@@ -1338,7 +1380,9 @@ final class GameSessionTests: XCTestCase {
         let robot = RobotFactory.makeROB()
         game.begin()
         game.robotPosition = [0, 0, -2.65]
-        game.saberAttack(); game.saberAttack(); game.saberAttack()
+        game.saberAttack(); game.tick(0.5)
+        game.saberAttack(); game.tick(0.5)
+        game.saberAttack(); game.tick(0.25)
 
         RobotFactory.applyWeapons(to: robot, session: game)
 
@@ -1692,7 +1736,7 @@ final class GameSessionTests: XCTestCase {
         }
     }
 
-    func testBattleSaberAttackExtendsBladesAndAnimatesBothArms() {
+    func testBattleSabersStayVisibleAndReturnBothArmsToRest() {
         let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
         let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", audioEnabled: false)
@@ -1704,6 +1748,7 @@ final class GameSessionTests: XCTestCase {
         let robot = ROBBattleFactory.makeBattleRobot(identity: battle.localIdentity)
 
         battle.saberAttack()
+        battle.tick(0.1)
         ROBBattleFactory.applyAnimation(to: robot, state: battle.animationState(for: localID))
 
         XCTAssertEqual(robot.findEntity(named: "Left Lightsaber")?.scale.y ?? 0, 1, accuracy: 0.001)
@@ -1721,7 +1766,7 @@ final class GameSessionTests: XCTestCase {
             battle.tick(0.1)
         }
         ROBBattleFactory.applyAnimation(to: robot, state: battle.animationState(for: localID))
-        XCTAssertEqual(robot.findEntity(named: "Left Lightsaber")?.scale.y ?? 0, 0.06, accuracy: 0.001)
+        XCTAssertEqual(robot.findEntity(named: "Left Lightsaber")?.scale.y ?? 0, 1, accuracy: 0.001)
         XCTAssertEqual(
             robot.findEntity(named: "Left Arm Assembly")?.orientation,
             simd_quatf(angle: 0, axis: [0, 1, 0])
@@ -2123,7 +2168,7 @@ final class GameSessionTests: XCTestCase {
         let drive = robot.findEntity(named: "Drive Base Assembly")!
         XCTAssertEqual(drive.position.y, 0, accuracy: 0.0001)
         XCTAssertGreaterThan(drive.convert(position: [0, 0, -GameSession.robotContactSpan], to: robot).y, ledge.height)
-        XCTAssertGreaterThan(robot.findEntity(named: "Torso Assembly")!.orientation.act([0, 1, 0]).y, 0.99, "The LACT keeps the torso upright while the treads pitch")
+        XCTAssertLessThan(robot.findEntity(named: "Torso Assembly")!.orientation.act([0, 1, 0]).z, -0.35, "The LACT swings the entire body forward to balance the lifted base")
 
         game.setDrive(forward: 1, steering: 0)
         var sawAutomaticRearSupport = false
@@ -2154,6 +2199,33 @@ final class GameSessionTests: XCTestCase {
             XCTAssertTrue(game.moveBaseFlipperBackward())
             game.tick(GameSession.baseFlipperDuration + 0.05)
             XCTAssertEqual(game.baseLiftPitch, 0, accuracy: 0.0001)
+        }
+    }
+
+    func testPlatformOverhangDoesNotLockFlipperControlsToTheLowerFloor() {
+        for heading: Float in [0, .pi] {
+            let game = GameSession(audioEnabled: false)
+            game.begin(); game.enemies = []
+            let ledge = game.puzzle.ledges[0]
+            // The center is on the deck but one tread end extends over its lip.
+            game.robotPosition = [0, ledge.height, ledge.approachEdgeZ - 0.1]
+            game.robotHeading = heading
+            game.tick(0.02)
+            let robot = RobotFactory.makeROB()
+            for _ in 0..<3 {
+                XCTAssertTrue(game.isBaseGrounded)
+                XCTAssertTrue(game.moveBaseFlipperForward())
+                for _ in 0..<20 { game.tick(0.02) }
+                XCTAssertGreaterThan(game.baseLiftPitch, 0.7)
+                XCTAssertEqual(game.baseLiftHeight, ledge.height, accuracy: 0.0001)
+                RobotFactory.applyWeapons(to: robot, session: game)
+                let roller = robot.findEntity(named: "Left Flipper End Roller")!
+                XCTAssertEqual(roller.position(relativeTo: robot).y + game.robotPosition.y,
+                               ledge.height + 0.029 * ROBScanVisualModel.presentationScale, accuracy: 0.0001)
+                XCTAssertTrue(game.moveBaseFlipperBackward())
+                for _ in 0..<20 { game.tick(0.02) }
+                XCTAssertEqual(game.baseLiftPitch, 0, accuracy: 0.0001)
+            }
         }
     }
 
@@ -2190,15 +2262,44 @@ final class GameSessionTests: XCTestCase {
         let rest = ROBBodyKinematics.torsoPose(basePitch: 0, leanAngle: 0)
         XCTAssertEqual(rest.lactLength, 0.20955, accuracy: 0.000001)
         let inMotion = ROBBodyKinematics.advanceLean(0, basePitch: 0.8, delta: 0.05)
-        XCTAssertEqual(ROBBodyKinematics.lactLength(leanAngle: inMotion), 0.20955 - 0.015, accuracy: 0.000001)
+        XCTAssertEqual(ROBBodyKinematics.lactLength(leanAngle: inMotion), 0.20955 - 0.045, accuracy: 0.000001)
         for pitch: Float in [0.8, -0.35] {
             let lean = ROBBodyKinematics.advanceLean(0, basePitch: pitch, delta: 1)
             let pose = ROBBodyKinematics.torsoPose(basePitch: pitch, leanAngle: lean)
             let original = ROBBodyKinematics.torsoPose(basePitch: pitch, leanAngle: 0)
-            XCTAssertEqual(pose.orientation.act([0, 1, 0]).y, 1, accuracy: 0.000001)
+            XCTAssertLessThanOrEqual(pose.massCenter.z, 0.212725)
+            XCTAssertGreaterThanOrEqual(pose.massCenter.z, 0.212725 - 0.42545 * cos(pitch))
             XCTAssertLessThan(simd_distance(pose.position + pose.orientation.act(ROBBodyKinematics.leanHinge),
                                            original.position + original.orientation.act(ROBBodyKinematics.leanHinge)), 0.000001)
             XCTAssertGreaterThan(abs(pose.lactLength - rest.lactLength), 0.001)
+        }
+    }
+
+    func testWholeBodySwingsAtUpperTreadWheelWithoutLeaningBehindTheTracks() {
+        let game = GameSession(audioEnabled: false)
+        game.begin(); game.enemies = []
+        let robot = RobotFactory.makeROB()
+        let scale = ROBScanVisualModel.presentationScale
+        let wheels = (1...3).map { robot.findEntity(named: "Left Tri-Wheel \($0)")! }
+        let upperWheel = wheels.max { $0.position(relativeTo: robot).y < $1.position(relativeTo: robot).y }!
+        XCTAssertEqual(ROBBodyKinematics.leanHinge.y * scale, upperWheel.position(relativeTo: robot).y + 0.073 * scale, accuracy: 0.0001)
+        XCTAssertEqual(ROBBodyKinematics.leanHinge.z * scale, upperWheel.position(relativeTo: robot).z, accuracy: 0.0001)
+        for lower in [true, false] {
+            XCTAssertTrue(lower ? game.moveBaseFlipperForward() : game.moveBaseFlipperBackward())
+            for _ in 0..<40 {
+                game.tick(0.01)
+                RobotFactory.applyWeapons(to: robot, session: game)
+                let torso = robot.findEntity(named: "Torso Assembly")!
+                let mass = torso.convert(position: ROBBodyKinematics.torsoMassCenter * scale, to: robot)
+                XCTAssertLessThanOrEqual(mass.z, 0.212725 * scale + 0.0001)
+                XCTAssertGreaterThanOrEqual(mass.z, (0.212725 - 0.42545 * cos(game.baseLiftPitch)) * scale - 0.0001)
+                let chest = robot.findEntity(named: "Cerebro Torso")!
+                XCTAssertTrue(chest.parent === torso)
+                let drive = robot.findEntity(named: "Drive Base Assembly")!
+                let bodyHinge = torso.convert(position: ROBBodyKinematics.leanHinge * scale, to: robot)
+                let baseHinge = drive.convert(position: (ROBBodyKinematics.leanHinge - [0, 0, 0.212725]) * scale, to: robot)
+                XCTAssertLessThan(simd_distance(bodyHinge, baseHinge), 0.0001, "Body stays attached to the hinge throughout the swing")
+            }
         }
     }
 
@@ -2279,7 +2380,7 @@ final class GameSessionTests: XCTestCase {
         RobotFactory.applyWeapons(to: robot, session: game)
         XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: GameSession.baseFlipperForwardAngle, axis: [1, 0, 0]))
         XCTAssertNotEqual(robot.findEntity(named: "Drive Base Assembly")?.orientation, simd_quatf(angle: 0, axis: [1, 0, 0]))
-        XCTAssertGreaterThan(robot.findEntity(named: "Torso Assembly")!.orientation.act([0, 1, 0]).y, 0.99)
+        XCTAssertLessThan(robot.findEntity(named: "Torso Assembly")!.orientation.act([0, 1, 0]).z, -0.35)
     }
 
     func testFlipperRollersClearTheFloorThroughoutLiftCycle() {

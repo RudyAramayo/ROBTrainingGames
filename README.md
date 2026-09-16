@@ -34,7 +34,7 @@ Run the shared campaign tests on an iOS Simulator with `xcodebuild test -scheme 
 
 ## Cross-platform gameplay sync
 
-`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. `Shared/ROBDroidProfile.swift` is the native half of the portable customization format; its field keys, allowlists, Base64URL encoding, and FNV-1a checksum must remain byte-compatible with the website's `assets/js/rob-droid-profile.mjs`. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.16.3`.
+`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. `Shared/ROBDroidProfile.swift` is the native half of the portable customization format; its field keys, allowlists, Base64URL encoding, and FNV-1a checksum must remain byte-compatible with the website's `assets/js/rob-droid-profile.mjs`. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.16.4`.
 
 Before App Store submission, add production icons/screenshots, signing, privacy review, age rating, support URLs, and device testing. Keep lessons synchronized with `Presentation/ROB-Books/ROBOT_GAME_CURRICULUM.md` as the books evolve.
 
@@ -59,11 +59,21 @@ rear contact during front lift, then holds the front at the step while the rear
 rises. Forward motion triggers the rear-support transition and final stow.
 This contact-based presentation is a game approximation, not a rigid-body solver.
 Completing a climb releases its latch so another flipper cycle works on the
-platform. Leaving an edge tips the base, releases it into gravity, and settles it
-on the lower floor. The LACT counter-leans the torso about the lower waist hinge.
+platform, including near its lip while the center remains supported. A single
+overhanging tread end does not disable the controls or replace the deck with the
+lower floor. Leaving an edge tips the base, releases it into gravity, and settles it
+on the lower floor. The LACT swings the entire upper body about the hinge above
+the upper tread wheel. It targets an estimated upper-body mass center within the
+tread support span, leaning forward beyond vertical when a raised base moves the
+hinge aft. Its animation keeps pace with the flippers during the transition.
 `ROBSupportMotion.swift` matches the browser's support motion and body kinematics;
 its illustrative pin geometry uses the photo's 8¼-inch reference length (209.55
 mm), not an actuator stroke or a calibrated physical control limit.
+
+Equipped sabers remain fully visible while idle, attacking, and recovering.
+`ROBMeleeAnimation.swift` matches the browser's `rob-melee-animation.mjs`: sweeps
+ease outward and reverse back to rest, and spin arms ease out and back. Recovery
+does not repeat damage; another attack waits for the current animation to finish.
 
 The captured base is aligned with the flipper rig. The virtual training laser
 uses the captured shoulder housing and a named muzzle attachment, with no

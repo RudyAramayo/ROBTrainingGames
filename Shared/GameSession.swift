@@ -332,7 +332,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.16.3"
+    static let gameplayRulesetVersion = "2026.09.16.4"
     static let robotCollisionRadius: Float = 0.54
     static let baseDriveSpeed: Float = 1.2
     static let securityCameraHalfAngle: Float = .pi / 5
@@ -1146,12 +1146,7 @@ final class GameSession {
         updateCameraHack(delta)
         updateSecurityCameras()
         if saberAnimation > 0 {
-            let animationSpeed = switch saberStyle {
-            case .spin: 1.25
-            case .hammerSmash: 1.55
-            default: 2.25
-            }
-            saberAnimation = max(0, saberAnimation - delta * animationSpeed)
+            saberAnimation = max(0, saberAnimation - delta / ROBMeleeAnimation.duration(saberStyle))
             if saberAnimation == 0 { saberStyle = nil }
         }
         if isChargingLaser { laserCharge = min(1, laserCharge + delta / 1.25) }
@@ -1896,7 +1891,7 @@ final class GameSession {
         if audioEnabled { SoundPlayer.shared.playLaser(charge: clampedCharge) }
     }
     func saberAttack() {
-        guard isRunning else { return }
+        guard isRunning, saberAnimation == 0 else { return }
         if meleeWeapon == .powerHammer {
             saberComboCount = 0; lastSaberAttackTime = elapsed; saberAnimation = 1; saberStyle = .hammerSmash
             let forward = SIMD2<Float>(-sin(robotHeading), -cos(robotHeading))
