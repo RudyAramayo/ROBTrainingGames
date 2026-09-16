@@ -34,6 +34,20 @@ Run the shared campaign tests on an iOS Simulator with `xcodebuild test -scheme 
 
 ## Cross-platform gameplay sync
 
-`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. `Shared/ROBDroidProfile.swift` is the native half of the portable customization format; its field keys, allowlists, Base64URL encoding, and FNV-1a checksum must remain byte-compatible with the website's `assets/js/rob-droid-profile.mjs`. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.13`.
+`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. `Shared/ROBDroidProfile.swift` is the native half of the portable customization format; its field keys, allowlists, Base64URL encoding, and FNV-1a checksum must remain byte-compatible with the website's `assets/js/rob-droid-profile.mjs`. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.16`.
 
 Before App Store submission, add production icons/screenshots, signing, privacy review, age rating, support URLs, and device testing. Keep lessons synchronized with `Presentation/ROB-Books/ROBOT_GAME_CURRICULUM.md` as the books evolve.
+
+## Scan-informed ROB appearance
+
+The shared `ROBScanVisualModel` now loads the same articulated visual mesh used
+by the browser and Cerebro. September 15 scans inform the twin speaker chest,
+long open neck, camera optics, seven-joint arms, triangular treads and perforated
+rear axle flippers with independent end rollers. The engine-neutral
+`Shared/Resources/rob-visual.json` is exported from ORobotics's
+`assets/js/rob-visual-model.mjs`; regenerate it with that repository's
+`scripts/export-rob-visual.mjs` and keep both Apple adapters identical.
+
+These meshes are visual approximations, not calibrated physical kinematics.
+Existing game inputs and cosmetics still apply; a display support offset keeps
+rollers above the floor during the full-turn flipper animation.

@@ -1289,7 +1289,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNotNil(robot.findEntity(named: "Right Tri-Wheel Tread"))
         for side in ["Left", "Right"] {
             guard let tread = robot.findEntity(named: "\(side) Tri-Wheel Tread") else { return XCTFail("Missing \(side) tread") }
-            XCTAssertGreaterThanOrEqual(tread.children.filter { $0.name.hasPrefix("\(side) Tread Shoe ") }.count, 18)
+            XCTAssertGreaterThanOrEqual(tread.children.filter { $0.name.hasPrefix("\(side) Tread Shoe ") }.count, 18, "Tread children: \(tread.children.map(\.name))")
             for index in 1...6 { XCTAssertNotNil(robot.findEntity(named: "\(side) Track Belt Segment \(index)")) }
             for index in 1...3 { XCTAssertNotNil(robot.findEntity(named: "\(side) Tri-Wheel \(index)")) }
             guard
@@ -2154,7 +2154,7 @@ final class GameSessionTests: XCTestCase {
         }
     }
 
-    func testRobotModelIncludesTwoFlatFlipperPolesAndNoHeadTopCylinder() {
+    func testScanModelHasRearAxleFlippersWithIndependentRollers() {
         let game = GameSession(audioEnabled: false)
         let robot = RobotFactory.makeROB()
         for name in [
@@ -2173,12 +2173,23 @@ final class GameSessionTests: XCTestCase {
         let flipperAssembly = robot.findEntity(named: "Base Lift Flipper Assembly")
         XCTAssertEqual(flipperAssembly?.parent?.name, "Drive Base Assembly")
         XCTAssertEqual(flipperAssembly?.children.map(\.name).sorted(), ["Left Base Lift Flipper Arm", "Right Base Lift Flipper Arm"])
-        XCTAssertEqual(flipperAssembly?.position.y ?? 0, 0.22, accuracy: 0.0001)
+        let scale = ROBScanVisualModel.presentationScale
+        XCTAssertEqual(flipperAssembly?.position.y ?? 0, 0.11 * scale, accuracy: 0.0001)
         XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: 0, axis: [1, 0, 0]))
-        XCTAssertLessThan(robot.findEntity(named: "Left Base Lift Flipper Arm")?.position.z ?? 0, 0)
-        XCTAssertLessThan(robot.findEntity(named: "Right Base Lift Flipper Arm")?.position.z ?? 0, 0)
-        XCTAssertEqual(robot.findEntity(named: "Left Tri-Wheel Tread")?.position.x ?? 0, -0.39, accuracy: 0.0001)
-        XCTAssertEqual(robot.findEntity(named: "Right Tri-Wheel Tread")?.position.x ?? 0, 0.39, accuracy: 0.0001)
+        for side in ["Left", "Right"] {
+            let plate = try! XCTUnwrap(robot.findEntity(named: "\(side) Perforated UHMW Flipper") as? ModelEntity)
+            XCTAssertNotNil(plate.model)
+            let roller = try! XCTUnwrap(robot.findEntity(named: "\(side) Flipper End Roller"))
+            XCTAssertEqual(roller.position.z, -0.33655 * scale, accuracy: 0.0001)
+            let axle = try! XCTUnwrap(robot.findEntity(named: "\(side) Tri-Wheel 3"))
+            let pivot = flipperAssembly!.position(relativeTo: robot)
+            XCTAssertEqual(axle.position(relativeTo: robot).z, pivot.z, accuracy: 0.0001)
+            XCTAssertEqual(axle.position(relativeTo: robot).y, pivot.y, accuracy: 0.0001)
+        }
+        for name in ["Camera Head", "Left Camera Eye", "Right Camera Eye", "Neck Pan", "Left Gripper Finger -1", "Right Gripper Finger 1"] {
+            XCTAssertNotNil(robot.findEntity(named: name), "Missing ROB feature: \(name)")
+        }
+
 
         game.begin()
         XCTAssertTrue(game.moveBaseFlipperForward())
@@ -2190,6 +2201,25 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: -.pi * 2, axis: [1, 0, 0]))
         XCTAssertNotEqual(robot.findEntity(named: "Drive Base Assembly")?.orientation, simd_quatf(angle: 0, axis: [1, 0, 0]))
         XCTAssertEqual(robot.findEntity(named: "Torso Assembly")?.orientation, simd_quatf(angle: 0, axis: [0, 1, 0]))
+    }
+
+    func testFlipperRollersClearTheFloorThroughoutLiftCycle() {
+        let robot = RobotFactory.makeROB()
+        let drive = robot.findEntity(named: "Drive Base Assembly")!
+        let flipper = robot.findEntity(named: "Base Lift Flipper Assembly")!
+        for degree in stride(from: 0, through: -360, by: -5) {
+            let angle = Float(degree) * .pi / 180
+            let pitch = 0.23 * Float(-degree) / 360
+            flipper.orientation = simd_quatf(angle: angle, axis: [1, 0, 0])
+            drive.orientation = simd_quatf(angle: pitch, axis: [1, 0, 0])
+            drive.position.y = ROBScanVisualModel.flipperSupportHeight(angle: angle, pitch: pitch)
+            for side in ["Left", "Right"] {
+                let roller = robot.findEntity(named: "\(side) Flipper End Roller") as! ModelEntity
+                let radius = roller.model!.mesh.bounds.extents.x / 2
+                XCTAssertGreaterThanOrEqual(roller.position(relativeTo: robot).y - radius, -0.00001,
+                                           "Roller penetrated floor at \(degree) degrees")
+            }
+        }
     }
 
     func testBookBridgeDroidSectionsRoundTripAndStayOrdered() throws {

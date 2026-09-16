@@ -69,7 +69,7 @@ import UIKit
         componentMode: Bool = false,
         arPresentation: Bool = false
     ) -> ModelEntity {
-        let root = ModelEntity(); root.name = "ROB"
+        let root = ROBScanVisualModel.makeRobot(arPresentation: arPresentation)
         @discardableResult func part(_ name: String, _ size: SIMD3<Float>, _ position: SIMD3<Float>, _ color: UIColor, parent: Entity? = nil) -> ModelEntity { let entity = ModelEntity(mesh: .generateBox(size: size, cornerRadius: 0.015), materials: [SimpleMaterial(color: color, isMetallic: !arPresentation)]); entity.name = name; entity.position = position; (parent ?? root).addChild(entity); return entity }
         func cylinder(_ name: String, radius: Float, height: Float, position: SIMD3<Float>, color: UIColor, faceForward: Bool = false, sideways: Bool = false, parent: Entity? = nil) {
             let entity = ModelEntity(mesh: .generateCylinder(height: height, radius: radius), materials: [SimpleMaterial(color: color, isMetallic: !arPresentation)])
@@ -78,101 +78,15 @@ import UIKit
             if sideways { entity.orientation = simd_quatf(angle: .pi / 2, axis: [0, 0, 1]) }
             (parent ?? root).addChild(entity)
         }
-        // The LT-2-style base pitches around its rear axle while the torso remains
-        // level above it. Keeping the complete drive base under one pivot makes the
-        // ledge-climbing pose match ROB's physical linear-actuator geometry.
-        let driveBase = Entity(); driveBase.name = "Drive Base Assembly"; driveBase.position = [0, 0, 0.35]; root.addChild(driveBase)
-        part("Tri-Wheel Chassis", [0.6, 0.2, 0.68], [0, 0.48, -0.35], .black, parent: driveBase)
-        let baseFlipper = Entity(); baseFlipper.name = "Base Lift Flipper Assembly"; baseFlipper.position = [0, 0.22, 0]; baseFlipper.orientation = simd_quatf(angle: GameSession.baseFlipperRearAngle, axis: [1, 0, 0]); driveBase.addChild(baseFlipper)
-        for side: Float in [-1, 1] {
-            part(
-                side < 0 ? "Left Base Lift Flipper Arm" : "Right Base Lift Flipper Arm",
-                [0.075, 0.075, 1.04],
-                [side * 0.34, 0, -0.52],
-                .darkGray,
-                parent: baseFlipper
-            )
-        }
-        for side: Float in [-1, 1] {
-            let prefix = side < 0 ? "Left" : "Right"
-            let tread = Entity(); tread.name = "\(prefix) Tri-Wheel Tread"; tread.position = [side * 0.39, 0, -0.35]; driveBase.addChild(tread)
-
-            // ROB's physical base uses a continuous cleated belt wrapped around a
-            // triangular three-wheel bogie. Build the belt from tangent rails and
-            // individual shoes so its silhouette matches the real tracked base.
-            let beltPath: [SIMD2<Float>] = [
-                [-0.51, 0.06], [0.51, 0.06], [0.43, 0.28],
-                [0.18, 0.59], [-0.18, 0.59], [-0.43, 0.28],
-            ]
-            var shoeIndex = 0
-            for segmentIndex in beltPath.indices {
-                let start = beltPath[segmentIndex]
-                let end = beltPath[(segmentIndex + 1) % beltPath.count]
-                let delta = end - start
-                let length = simd_length(delta)
-                let angle = atan2(-delta.y, delta.x)
-                let center = (start + end) / 2
-                let rail = part(
-                    "\(prefix) Track Belt Segment \(segmentIndex + 1)",
-                    [0.27, 0.07, length + 0.025],
-                    [0, center.y, center.x],
-                    UIColor(white: 0.018, alpha: 1),
-                    parent: tread
-                )
-                rail.orientation = simd_quatf(angle: angle, axis: [1, 0, 0])
-
-                let segmentShoeCount = max(1, Int((length / 0.115).rounded(.up)))
-                for offset in 0..<segmentShoeCount {
-                    shoeIndex += 1
-                    let progress = (Float(offset) + 0.5) / Float(segmentShoeCount)
-                    let point = start + delta * progress
-                    let shoe = part(
-                        "\(prefix) Tread Shoe \(shoeIndex)",
-                        [0.31, 0.1, min(0.09, length / Float(segmentShoeCount) * 0.82)],
-                        [0, point.y, point.x],
-                        UIColor(white: 0.055, alpha: 1),
-                        parent: tread
-                    )
-                    shoe.orientation = simd_quatf(angle: angle, axis: [1, 0, 0])
-                }
-            }
-
-            let wheelLayout: [(z: Float, y: Float, radius: Float)] = [(-0.35, 0.22, 0.16), (0, 0.43, 0.15), (0.35, 0.22, 0.16)]
-            for (index, wheelSpec) in wheelLayout.enumerated() {
-                let wheel = Entity(); wheel.name = "\(prefix) Tri-Wheel \(index + 1)"; wheel.position = [0, wheelSpec.y, wheelSpec.z]; tread.addChild(wheel)
-                cylinder("\(prefix) Tri-Wheel Tire", radius: wheelSpec.radius, height: 0.285, position: .zero, color: UIColor(white: 0.025, alpha: 1), sideways: true, parent: wheel)
-                cylinder("\(prefix) Tri-Wheel Rim", radius: wheelSpec.radius * 0.67, height: 0.3, position: .zero, color: .darkGray, sideways: true, parent: wheel)
-                cylinder("\(prefix) Tri-Wheel Hub", radius: wheelSpec.radius * 0.25, height: 0.315, position: .zero, color: .systemOrange, sideways: true, parent: wheel)
-            }
-        }
-
-        let torso = Entity(); torso.name = "Torso Assembly"; root.addChild(torso)
-        part("Torso Linear Actuator", [0.16, 0.5, 0.16], [0, 0.47, 0.08], .gray, parent: torso)
-        part("Torso Linear Actuator Collar", [0.24, 0.1, 0.24], [0, 0.54, 0.08], .systemOrange, parent: torso)
-        part("Cerebro Torso", [0.58, 0.64, 0.54], [0, 0.72, 0], UIColor(red: 0.08, green: 0.12, blue: 0.16, alpha: 1), parent: torso)
-        for x: Float in [-0.19, 0.19] {
-            let prefix = x < 0 ? "Left" : "Right"
-            let color: UIColor = x < 0 ? .systemBlue : .systemCyan
-            cylinder("\(prefix) ROB Speaker Ring", radius: 0.12, height: 0.025, position: [x, 0.8, -0.285], color: color, faceForward: true, parent: torso)
-            cylinder("\(prefix) ROB Speaker Cone", radius: 0.078, height: 0.032, position: [x, 0.8, -0.305], color: UIColor(white: 0.025, alpha: 1), faceForward: true, parent: torso)
-        }
-        part("Depth Camera", [0.2, 0.1, 0.065], [0, 0.59, -0.3], .gray, parent: torso)
-        let flipper = Entity(); flipper.name = "Flipper Zero Hacker"; torso.addChild(flipper)
-        part("Flipper Zero Orange Case", [0.13, 0.2, 0.045], [0.3, 0.7, -0.315], .systemOrange, parent: flipper)
-        part("Flipper Zero Screen", [0.082, 0.07, 0.012], [0.3, 0.73, -0.344], UIColor(red: 0.12, green: 0.42, blue: 0.2, alpha: 1), parent: flipper)
-        for side: Float in [-1, 1] {
-            let armColor: UIColor = componentMode ? (side < 0 ? .systemGreen : .systemBlue) : .gray
-            let prefix = side < 0 ? "Left" : "Right"
-            let arm = Entity(); arm.name = "\(prefix) Arm Assembly"; arm.position = [side * 0.45, 0.93, 0]; torso.addChild(arm)
-            cylinder("\(prefix) Shoulder Joint", radius: 0.095, height: 0.15, position: [0, 0, 0], color: .darkGray, sideways: true, parent: arm)
-            part("\(prefix) Upper Arm", [0.12, 0.32, 0.13], [side * 0.05, -0.18, 0], armColor, parent: arm)
-            cylinder("\(prefix) Elbow Joint", radius: 0.075, height: 0.13, position: [side * 0.08, -0.36, -0.01], color: .darkGray, sideways: true, parent: arm)
-            part("\(prefix) Forearm", [0.1, 0.28, 0.11], [side * 0.1, -0.52, -0.02], armColor, parent: arm)
-            cylinder("\(prefix) Wrist Joint", radius: 0.06, height: 0.11, position: [side * 0.11, -0.68, -0.03], color: .darkGray, sideways: true, parent: arm)
-            for joint in 0..<4 {
-                cylinder("\(prefix) AMBER Joint \(joint + 4)", radius: 0.035, height: 0.08, position: [side * (0.12 + Float(joint) * 0.035), -0.71, -0.09 - Float(joint) * 0.07], color: joint.isMultiple(of: 2) ? .lightGray : .darkGray, sideways: true, parent: arm)
-            }
-            cylinder("\(prefix) Lightsaber", radius: 0.025, height: 0.9, position: [side * 0.24, -0.64, -0.55], color: side < 0 ? .systemGreen : .systemCyan, faceForward: true, parent: arm)
+        let torso = root.findEntity(named: "Torso Assembly")!
+        let hacker = Entity(); hacker.name = "Flipper Zero Hacker"; torso.addChild(hacker)
+        part("Flipper Zero Orange Case", [0.10, 0.15, 0.04], [0.25, 0.98, -0.14], .systemOrange, parent: hacker)
+        part("Flipper Zero Screen", [0.065, 0.045, 0.01], [0.25, 1.0, -0.166], .systemGreen, parent: hacker)
+        for (name, side) in [("Left", Float(-1)), ("Right", Float(1))] {
+            let arm = root.findEntity(named: "\(name) Arm Assembly")!
+            cylinder("\(name) Lightsaber", radius: 0.025, height: 0.9,
+                     position: [side * 0.114, -0.77, -0.5], color: side < 0 ? .systemGreen : .systemCyan,
+                     faceForward: true, parent: arm)
         }
 
         if let rightArm = root.findEntity(named: "Right Arm Assembly") {
@@ -217,25 +131,6 @@ import UIKit
             twinBeam.name = "\(prefix) Blaster Laser Beam"; twinBeam.isEnabled = false; twinShot.addChild(twinBeam)
         }
 
-        part("Sensor Mast", [0.1, 0.48, 0.1], [0, 1.2, 0], .gray, parent: torso)
-        let head = ModelEntity(mesh: .generateSphere(radius: 0.22), materials: [SimpleMaterial(color: .black, isMetallic: !arPresentation)]); head.name = "Camera Head"; head.position = [0, 1.52, 0]; head.scale.z = 0.82; torso.addChild(head)
-        let smileMaterial = UnlitMaterial(color: faceColor(for: .lime))
-        let smileParts: [(String, Float, Float, Float)] = [
-            ("Face Smiley Left Eye", -0.075, 1.565, 0.026),
-            ("Face Smiley Right Eye", 0.075, 1.565, 0.026),
-            ("Face Smiley Left Corner", -0.09, 1.475, 0.022),
-            ("Face Smiley Left Smile", -0.045, 1.45, 0.022),
-            ("Face Smiley Center Smile", 0, 1.44, 0.022),
-            ("Face Smiley Right Smile", 0.045, 1.45, 0.022),
-            ("Face Smiley Right Corner", 0.09, 1.475, 0.022),
-        ]
-        for (name, x, y, radius) in smileParts {
-            let pixel = ModelEntity(mesh: .generateCylinder(height: 0.018, radius: radius), materials: [smileMaterial])
-            pixel.name = name
-            pixel.position = [x, y, -0.202]
-            pixel.orientation = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
-            torso.addChild(pixel)
-        }
         root.components.set(InputTargetComponent())
         root.generateCollisionShapes(recursive: true)
         root.collision = CollisionComponent(shapes: [
@@ -452,7 +347,10 @@ import UIKit
         robot.findEntity(named: "Right ROB Speaker Cone")?.scale = [1 + (speakerPulse - 1) * 0.78, 1, 1 + (speakerPulse - 1) * 0.78]
         let progress = Float(1 - session.saberAnimation), arc = sin(progress * .pi)
         let torso = robot.findEntity(named: "Torso Assembly")
-        torso?.position.y = session.baseLiftHeight
+        let supportHeight = ROBScanVisualModel.flipperSupportHeight(angle: session.baseFlipperAngle, pitch: session.baseLiftPitch)
+        robot.findEntity(named: "Drive Base Assembly")?.position.y = supportHeight
+        torso?.position.y = session.baseLiftHeight + supportHeight
+        for marker in robot.children where marker.name.hasPrefix("Applied Appearance ") { marker.position.y = session.baseLiftHeight + supportHeight }
         var torsoYaw: Float = 0
         if let style = session.saberStyle, session.saberAnimation > 0 {
             switch style {
