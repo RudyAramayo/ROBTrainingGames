@@ -327,11 +327,11 @@ private struct VisionControlDeck: View {
                             Button("Flipper Down", systemImage: "arrow.clockwise.circle.fill") {
                                 session.moveBaseFlipperForward()
                             }
-                            .disabled(!session.isRunning || session.baseFlipperTarget == .forward || session.isClimbingLedge)
+                            .disabled(!session.isRunning || session.baseFlipperTarget == .forward || session.isClimbingLedge || !session.isBaseGrounded)
                             Button("Flipper Up", systemImage: "arrow.counterclockwise.circle.fill") {
                                 session.moveBaseFlipperBackward()
                             }
-                            .disabled(!session.isRunning || session.baseFlipperTarget == .rear)
+                            .disabled(!session.isRunning || session.baseFlipperTarget == .rear || !session.isBaseGrounded)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(session.isLedgeStabilized ? .green : .orange)

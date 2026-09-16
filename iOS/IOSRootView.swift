@@ -488,7 +488,7 @@ struct MobileTankControls: View {
                         tint: .orange,
                         size: actionSize,
                         accessibilityLabel: "Lower flippers to lift the front",
-                        disabled: !session.isRunning || session.baseFlipperTarget == .forward || session.isClimbingLedge,
+                        disabled: !session.isRunning || session.baseFlipperTarget == .forward || session.isClimbingLedge || !session.isBaseGrounded,
                         action: { _ = session.moveBaseFlipperForward() }
                     )
                     HUDActionButton(
@@ -496,7 +496,7 @@ struct MobileTankControls: View {
                         tint: .yellow,
                         size: actionSize,
                         accessibilityLabel: "Raise flippers and support the rear",
-                        disabled: !session.isRunning || session.baseFlipperTarget == .rear,
+                        disabled: !session.isRunning || session.baseFlipperTarget == .rear || !session.isBaseGrounded,
                         action: { _ = session.moveBaseFlipperBackward() }
                     )
                 }

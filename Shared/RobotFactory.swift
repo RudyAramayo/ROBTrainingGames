@@ -345,9 +345,7 @@ import UIKit
         let progress = Float(1 - session.saberAnimation), arc = sin(progress * .pi)
         let torso = robot.findEntity(named: "Torso Assembly")
         let supportHeight = session.baseLiftHeight - session.robotPosition.y
-        let rearPivotZ: Float = 0.212725 * ROBScanVisualModel.presentationScale
         robot.findEntity(named: "Drive Base Assembly")?.position.y = supportHeight
-        torso?.position = [0, supportHeight + rearPivotZ * sin(session.baseLiftPitch), rearPivotZ * (1 - cos(session.baseLiftPitch))]
         var torsoYaw: Float = 0
         if let style = session.saberStyle, session.saberAnimation > 0 {
             switch style {
@@ -357,7 +355,11 @@ import UIKit
             case .hammerSmash: torsoYaw = 0
             }
         }
-        torso?.orientation = simd_quatf(angle: session.baseLiftPitch, axis: [1, 0, 0]) * simd_quatf(angle: torsoYaw, axis: [0, 1, 0])
+        let bodyPose = ROBBodyKinematics.torsoPose(basePitch: session.baseLiftPitch, leanAngle: session.torsoLeanAngle,
+                                                  rearHeight: session.baseLiftHeight, rootHeight: session.robotPosition.y,
+                                                  scale: ROBScanVisualModel.presentationScale, yaw: torsoYaw)
+        torso?.position = bodyPose.position
+        torso?.orientation = bodyPose.orientation
         for marker in robot.children where marker.name.hasPrefix("Applied Appearance ") {
             marker.position = torso?.position ?? .zero
             marker.orientation = torso?.orientation ?? simd_quatf(angle: 0, axis: [0, 1, 0])

@@ -2123,7 +2123,7 @@ final class GameSessionTests: XCTestCase {
         let drive = robot.findEntity(named: "Drive Base Assembly")!
         XCTAssertEqual(drive.position.y, 0, accuracy: 0.0001)
         XCTAssertGreaterThan(drive.convert(position: [0, 0, -GameSession.robotContactSpan], to: robot).y, ledge.height)
-        XCTAssertEqual(robot.findEntity(named: "Torso Assembly")!.orientation, drive.orientation, "The body pitches with the treads")
+        XCTAssertGreaterThan(robot.findEntity(named: "Torso Assembly")!.orientation.act([0, 1, 0]).y, 0.99, "The LACT keeps the torso upright while the treads pitch")
 
         game.setDrive(forward: 1, steering: 0)
         var sawAutomaticRearSupport = false
@@ -2145,6 +2145,61 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(game.isLedgeStabilized)
         XCTAssertEqual(game.baseLiftPitch, 0, accuracy: 0.0001)
         XCTAssertEqual(game.presentationPosition.y, ledge.height, accuracy: 0.0001)
+
+        for _ in 0..<3 {
+            XCTAssertTrue(game.moveBaseFlipperForward(), "The completed climb must release its control latch")
+            game.tick(GameSession.baseFlipperDuration + 0.05)
+            XCTAssertGreaterThan(game.baseLiftPitch, 0.7, "The raised platform supports another front lift")
+            XCTAssertEqual(game.baseLiftHeight, ledge.height, accuracy: 0.0001)
+            XCTAssertTrue(game.moveBaseFlipperBackward())
+            game.tick(GameSession.baseFlipperDuration + 0.05)
+            XCTAssertEqual(game.baseLiftPitch, 0, accuracy: 0.0001)
+        }
+    }
+
+    func testLeavingPlatformFallsAndReleasesFlippersAfterLanding() {
+        let game = GameSession(audioEnabled: false)
+        game.begin(); game.enemies = []
+        let ledge = game.puzzle.ledges[0]
+        game.robotPosition = [0, ledge.height, ledge.approachEdgeZ - 0.1]
+        game.robotHeading = .pi
+        game.setDrive(forward: 1, steering: 0)
+        var sawEdge = false, sawFall = false, sawBackwardLean = false
+        for _ in 0..<120 {
+            game.tick(0.02)
+            sawEdge = sawEdge || game.isAtLedgeEdge
+            if game.isFalling {
+                sawFall = true
+                XCTAssertGreaterThan(game.robotPosition.y, 0)
+                XCTAssertLessThan(game.robotPosition.y, ledge.height)
+                XCTAssertFalse(game.isClimbingLedge)
+                game.stopDrive() // Falling must continue without a drive command.
+            }
+            sawBackwardLean = sawBackwardLean || (game.baseLiftPitch < -0.1 && game.torsoLeanAngle > 0.1)
+        }
+        XCTAssertTrue(sawEdge); XCTAssertTrue(sawFall); XCTAssertTrue(sawBackwardLean)
+        XCTAssertTrue(game.isBaseGrounded)
+        XCTAssertEqual(game.robotPosition.y, 0, accuracy: 0.0001)
+        XCTAssertEqual(game.baseLiftPitch, 0, accuracy: 0.0001)
+        XCTAssertTrue(game.moveBaseFlipperForward(), "Landing makes the next flip available")
+        game.tick(GameSession.baseFlipperDuration + 0.05)
+        XCTAssertGreaterThan(game.baseLiftPitch, 0.7)
+    }
+
+    func testLACTReferenceLengthAndTorsoHingeRemainConsistent() {
+        let rest = ROBBodyKinematics.torsoPose(basePitch: 0, leanAngle: 0)
+        XCTAssertEqual(rest.lactLength, 0.20955, accuracy: 0.000001)
+        let inMotion = ROBBodyKinematics.advanceLean(0, basePitch: 0.8, delta: 0.05)
+        XCTAssertEqual(ROBBodyKinematics.lactLength(leanAngle: inMotion), 0.20955 - 0.015, accuracy: 0.000001)
+        for pitch: Float in [0.8, -0.35] {
+            let lean = ROBBodyKinematics.advanceLean(0, basePitch: pitch, delta: 1)
+            let pose = ROBBodyKinematics.torsoPose(basePitch: pitch, leanAngle: lean)
+            let original = ROBBodyKinematics.torsoPose(basePitch: pitch, leanAngle: 0)
+            XCTAssertEqual(pose.orientation.act([0, 1, 0]).y, 1, accuracy: 0.000001)
+            XCTAssertLessThan(simd_distance(pose.position + pose.orientation.act(ROBBodyKinematics.leanHinge),
+                                           original.position + original.orientation.act(ROBBodyKinematics.leanHinge)), 0.000001)
+            XCTAssertGreaterThan(abs(pose.lactLength - rest.lactLength), 0.001)
+        }
     }
 
     func testEveryCampaignMapIncludesRaisedFlipperDeck() {
@@ -2224,7 +2279,7 @@ final class GameSessionTests: XCTestCase {
         RobotFactory.applyWeapons(to: robot, session: game)
         XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: GameSession.baseFlipperForwardAngle, axis: [1, 0, 0]))
         XCTAssertNotEqual(robot.findEntity(named: "Drive Base Assembly")?.orientation, simd_quatf(angle: 0, axis: [1, 0, 0]))
-        XCTAssertEqual(robot.findEntity(named: "Torso Assembly")?.orientation, simd_quatf(angle: game.baseLiftPitch, axis: [1, 0, 0]))
+        XCTAssertGreaterThan(robot.findEntity(named: "Torso Assembly")!.orientation.act([0, 1, 0]).y, 0.99)
     }
 
     func testFlipperRollersClearTheFloorThroughoutLiftCycle() {
