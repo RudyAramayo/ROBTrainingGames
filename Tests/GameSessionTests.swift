@@ -1180,7 +1180,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(game.upgradePoints - pointsBeforeHit, 50)
     }
 
-    func testShoulderLaserLocksAndChargedShotDealsMoreDamage() {
+    func testManualShoulderLaserChargedShotSpendsEnergyAndDealsMoreDamage() {
         let game = GameSession(audioEnabled: false)
         game.begin()
         guard let targetIndex = game.enemies.indices.first else { return XCTFail("Missing training target") }
@@ -1189,7 +1189,7 @@ final class GameSessionTests: XCTestCase {
         let shields = game.enemies[targetIndex].shields
 
         game.beginLaserCharge()
-        game.tick(1.0)
+        game.tick(1.5)
         let energyBeforeShot = game.energy
         game.releaseLaserCharge()
 
@@ -1209,6 +1209,87 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNil(game.laserDistance)
     }
 
+    func testEveryLaserRequiresTheComputerUpgradeForAutoLock() {
+        let suite = "ROBTargeting.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(15, forKey: "robHighestCompletedLevel")
+        for weapon in ROBRangedWeapon.allCases {
+            defaults.set(1_200, forKey: "robUpgradePoints")
+            defaults.set(0, forKey: "robTargetingComputerUpgradeLevel")
+            let game = GameSession(audioEnabled: false, progressStore: defaults)
+            game.selectRangedWeapon(weapon); game.begin()
+            for index in game.enemies.indices { game.enemies[index].position = game.robotPosition + [2 + Float(index), 0, -2] }
+            game.tick(0.01)
+            XCTAssertNil(game.lockedEnemy); XCTAssertNil(game.secondaryLockedEnemy)
+            let basicCycle = game.laserCycleDuration, basicCharge = game.laserChargeDuration
+            let robot = RobotFactory.makeROB()
+            RobotFactory.applyWeapons(to: robot, session: game)
+            XCTAssertFalse(robot.findEntity(named: "Gatling Lock Indicator")!.isEnabled)
+            let energy = game.energy
+            game.fireLaser()
+            XCTAssertTrue(game.laserProjectiles.allSatisfy { $0.targetID == nil && $0.heading == game.robotHeading })
+            XCTAssertEqual(game.energy, energy - weapon.energyCost(charge: 0), accuracy: 0.0001)
+            game.purchaseUpgrade(.targetingComputer)
+            game.tick(0.01)
+            XCTAssertNotNil(game.lockedEnemy)
+            XCTAssertEqual(game.secondaryLockedEnemy != nil, weapon == .twinBlasters)
+            XCTAssertLessThan(game.laserCycleDuration, basicCycle)
+            XCTAssertLessThan(game.laserChargeDuration, basicCharge)
+            RobotFactory.applyWeapons(to: robot, session: game)
+            XCTAssertTrue(robot.findEntity(named: "Gatling Lock Indicator")!.isEnabled)
+        }
+    }
+
+    func testManualMissSpendsEnergyAndRechargeWaitsUntilFiringStops() {
+        let game = GameSession(audioEnabled: false)
+        game.begin(); game.enemies = []
+        game.robotPosition = [0, 0, 2.8] // A wall stops the forward shot quickly.
+        game.fireLaser()
+        XCTAssertEqual(game.energy, 96, accuracy: 0.0001)
+        game.tick(0.5)
+        XCTAssertTrue(game.laserProjectiles.isEmpty)
+        XCTAssertEqual(game.energy, 96, accuracy: 0.0001)
+        game.fireLaser()
+        XCTAssertTrue(game.laserProjectiles.isEmpty, "The basic computer still needs its 0.8 second cycle")
+        game.tick(0.31)
+        game.fireLaser()
+        XCTAssertFalse(game.laserProjectiles.isEmpty)
+        XCTAssertEqual(game.energy, 92, accuracy: 0.0001)
+        game.tick(0.5)
+        game.beginLaserCharge() // Still cooling down.
+        XCTAssertFalse(game.isChargingLaser)
+        game.tick(0.31)
+        game.beginLaserCharge()
+        XCTAssertTrue(game.isChargingLaser)
+        game.tick(2)
+        XCTAssertEqual(game.energy, 92, accuracy: 0.0001, "Holding charge cannot refill the battery")
+        game.releaseLaserCharge()
+        XCTAssertEqual(game.energy, 80, accuracy: 0.0001)
+        game.tick(1)
+        XCTAssertEqual(game.energy, 80, accuracy: 0.0001)
+        game.tick(1)
+        XCTAssertGreaterThan(game.energy, 80)
+    }
+
+    func testInsufficientEnergyBlocksChargedAndUnchargedManualShots() {
+        let game = GameSession(audioEnabled: false)
+        game.begin(); game.enemies = []
+        game.setDrive(forward: 0, steering: 1)
+        game.tick(30)
+        game.stopDrive()
+        XCTAssertEqual(game.energy, 0, accuracy: 0.0001)
+        game.fireLaser(); game.beginLaserCharge()
+        XCTAssertTrue(game.laserProjectiles.isEmpty)
+        XCTAssertFalse(game.isChargingLaser)
+        game.tick(1) // Six units cover a basic shot, but not a charged shot.
+        game.beginLaserCharge(); game.tick(2)
+        let energy = game.energy
+        game.releaseLaserCharge()
+        XCTAssertTrue(game.laserProjectiles.isEmpty)
+        XCTAssertEqual(game.energy, energy)
+    }
+
     func testEveryRangedWeaponUsesMoreEnergyForChargedShots() {
         XCTAssertEqual(ROBRangedWeapon.shoulderGatling.energyCost(charge: 0), 4, accuracy: 0.001)
         XCTAssertEqual(ROBRangedWeapon.shoulderGatling.energyCost(charge: 1), 12, accuracy: 0.001)
@@ -1218,7 +1299,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(ROBRangedWeapon.arcCannon.energyCost(charge: 1), 22, accuracy: 0.001)
     }
 
-    func testTwinBlastersAlwaysLaunchTwoProjectilesAtThePrimaryLockBeforeTargetingUpgrade() {
+    func testTwinBlastersFireForwardWithoutAnyLockBeforeTargetingUpgrade() {
         let game = GameSession(audioEnabled: false)
         for _ in 0..<5 { completeCurrentLevel(game) }
         game.selectRangedWeapon(.twinBlasters)
@@ -1232,9 +1313,10 @@ final class GameSessionTests: XCTestCase {
 
         XCTAssertEqual(game.laserProjectiles.count, 2)
         XCTAssertEqual(Set(game.laserProjectiles.map(\.barrel)), [.left, .right])
-        XCTAssertEqual(Set(game.laserProjectiles.map(\.targetID)).count, 1)
+        XCTAssertTrue(game.laserProjectiles.allSatisfy { $0.targetID == nil && $0.heading == game.robotHeading })
         XCTAssertNil(game.secondaryLockedEnemy)
-        XCTAssertTrue(game.laserLockDescription.localizedCaseInsensitiveContains("upgrade targeting computer"))
+        XCTAssertNil(game.lockedEnemy)
+        XCTAssertTrue(game.laserLockDescription.localizedCaseInsensitiveContains("manual aim"))
     }
 
     func testTargetingComputerLetsTwinBlastersDamageTwoIndependentTargets() {
@@ -1351,7 +1433,7 @@ final class GameSessionTests: XCTestCase {
 
         game.begin()
         RobotFactory.applyWeapons(to: robot, session: game)
-        XCTAssertTrue(robot.findEntity(named: "Gatling Lock Indicator")?.isEnabled == true)
+        XCTAssertFalse(robot.findEntity(named: "Gatling Lock Indicator")?.isEnabled == true, "The basic computer must not display an automatic target lock")
     }
 
     func testROBGestureRootHasInputAndCollisionComponents() {
@@ -1734,6 +1816,33 @@ final class GameSessionTests: XCTestCase {
             let towardCenter = simd_normalize(SIMD2<Float>(-robot.x, -robot.z))
             XCTAssertGreaterThan(simd_dot(forward, towardCenter), 0.999)
         }
+    }
+
+    func testBattleLasersUseEnergyAndCannotFireFromAnEmptyBattery() {
+        let localID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let remoteID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let battle = ROBBattleCoordinator(networkingEnabled: false, playerID: localID, playerName: "Alpha", audioEnabled: false)
+        let remote = ROBBattlePlayerIdentity(id: remoteID, name: "Beta", transportName: "ROB-BETA", colorIndex: 1)
+        battle.testReceive(.init(kind: .hello, sender: remote))
+        battle.vote(for: .neonFoundry)
+        battle.testReceive(.init(kind: .vote, sender: remote, vote: .neonFoundry))
+        battle.startMatch()
+        for _ in 0..<25 {
+            battle.fireLaser()
+            for _ in 0..<3 { battle.tick(0.1) }
+        }
+        XCTAssertEqual(battle.localEnergy, 0, accuracy: 0.0001)
+        let projectiles = battle.projectiles.count
+        battle.fireLaser()
+        XCTAssertEqual(battle.projectiles.count, projectiles)
+        XCTAssertTrue(battle.statusMessage.contains("energy"))
+        for _ in 0..<8 { battle.tick(0.1) }
+        XCTAssertEqual(battle.localEnergy, 0, accuracy: 0.0001)
+        for _ in 0..<15 { battle.tick(0.1) }
+        XCTAssertGreaterThan(battle.localEnergy, 4)
+        let recharged = battle.localEnergy
+        battle.fireLaser()
+        XCTAssertEqual(battle.localEnergy, recharged - 4, accuracy: 0.0001)
     }
 
     func testBattleSabersStayVisibleAndReturnBothArmsToRest() {

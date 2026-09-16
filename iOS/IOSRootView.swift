@@ -397,6 +397,9 @@ struct MissionCornerHUD: View {
             miniMeter(icon: "heart.fill", value: Double(session.health), maximum: Double(session.maxHealth), color: healthColor, label: "ROB health")
             miniMeter(icon: "shield.fill", value: Double(session.shields), maximum: Double(session.maxShields), color: .cyan, label: "ROB shields")
             miniMeter(icon: "bolt.batteryblock.fill", value: session.energy, maximum: session.maxEnergy, color: session.energyFraction < 0.2 ? .orange : .mint, label: "System energy")
+            Text("\(session.hasAutoTargeting ? "AUTO TARGETING" : "BASIC MANUAL AIM") · \(Int(ceil(session.currentLaserEnergyCost))) E / SHOT")
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
             if session.level.requiresKey {
                 HStack(spacing: 4) {
                     Image(systemName: session.hasKey ? "key.fill" : "key")

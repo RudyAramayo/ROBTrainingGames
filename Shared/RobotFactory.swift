@@ -362,11 +362,11 @@ import UIKit
                 * simd_quatf(angle: side > 0 ? attack.hammerPitch : 0, axis: [1, 0, 0])
         }
         let scanningHeading = Float(sin(session.elapsed * 0.85)) * 0.9
-        let relativeHeading = session.laserLockHeading.map { $0 - session.robotHeading - torsoYaw } ?? scanningHeading
+        let relativeHeading = session.laserLockHeading.map { $0 - session.robotHeading - torsoYaw } ?? (session.hasAutoTargeting ? scanningHeading : -torsoYaw)
         for name in ["Right Shoulder Gatling", "Arc Cannon"] {
             robot.findEntity(named: name)?.orientation = simd_quatf(angle: relativeHeading, axis: [0, 1, 0])
         }
-        robot.findEntity(named: "Gatling Tilt Servo")?.orientation = simd_quatf(angle: session.lockedEnemy == nil ? Float(sin(session.elapsed * 0.7)) * 0.13 : -0.06, axis: [1, 0, 0])
+        robot.findEntity(named: "Gatling Tilt Servo")?.orientation = simd_quatf(angle: session.lockedEnemy != nil ? -0.06 : session.hasAutoTargeting ? Float(sin(session.elapsed * 0.7)) * 0.13 : 0, axis: [1, 0, 0])
         robot.findEntity(named: "Twin Blasters")?.orientation = simd_quatf(angle: 0, axis: [0, 1, 0])
         robot.findEntity(named: "Left Blaster Mount")?.orientation = simd_quatf(angle: relativeHeading, axis: [0, 1, 0])
         let secondaryRelativeHeading = session.secondaryLaserLockHeading.map { $0 - session.robotHeading - torsoYaw } ?? relativeHeading

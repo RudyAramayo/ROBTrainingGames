@@ -368,6 +368,7 @@ private struct ROBBattleVitals: View {
                 .monospacedDigit()
             vitalRow(value: battle.localHealthFraction, tint: .red, label: "H \(battle.localRobot.health)")
             vitalRow(value: battle.localShieldFraction, tint: .cyan, label: "S \(battle.localRobot.shields)")
+            vitalRow(value: battle.localEnergyFraction, tint: .mint, label: "E \(Int(battle.localEnergy))")
         }
         .padding(.horizontal, 7)
         .padding(.vertical, 5)

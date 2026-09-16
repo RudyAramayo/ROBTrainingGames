@@ -94,7 +94,7 @@ struct ROBLaserProjectile: Identifiable, Sendable {
     let barrel: ROBLaserBarrel
     let weapon: ROBRangedWeapon
     let charge: Double
-    let targetID: Int
+    let targetID: Int?
     let origin: SIMD2<Float>
     let heading: Float
     var distance: Float
@@ -176,7 +176,7 @@ enum ROBRangedWeapon: String, CaseIterable, Identifiable, Sendable {
     var summary: String {
         switch self {
         case .shoulderGatling: "Balanced tracking weapon with a chargeable shoulder shot."
-        case .twinBlasters: "Two fast projectiles converge on one lock, or split across two targets with the targeting computer upgrade."
+        case .twinBlasters: "Two forward-firing beams; the targeting computer upgrade adds independent automatic locks."
         case .arcCannon: "Heavy charged energy that arcs into a nearby second target."
         }
     }
@@ -316,7 +316,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
         case .speedBoost: "Raises tread speed by 60% per upgrade."
         case .energyCapacity: "Adds 60 energy and dramatically improves cells and passive charging."
         case .weaponPower: "Adds one shield point of damage to every hit."
-        case .targetingComputer: "Unlocks independent target locks for the two Twin Blaster barrels."
+        case .targetingComputer: "Replaces slow manual aim with fast automatic lock-on for every laser, including two independent Twin Blaster locks."
         }
     }
     var maximumLevel: Int { self == .targetingComputer ? 1 : 3 }
@@ -332,7 +332,8 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.16.4"
+    static let gameplayRulesetVersion = "2026.09.16.5"
+    static let laserRechargeDelay = 1.5
     static let robotCollisionRadius: Float = 0.54
     static let baseDriveSpeed: Float = 1.2
     static let securityCameraHalfAngle: Float = .pi / 5
@@ -421,6 +422,7 @@ final class GameSession {
     private(set) var laserCharge = 0.0
     private(set) var isChargingLaser = false
     private(set) var laserShotCharge = 0.0
+    private var lastLaserShotTime = -Double.infinity
     private(set) var lockedEnemyID: Int?
     private(set) var secondaryLockedEnemyID: Int?
     var selectedComponent: ROBComponent?
@@ -468,7 +470,12 @@ final class GameSession {
     var energyPickupAmount: Double { 70 + Double(energyUpgradeLevel * 20) }
     var passiveEnergyRecharge: Double { 6 + Double(energyUpgradeLevel * 3) }
     var weaponDamageBonus: Int { weaponUpgradeLevel }
-    var hasIndependentTwinTargeting: Bool { targetingComputerUpgradeLevel > 0 }
+    var hasAutoTargeting: Bool { targetingComputerUpgradeLevel > 0 }
+    var hasIndependentTwinTargeting: Bool { hasAutoTargeting }
+    var laserCycleDuration: TimeInterval { hasAutoTargeting ? 0.25 : 0.8 }
+    var laserChargeDuration: TimeInterval { hasAutoTargeting ? 1.25 : 1.8 }
+    var laserCooldownRemaining: TimeInterval { max(0, laserCycleDuration - (elapsed - lastLaserShotTime)) }
+    var currentLaserEnergyCost: Double { rangedWeapon.energyCost(charge: laserCharge) }
     var isSecurityAlerted: Bool { securityAlertRemaining > 0 }
     var isBaseFlipperActive: Bool { abs(baseFlipperAngle - baseFlipperTargetAngle) > 0.005 }
     var baseFlipperPhase: Float {
@@ -575,14 +582,13 @@ final class GameSession {
         return doorHackDescription
     }
     var laserLockDescription: String {
-        guard let primary = lockedEnemy else { return "SCANNING" }
+        guard hasAutoTargeting else { return "BASIC COMPUTER · MANUAL AIM · UPGRADE FOR AUTO LOCK" }
+        guard let primary = lockedEnemy else { return "AUTO TARGETING · SCANNING" }
         guard rangedWeapon == .twinBlasters else { return "LOCK: \(primary.displayName.uppercased())" }
         if let secondary = secondaryLockedEnemy {
             return "DUAL LOCK: \(primary.displayName.uppercased()) + \(secondary.displayName.uppercased())"
         }
-        return hasIndependentTwinTargeting
-            ? "LOCK: \(primary.displayName.uppercased()) · SEEKING SECOND TARGET"
-            : "LOCK: \(primary.displayName.uppercased()) · UPGRADE TARGETING COMPUTER FOR DUAL LOCK"
+        return "LOCK: \(primary.displayName.uppercased()) · SEEKING SECOND TARGET"
     }
     var laserLockHeading: Float? {
         guard let target = lockedEnemy else { return nil }
@@ -948,7 +954,7 @@ final class GameSession {
         collectedCellIndices = []; collectedShieldPickupIndices = []; collectedRepairPickupIndices = []
         shieldTimeRemaining = 0
         saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
-        laserProjectiles = []; laserCharge = 0; laserShotCharge = 0; isChargingLaser = false; lockedEnemyID = nil; secondaryLockedEnemyID = nil
+        laserProjectiles = []; laserCharge = 0; laserShotCharge = 0; isChargingLaser = false; lockedEnemyID = nil; secondaryLockedEnemyID = nil; lastLaserShotTime = -.infinity
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
         energy = maxEnergy; wasEnergyDepleted = false
         let layout = puzzle
@@ -1131,7 +1137,7 @@ final class GameSession {
         let driveLoad = (abs(leftTread) + abs(rightTread)) * 0.5
         if hasDriveEnergy && driveLoad > 0.01 {
             energy = max(0, energy - delta * (4.4 + driveLoad * 2.2))
-        } else if !isHackingDoor && !isHackingCamera && !isBaseFlipperActive {
+        } else if !isHackingDoor && !isHackingCamera && !isBaseFlipperActive && !isChargingLaser && elapsed - lastLaserShotTime >= Self.laserRechargeDelay {
             energy = min(maxEnergy, energy + delta * passiveEnergyRecharge)
         }
         if energy <= 0.05, !wasEnergyDepleted {
@@ -1149,7 +1155,7 @@ final class GameSession {
             saberAnimation = max(0, saberAnimation - delta / ROBMeleeAnimation.duration(saberStyle))
             if saberAnimation == 0 { saberStyle = nil }
         }
-        if isChargingLaser { laserCharge = min(1, laserCharge + delta / 1.25) }
+        if isChargingLaser { laserCharge = min(1, laserCharge + delta / laserChargeDuration) }
         updateLaserProjectiles(delta)
         updateEnemies(delta)
         updateLaserLock()
@@ -1793,6 +1799,7 @@ final class GameSession {
         return requirements.joined(separator: " and ")
     }
     private func updateLaserLock() {
+        guard hasAutoTargeting else { lockedEnemyID = nil; secondaryLockedEnemyID = nil; return }
         let maxRange = puzzle.arenaHalfExtent * 1.75
         let candidates = enemies.indices.compactMap { index -> (id: Int, distance: Float)? in
             guard enemies[index].isActive else { return nil }
@@ -1826,14 +1833,18 @@ final class GameSession {
         fireLaser(charge: 0)
     }
     func beginLaserCharge() {
-        guard isRunning, laserProjectiles.isEmpty, !isChargingLaser else { return }
+        guard isRunning, laserProjectiles.isEmpty, !isChargingLaser, laserCooldownRemaining == 0 else { return }
         let minimumEnergy = rangedWeapon.energyCost(charge: 0)
         guard energy >= minimumEnergy else {
             message = "Not enough system energy for the \(rangedWeapon.displayName). Hold position or collect an energy cell."
             report(message)
             return
         }
-        laserCharge = 0; isChargingLaser = true; message = lockedEnemy == nil ? "\(rangedWeapon.displayName) scanning — no target lock yet." : "\(rangedWeapon.displayName) charging on locked target…"
+        updateLaserLock()
+        laserCharge = 0; isChargingLaser = true
+        message = lockedEnemy != nil ? "\(rangedWeapon.displayName) charging on locked target…"
+            : hasAutoTargeting ? "No target lock. This shot will fire forward."
+            : "Basic computer: steer ROB to aim forward. Upgrade for faster automatic targeting."
     }
     func releaseLaserCharge() {
         guard isChargingLaser else { return }
@@ -1841,11 +1852,9 @@ final class GameSession {
         fireLaser(charge: charge)
     }
     private func fireLaser(charge: Double) {
-        guard isRunning, laserProjectiles.isEmpty else { return }
+        guard isRunning, laserProjectiles.isEmpty, !isChargingLaser, laserCooldownRemaining == 0 else { return }
         updateLaserLock()
-        guard let targetID = lockedEnemyID, let primaryTarget = enemies.first(where: { $0.id == targetID && $0.isActive }) else {
-            message = "\(rangedWeapon.displayName) is still scanning. Turn or move closer until the lock indicator turns red."; report(message); return
-        }
+        let primaryTarget = lockedEnemy
         let clampedCharge = min(1, max(0, charge))
         let energyCost = rangedWeapon.energyCost(charge: clampedCharge)
         guard energy >= energyCost else {
@@ -1854,17 +1863,18 @@ final class GameSession {
             return
         }
         energy -= energyCost
+        lastLaserShotTime = elapsed
         let robotOrigin = SIMD2<Float>(robotPosition.x, robotPosition.z)
         let forward = SIMD2<Float>(-sin(robotHeading), -cos(robotHeading))
         let right = SIMD2<Float>(cos(robotHeading), -sin(robotHeading))
-        func projectile(barrel: ROBLaserBarrel, lateralOffset: Float, target: TrainingEnemy) -> ROBLaserProjectile {
+        func projectile(barrel: ROBLaserBarrel, lateralOffset: Float, target: TrainingEnemy?) -> ROBLaserProjectile {
             let origin = robotOrigin + forward * 0.28 + right * lateralOffset
-            let heading = atan2(-(target.position.x - origin.x), -(target.position.z - origin.y))
+            let heading = target.map { atan2(-($0.position.x - origin.x), -($0.position.z - origin.y)) } ?? robotHeading
             return ROBLaserProjectile(
                 barrel: barrel,
                 weapon: rangedWeapon,
                 charge: clampedCharge,
-                targetID: target.id,
+                targetID: target?.id,
                 origin: origin,
                 heading: heading,
                 distance: 0.55
@@ -1880,12 +1890,12 @@ final class GameSession {
             laserProjectiles = [projectile(barrel: .center, lateralOffset: 0, target: primaryTarget)]
         }
         laserShotCharge = clampedCharge
-        if rangedWeapon == .twinBlasters, let secondary = secondaryLockedEnemy {
+        if rangedWeapon == .twinBlasters, let primaryTarget, let secondary = secondaryLockedEnemy {
             message = "Twin Blasters fired two independent beams at \(primaryTarget.displayName) and \(secondary.displayName) for \(Int(ceil(energyCost))) energy."
-        } else if rangedWeapon == .twinBlasters {
-            message = "Twin Blasters fired both beams at \(primaryTarget.displayName) for \(Int(ceil(energyCost))) energy."
+        } else if let primaryTarget {
+            message = "\(rangedWeapon.displayName) fired at \(primaryTarget.displayName) for \(Int(ceil(energyCost))) energy."
         } else {
-            message = "\(rangedWeapon.displayName) fired for \(Int(ceil(energyCost))) energy."
+            message = "\(rangedWeapon.displayName) manual shot fired forward for \(Int(ceil(energyCost))) energy."
         }
         report(message)
         if audioEnabled { SoundPlayer.shared.playLaser(charge: clampedCharge) }

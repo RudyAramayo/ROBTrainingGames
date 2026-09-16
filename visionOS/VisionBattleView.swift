@@ -122,6 +122,7 @@ struct VisionBattleWorkshop: View {
             Label(timeText, systemImage: "timer").monospacedDigit()
             Label("\(battle.localRobot.health) H", systemImage: "heart.fill").foregroundStyle(.red)
             Label("\(battle.localRobot.shields) S", systemImage: "shield.fill").foregroundStyle(.cyan)
+            Label("\(Int(battle.localEnergy)) E", systemImage: "bolt.fill").foregroundStyle(.mint)
             Label(
                 battle.mode == .captureTheFlag ? "\(battle.localScore) captures" : "\(battle.localScore) KOs",
                 systemImage: battle.mode.symbol

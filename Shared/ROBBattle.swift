@@ -473,6 +473,7 @@ final class ROBBattleCoordinator {
     private(set) var matchID = UUID()
     private(set) var remainingTime = ROBBattleCoordinator.matchDuration
     private(set) var localRobot: ROBBattleRobotState
+    private(set) var localEnergy = 100.0
     private(set) var remoteRobots: [UUID: ROBBattleRobotState] = [:]
     private(set) var projectiles: [ROBBattleProjectile] = []
     private(set) var robotAnimations: [UUID: ROBBattleRobotAnimationState] = [:]
@@ -517,6 +518,7 @@ final class ROBBattleCoordinator {
     var localDeaths: Int { deaths[localIdentity.id, default: 0] }
     var localHealthFraction: Double { Double(localRobot.health) / 100 }
     var localShieldFraction: Double { Double(localRobot.shields) / 50 }
+    var localEnergyFraction: Double { localEnergy / 100 }
     var winnerName: String? { winnerID.flatMap { players[$0]?.name } }
     var networkPlayerDescription: String { "\(playerCount)/\(Self.maximumPlayers) players" }
     var localCarriedFlag: ROBBattleFlagState? { flags.values.first { $0.carrierID == localIdentity.id } }
@@ -659,6 +661,9 @@ final class ROBBattleCoordinator {
 
         if localRobot.isAlive {
             updateMovement(step)
+            if Self.matchDuration - remainingTime - lastLaserTime >= GameSession.laserRechargeDelay {
+                localEnergy = min(100, localEnergy + step * 6)
+            }
         } else {
             localRobot.respawnRemaining = max(0, localRobot.respawnRemaining - step)
             if localRobot.respawnRemaining <= 0 { respawnLocalRobot() }
@@ -683,6 +688,12 @@ final class ROBBattleCoordinator {
     func fireLaser() {
         let matchElapsed = Self.matchDuration - remainingTime
         guard phase == .playing, localRobot.isAlive, matchElapsed - lastLaserTime >= 0.28 else { return }
+        let energyCost = ROBRangedWeapon.shoulderGatling.energyCost(charge: 0)
+        guard localEnergy >= energyCost else {
+            statusMessage = "Laser needs \(Int(energyCost)) energy. Stop firing briefly to recharge."
+            return
+        }
+        localEnergy -= energyCost
         lastLaserTime = matchElapsed
         let speed: Float = 10.5
         let projectile = ROBBattleProjectile(
@@ -1207,6 +1218,8 @@ final class ROBBattleCoordinator {
     }
 
     private func respawnLocalRobot() {
+        localEnergy = 100
+        lastLaserTime = -.infinity
         let ids = players.keys.sorted { $0.uuidString < $1.uuidString }
         let spawnIndex = ids.firstIndex(of: localIdentity.id) ?? 0
         let spawn = arena.spawnPoints[spawnIndex % arena.spawnPoints.count]
@@ -1266,6 +1279,7 @@ final class ROBBattleCoordinator {
         flagRevision = 0
         lastFlagRequestTime = -.infinity
         lastSnapshotSent = -.infinity
+        localEnergy = 100
         lastLaserTime = -.infinity
         lastMeleeTime = -.infinity
         let spawnIndex = start.assignments.first(where: { $0.playerID == localIdentity.id })?.spawnIndex ?? 0
