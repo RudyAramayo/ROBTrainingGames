@@ -1274,6 +1274,10 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNotNil(robot.findEntity(named: "Left Arm Assembly"))
         XCTAssertNotNil(robot.findEntity(named: "Right Arm Assembly"))
         XCTAssertNotNil(robot.findEntity(named: "Right Shoulder Gatling"))
+        XCTAssertNotNil((robot.findEntity(named: "Captured Shoulder Laser") as? ModelEntity)?.model)
+        XCTAssertNil(robot.findEntity(named: "Gatling Housing"), "Use the shoulder housing already captured in the scan")
+        XCTAssertNil(robot.findEntity(named: "Gatling Barrel"))
+        XCTAssertEqual(robot.findEntity(named: "Gatling Lock Indicator")?.parent?.name, "Shoulder Laser Muzzle")
         XCTAssertNotNil(robot.findEntity(named: "Flipper Zero Hacker"))
         XCTAssertNotNil(robot.findEntity(named: "Gatling Lock Indicator"))
         XCTAssertNotNil(robot.findEntity(named: "Shoulder Laser Beam"))
@@ -2101,44 +2105,43 @@ final class GameSessionTests: XCTestCase {
 
     func testRearFlipperMountsLedgeThenRotatesBackToStabilize() {
         let game = GameSession(audioEnabled: false)
-        game.begin()
-        game.enemies = []
+        game.begin(); game.enemies = []
         let ledge = try! XCTUnwrap(game.puzzle.ledges.first)
         game.robotPosition = [0, 0, ledge.approachEdgeZ + 0.18]
-
-        game.setDrive(forward: 1, steering: 0)
-        game.tick(0.45)
-        XCTAssertFalse(game.isOnLedge)
-        XCTAssertEqual(game.robotPosition.y, 0, accuracy: 0.0001)
-
-        game.stopDrive()
-        game.robotPosition = [0, 0, ledge.approachEdgeZ + 0.18]
+        game.setDrive(forward: 1, steering: 0); game.tick(0.45)
+        XCTAssertFalse(game.isOnLedge, "Cannot drive through a step without front clearance")
+        game.stopDrive(); game.robotPosition = [0, 0, ledge.approachEdgeZ + 0.18]
         let energyBeforeLift = game.energy
-
         XCTAssertTrue(game.moveBaseFlipperForward())
-        XCTAssertTrue(game.isBaseFlipperActive)
         XCTAssertEqual(game.energy, energyBeforeLift - GameSession.baseFlipperEnergyCost, accuracy: 0.0001)
-        game.tick(GameSession.baseFlipperDuration / 2)
-        XCTAssertTrue(game.isBaseFlipperActive)
-        XCTAssertEqual(game.baseFlipperPhase, 0.5, accuracy: 0.0001)
-        XCTAssertEqual(game.baseFlipperAngle, -.pi, accuracy: 0.0001)
-        game.tick(GameSession.baseFlipperDuration / 2 + 0.05)
-        XCTAssertFalse(game.isBaseFlipperActive)
-        XCTAssertEqual(game.baseFlipperPhase, 1, accuracy: 0.0001)
-        XCTAssertEqual(game.baseFlipperAngle, -.pi * 2, accuracy: 0.0001)
-        XCTAssertEqual(game.baseLiftPitch, 0.23, accuracy: 0.0001)
-        XCTAssertEqual(game.baseLiftHeight, 0.13, accuracy: 0.0001)
+        game.tick(GameSession.baseFlipperDuration + 0.01)
+        XCTAssertEqual(game.baseFlipperAngle, GameSession.baseFlipperForwardAngle, accuracy: 0.0001)
+        XCTAssertEqual(game.baseLiftHeight, 0, "Rear contact must stay grounded during front lift")
+        XCTAssertGreaterThan(game.baseLiftPitch, 0.7)
+        let robot = RobotFactory.makeROB()
+        RobotFactory.applyWeapons(to: robot, session: game)
+        let drive = robot.findEntity(named: "Drive Base Assembly")!
+        XCTAssertEqual(drive.position.y, 0, accuracy: 0.0001)
+        XCTAssertGreaterThan(drive.convert(position: [0, 0, -GameSession.robotContactSpan], to: robot).y, ledge.height)
+        XCTAssertEqual(robot.findEntity(named: "Torso Assembly")!.orientation, drive.orientation, "The body pitches with the treads")
 
         game.setDrive(forward: 1, steering: 0)
-        game.tick(0.45)
+        var sawAutomaticRearSupport = false
+        var rearHeight: Float = 0
+        for _ in 0..<160 {
+            game.tick(0.02)
+            if game.isClimbingLedge {
+                sawAutomaticRearSupport = true
+                XCTAssertEqual(game.baseFlipperTarget, .rear)
+                XCTAssertGreaterThanOrEqual(game.baseLiftHeight, rearHeight - 0.0001)
+                XCTAssertGreaterThanOrEqual(game.baseLiftHeight + GameSession.robotContactSpan * sin(game.baseLiftPitch), ledge.height - 0.0001)
+                rearHeight = game.baseLiftHeight
+            }
+        }
+        game.stopDrive()
+        XCTAssertTrue(sawAutomaticRearSupport, "Forward drive should reverse the flippers at front contact")
         XCTAssertTrue(game.isOnLedge)
-        XCTAssertEqual(game.robotPosition.y, ledge.height, accuracy: 0.0001)
-        XCTAssertFalse(game.isLedgeStabilized)
-
-        XCTAssertTrue(game.moveBaseFlipperBackward())
-        game.tick(GameSession.baseFlipperDuration + 0.05)
-        XCTAssertFalse(game.isBaseFlipperActive)
-        XCTAssertEqual(game.baseFlipperPhase, 0, accuracy: 0.0001)
+        XCTAssertFalse(game.isClimbingLedge)
         XCTAssertTrue(game.isLedgeStabilized)
         XCTAssertEqual(game.baseLiftPitch, 0, accuracy: 0.0001)
         XCTAssertEqual(game.presentationPosition.y, ledge.height, accuracy: 0.0001)
@@ -2152,6 +2155,27 @@ final class GameSessionTests: XCTestCase {
             XCTAssertGreaterThan(ledge.height, 0)
             XCTAssertTrue(ledge.contains(game.puzzle.dock), "Level \(index + 1) dock should require the raised deck")
         }
+    }
+
+    func testCapturedSurfacesKeepTextureAndIndependentHeadMotion() throws {
+        let robot = RobotFactory.makeROB()
+        for name in ["Camera Head", "Cerebro Torso", "Tri-Wheel Chassis", "Left Tri-Wheel Tread", "Right Upper Arm"] {
+            let part = try XCTUnwrap(robot.findEntity(named: name) as? ModelEntity)
+            let model = try XCTUnwrap(part.model)
+            let material = try XCTUnwrap(model.materials.first as? UnlitMaterial)
+            XCTAssertNotNil(material.color.texture, name)
+            XCTAssertGreaterThan(model.mesh.bounds.extents.y, 0)
+            XCTAssertNil(part.components[CollisionComponent.self], "Detailed scans should not create costly convex hulls")
+        }
+        XCTAssertEqual(robot.components[CollisionComponent.self]?.shapes.count, 1)
+        let head = try XCTUnwrap(robot.findEntity(named: "Camera Head"))
+        let neck = try XCTUnwrap(robot.findEntity(named: "Neck Pan"))
+        let base = try XCTUnwrap(robot.findEntity(named: "Tri-Wheel Chassis"))
+        let before = head.convert(position: [0.06, 0, 0], to: robot)
+        let baseBefore = base.transformMatrix(relativeTo: robot)
+        neck.orientation = simd_quatf(angle: 0.6, axis: [0, 1, 0])
+        XCTAssertGreaterThan(simd_distance(head.convert(position: [0.06, 0, 0], to: robot), before), 0.001)
+        XCTAssertEqual(base.transformMatrix(relativeTo: robot), baseBefore)
     }
 
     func testScanModelHasRearAxleFlippersWithIndependentRollers() {
@@ -2195,12 +2219,12 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(game.moveBaseFlipperForward())
         game.tick(GameSession.baseFlipperDuration / 2)
         RobotFactory.applyWeapons(to: robot, session: game)
-        XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: -.pi, axis: [1, 0, 0]))
+        XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: GameSession.baseFlipperForwardAngle / 2, axis: [1, 0, 0]))
         game.tick(GameSession.baseFlipperDuration / 2 + 0.05)
         RobotFactory.applyWeapons(to: robot, session: game)
-        XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: -.pi * 2, axis: [1, 0, 0]))
+        XCTAssertEqual(flipperAssembly?.orientation, simd_quatf(angle: GameSession.baseFlipperForwardAngle, axis: [1, 0, 0]))
         XCTAssertNotEqual(robot.findEntity(named: "Drive Base Assembly")?.orientation, simd_quatf(angle: 0, axis: [1, 0, 0]))
-        XCTAssertEqual(robot.findEntity(named: "Torso Assembly")?.orientation, simd_quatf(angle: 0, axis: [0, 1, 0]))
+        XCTAssertEqual(robot.findEntity(named: "Torso Assembly")?.orientation, simd_quatf(angle: game.baseLiftPitch, axis: [1, 0, 0]))
     }
 
     func testFlipperRollersClearTheFloorThroughoutLiftCycle() {

@@ -4,9 +4,9 @@ A shared educational game for iPhone, iPad, and Apple Vision Pro that matches th
 
 ## Experiences
 
-- **Shared campaign:** fifteen matching missions in expanded arenas with raised ledge decks that require ROB's two-pole, 360-degree rear-shaft LT-2-style flipper, three lives shared across the full trial, coordinated arrow driving, animated directional conveyor chevrons, Flipper Zero door and security-camera hacks, security-camera stealth zones, larger energy-cell routes, a manually triggered bubble shield that fades after a short defensive window, shield and repair pickups, battle-funded upgrade bays between levels, shared drive-and-laser energy management, reinforced campaign bosses, enemy-contact damage, level restart, scoring, and increasingly difficult route-planning challenges. Losing the third life clears the trial score, upgrade points, and installed upgrades before returning to Level 1.
+- **Shared campaign:** fifteen matching missions in expanded arenas with raised ledge decks that require ROB's two-pole, rear-shaft LT-2-style flipper, three lives shared across the full trial, coordinated arrow driving, animated directional conveyor chevrons, Flipper Zero door and security-camera hacks, security-camera stealth zones, larger energy-cell routes, a manually triggered bubble shield that fades after a short defensive window, shield and repair pickups, battle-funded upgrade bays between levels, shared drive-and-laser energy management, reinforced campaign bosses, enemy-contact damage, level restart, scoring, and increasingly difficult route-planning challenges. Losing the third life clears the trial score, upgrade points, and installed upgrades before returning to Level 1.
 - **Active combat:** both AMBER arm assemblies alternate wide dual-saber sweeps and trigger a torso spin on the third consecutive attack. Ranged loadouts fire collision-tested projectiles; Twin Blasters launch two visible beams and gain independent two-target locks after the Targeting Computer upgrade, while spider bots and Dalek-style sentry robots coordinate increasingly dense counterattacks.
-- **Matching keyboard controls:** use arrow keys or `WASD` to drive, `F` to spin the full 360-degree flipper lift cycle, `B` to reverse the cycle for stable travel, `Space` for the saber combo, `Q` to charge the virtual pan-tilt training laser, and `E` to trigger the short bubble-shield window on iPad/iPhone with a hardware keyboard and Vision Pro with a connected keyboard.
+- **Matching keyboard controls:** use arrow keys or `WASD` to drive, `F` to lower the flippers and raise the front, `B` to raise them for stable travel, `Space` for the saber combo, `Q` to charge the virtual pan-tilt training laser, and `E` to trigger the short bubble-shield window on iPad/iPhone with a hardware keyboard and Vision Pro with a connected keyboard.
 - **Circuit School and Droid Workshop:** open the 90-build Circuit Quest from the Learn tab (80 core passport builds plus ten Book Bridge missions), then watch tutorial ranges accumulate into tread, torso, camera/network, compute, arm, commissioned, base-flipper, voice/audio, and show-ready robot sections. Learners add the base lift motor and recovery state, follow samples into ROB's speakers and procedural techno, and explore far-field conference-microphone signal, echo, privacy, and authority before choosing a finish, housing material, and housing style. A checked Droid Code moves the profile between the website, iPhone, iPad, and Apple Vision Pro without an account.
 - **Vision Pro tabletop controls:** place the complete scaled arena in a movable volumetric window while the compact mission deck stays in front of the board, pinch and drag independent left/right tread pads with either hand, use both sticks plus action buttons on a gamepad, or drive each tread with its matching member of a paired spatial-controller set.
 - **Readable spatial materials:** the campaign and AutoNet arenas use bright physically based wall/floor textures with a balanced four-light rig, preserving depth and obstacle readability in both tabletop and room-scale play.
@@ -34,20 +34,31 @@ Run the shared campaign tests on an iOS Simulator with `xcodebuild test -scheme 
 
 ## Cross-platform gameplay sync
 
-`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. `Shared/ROBDroidProfile.swift` is the native half of the portable customization format; its field keys, allowlists, Base64URL encoding, and FNV-1a checksum must remain byte-compatible with the website's `assets/js/rob-droid-profile.mjs`. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.16`.
+`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. `Shared/ROBDroidProfile.swift` is the native half of the portable customization format; its field keys, allowlists, Base64URL encoding, and FNV-1a checksum must remain byte-compatible with the website's `assets/js/rob-droid-profile.mjs`. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.16.2`.
 
 Before App Store submission, add production icons/screenshots, signing, privacy review, age rating, support URLs, and device testing. Keep lessons synchronized with `Presentation/ROB-Books/ROBOT_GAME_CURRICULUM.md` as the books evolve.
 
-## Scan-informed ROB appearance
+## Captured ROB appearance
 
-The shared `ROBScanVisualModel` now loads the same articulated visual mesh used
-by the browser and Cerebro. September 15 scans inform the twin speaker chest,
-long open neck, camera optics, seven-joint arms, triangular treads and perforated
-rear axle flippers with independent end rollers. The engine-neutral
-`Shared/Resources/rob-visual.json` is exported from ORobotics's
-`assets/js/rob-visual-model.mjs`; regenerate it with that repository's
-`scripts/export-rob-visual.mjs` and keep both Apple adapters identical.
+`ROBScanVisualModel` loads the same captured surfaces as the website and Cerebro:
+113,900 triangles from the upright PLY reconstruction, partitioned across the
+chassis, treads, torso, arms, neck and head. Procedural rear axle flippers, end
+rollers and face LEDs preserve their interactive controls. Individual captured
+speaker cones and road wheels remain in their reference pose.
+
+Regenerate with ORobotics's `scripts/prepare-captured-rob.py`; see that repository's
+`docs/rob-visual-model.md`. Copy `rob-visual.json`, `rob-captured.bin` and
+`rob-captured-colors.png` together into `Shared/Resources/` and Cerebro, and keep
+both Apple adapters identical. Meshes and textures are cached, and the game
+keeps a simple chassis collision box to avoid detailed convex-hull generation.
+Graphite shows original capture colors; other finishes tint the captured texture.
 
 These meshes are visual approximations, not calibrated physical kinematics.
-Existing game inputs and cosmetics still apply; a display support offset keeps
-rollers above the floor during the full-turn flipper animation.
+Existing game inputs and cosmetics still apply. The climb pose pivots about the
+rear contact during front lift, then holds the front at the step while the rear
+rises. Forward motion triggers the rear-support transition and final stow.
+This contact-based presentation is a game approximation, not a rigid-body solver.
+
+The captured base is aligned with the flipper rig. The virtual training laser
+uses the captured shoulder housing and a named muzzle attachment, with no
+additional housing. These attachment points are visual game effects only.

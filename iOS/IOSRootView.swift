@@ -484,18 +484,18 @@ struct MobileTankControls: View {
             HStack(alignment: .bottom, spacing: 4) {
                 VStack(spacing: 5) {
                     HUDActionButton(
-                        systemImage: "arrowshape.forward.circle.fill",
+                        systemImage: "arrow.down.circle.fill",
                         tint: .orange,
                         size: actionSize,
-                        accessibilityLabel: "Spin base flipper forward 360 degrees",
-                        disabled: !session.isRunning || session.baseFlipperTarget == .forward,
+                        accessibilityLabel: "Lower flippers to lift the front",
+                        disabled: !session.isRunning || session.baseFlipperTarget == .forward || session.isClimbingLedge,
                         action: { _ = session.moveBaseFlipperForward() }
                     )
                     HUDActionButton(
-                        systemImage: "arrowshape.backward.circle.fill",
+                        systemImage: "arrow.up.circle.fill",
                         tint: .yellow,
                         size: actionSize,
-                        accessibilityLabel: "Reverse base flipper 360 degrees",
+                        accessibilityLabel: "Raise flippers and support the rear",
                         disabled: !session.isRunning || session.baseFlipperTarget == .rear,
                         action: { _ = session.moveBaseFlipperBackward() }
                     )

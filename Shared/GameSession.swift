@@ -332,7 +332,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.16"
+    static let gameplayRulesetVersion = "2026.09.16.2"
     static let robotCollisionRadius: Float = 0.54
     static let baseDriveSpeed: Float = 1.2
     static let securityCameraHalfAngle: Float = .pi / 5
@@ -340,8 +340,10 @@ final class GameSession {
     static let flipperHackDuration = 2.2
     static let flipperHackReward = 300
     static let baseFlipperEnergyCost = 4.0
-    static let baseFlipperForwardAngle: Float = -.pi * 2
+    static let baseFlipperForwardAngle: Float = -.pi * 0.30
     static let baseFlipperRearAngle: Float = 0
+    static let baseFlipperRearAssistAngle: Float = .pi * 1.15
+    static let robotContactSpan: Float = 0.42545 * 1.35
     static let baseFlipperMotorSpeed: Float = 4.8
     static let baseFlipperDuration = TimeInterval(abs(baseFlipperRearAngle - baseFlipperForwardAngle) / baseFlipperMotorSpeed)
     static let doorwayWidth: Float = 2.1
@@ -353,7 +355,7 @@ final class GameSession {
     let shieldPickupStrength = 24
     let repairPickupStrength = 35
     let levels = [
-        ROBLevel(id: 1, name: "Calibration Ledge", lesson: "Spin the rear-mounted poles through one full turn to lift ROB, drive onto the ledge, then reverse the flipper cycle to stabilize and level the torso.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 900, requiresKey: false, challenge: "Use the flipper to mount the raised deck, evade three active enemies, collect five cells, and reach the dock."),
+        ROBLevel(id: 1, name: "Calibration Ledge", lesson: "Lower the flippers to raise the front, then drive onto the ledge. The flippers reverse automatically as the rear climbs and ROB levels out.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 900, requiresKey: false, challenge: "Use the flipper to mount the raised deck, evade three active enemies, collect five cells, and reach the dock."),
         ROBLevel(id: 2, name: "Key Workshop", lesson: "A key changes the state of a matching locked door.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 1_100, requiresKey: true, challenge: "Find the cyan key while a three-robot patrol guards the workshop door."),
         ROBLevel(id: 3, name: "Crossroads", lesson: "Plan a route before entering a narrow passage.", cellCount: 6, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 1_300, requiresKey: true, challenge: "Choose the safe branch, secure the key, then break through the center patrol."),
         ROBLevel(id: 4, name: "Sensor Hall", lesson: "Wide clearance is often faster than scraping along obstacles.", cellCount: 6, enemyKinds: [.spider, .fax, .spider, .fax], enemyShields: 2, timeBonus: 1_500, requiresKey: false, challenge: "Use the expanded hall to separate four sentries guarding the cells."),
@@ -371,7 +373,7 @@ final class GameSession {
     ]
     let components = [
         ROBComponent(id: "base", name: "Tri-Wheel Tracked Base", summary: "Three-wheel triangular tread pods expose the road wheels while a drive mixer preserves independent left and right tread speeds.", color: 0x263746),
-        ROBComponent(id: "baseFlipper", name: "LT-2-Style Rear Flipper", summary: "Two independent poles point forward from the rear drive shaft along ROB’s base. A complete 360-degree rotation pushes the front upward for a ledge climb; reversing the cycle stabilizes ROB while the linear actuator levels the torso.", color: 0xFF8B2F),
+        ROBComponent(id: "baseFlipper", name: "LT-2-Style Rear Flipper", summary: "Two independent poles point forward from the rear drive shaft along ROB’s base. Lowering the flippers raises the front around the grounded rear contact. Forward motion onto a step triggers rear support, bringing the chassis level as the rear tracks climb.", color: 0xFF8B2F),
         ROBComponent(id: "power", name: "Power System", summary: "Batteries, protection, disconnects, and motor electronics form ROB’s energy path.", color: 0xF1B93A),
         ROBComponent(id: "cerebro", name: "Cerebro", summary: "The Mac-based control layer coordinates operator intent, cameras, networking, and diagnostics.", color: 0x36DFFF),
         ROBComponent(id: "sensors", name: "Sensors", summary: "Cameras, lidar, inertial sensing, and infrared observations help ROB describe its environment.", color: 0x55DD88),
@@ -429,6 +431,7 @@ final class GameSession {
     var musicEnabled = true
     private(set) var baseFlipperAngle = GameSession.baseFlipperRearAngle
     private(set) var baseFlipperTarget: ROBBaseFlipperPosition = .rear
+    private(set) var baseClimbLedgeID: Int?
     var lastSituation = "ROB systems ready."
     var situationCount = 0
     private(set) var highestCompletedLevel = 0
@@ -472,18 +475,58 @@ final class GameSession {
     var isBaseFlipperForward: Bool { baseFlipperPhase >= 0.9 }
     var isBaseFlipperRearward: Bool { baseFlipperPhase <= 0.1 }
     var isOnLedge: Bool { puzzle.surfaceHeight(at: [robotPosition.x, robotPosition.z]) > 0 }
-    var isLedgeStabilized: Bool { isOnLedge && isBaseFlipperRearward && !isBaseFlipperActive }
-    var baseLiftHeight: Float { isLedgeStabilized ? 0 : 0.13 * baseFlipperPhase }
-    var baseLiftPitch: Float { isLedgeStabilized ? 0 : 0.23 * baseFlipperPhase }
+    var isClimbingLedge: Bool { baseClimbLedgeID != nil }
+    private var climbLedge: PuzzleLedge? { puzzle.ledges.first { $0.id == baseClimbLedgeID } }
+    var baseClimbProgress: Float {
+        guard let ledge = climbLedge else { return 0 }
+        let span = Self.robotContactSpan * max(0.1, cos(robotHeading))
+        let projected = span * cos(Self.flipperGroundPitch(Self.baseFlipperForwardAngle))
+        return (ledge.approachEdgeZ - robotPosition.z + projected - span / 2) / projected
+    }
+    static func flipperGroundPitch(_ angle: Float) -> Float {
+        let a: Float = 0.11 + 0.33655 * sin(angle), b: Float = 0.33655 * cos(angle)
+        guard a < 0.029, b > 0, angle < 0 else { return 0 }
+        return max(0, min(0.85, asin(0.029 / hypot(a, b)) - atan2(a, b)))
+    }
+    var isLedgeStabilized: Bool { isOnLedge && !isClimbingLedge && abs(baseFlipperAngle) < 0.005 && !isBaseFlipperActive }
+    /// Height of the rear support above the lower floor, not a whole-body lift.
+    var baseLiftHeight: Float {
+        guard let ledge = climbLedge else { return robotPosition.y }
+        return max(0, ledge.height - Self.robotContactSpan * sin(baseLiftPitch))
+    }
+    var baseLiftPitch: Float {
+        if let ledge = climbLedge {
+            let supportedPitch = asin(min(1, ledge.height / Self.robotContactSpan))
+            let t = min(1, max(0, (baseClimbProgress - 0.75) / 0.25))
+            let terrainPitch = supportedPitch * (1 - t * t * (3 - 2 * t))
+            if baseFlipperAngle <= 0 { return max(terrainPitch, Self.flipperGroundPitch(baseFlipperAngle)) }
+            var contactPitch = supportedPitch
+            func clearance(_ pitch: Float) -> Float {
+                ledge.height - Self.robotContactSpan * sin(pitch)
+                    + 1.35 * (0.11 * cos(pitch) + 0.33655 * sin(baseFlipperAngle + pitch) - 0.029)
+            }
+            if baseFlipperAngle > .pi / 2 && clearance(contactPitch) < 0 {
+                var low: Float = 0, high = contactPitch
+                for _ in 0..<24 {
+                    let mid = (low + high) / 2
+                    if clearance(mid) >= 0 { low = mid } else { high = mid }
+                }
+                contactPitch = low
+            }
+            return min(terrainPitch, contactPitch)
+        }
+        return isOnLedge ? 0 : Self.flipperGroundPitch(baseFlipperAngle)
+    }
     var baseFlipperDescription: String {
-        if isBaseFlipperActive { return baseFlipperTarget == .forward ? "Spinning 360° forward" : "Spinning 360° reverse" }
+        if isClimbingLedge { return "Rear support · leveling" }
+        if isBaseFlipperActive { return baseFlipperTarget == .forward ? "Lowering · front lift" : "Raising · rest" }
         if isLedgeStabilized { return "Rest · stable" }
-        return isBaseFlipperForward ? "Lift cycle · climb" : "Rest · travel"
+        return isBaseFlipperForward ? "Front raised · drive to climb" : "Rest · travel"
     }
     var presentationPosition: SIMD3<Float> { robotPosition }
     var presentationOrientation: simd_quatf { simd_quatf(angle: robotHeading, axis: [0, 1, 0]) }
     private var baseFlipperTargetAngle: Float {
-        baseFlipperTarget == .forward ? Self.baseFlipperForwardAngle : Self.baseFlipperRearAngle
+        baseFlipperTarget == .forward ? Self.baseFlipperForwardAngle : isClimbingLedge ? Self.baseFlipperRearAssistAngle : Self.baseFlipperRearAngle
     }
     var isInShadow: Bool {
         let point = SIMD3<Float>(robotPosition.x, 0, robotPosition.z)
@@ -893,7 +936,7 @@ final class GameSession {
         isUpgradeIntermission = false
         elapsed = 0; collectedCells = 0
         hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingCameraID = nil; hackingProgress = 0; securityAlertRemaining = 0; disabledSecurityCameraIDs = []
-        baseFlipperAngle = Self.baseFlipperRearAngle; baseFlipperTarget = .rear
+        baseFlipperAngle = Self.baseFlipperRearAngle; baseFlipperTarget = .rear; baseClimbLedgeID = nil
         collectedCellIndices = []; collectedShieldPickupIndices = []; collectedRepairPickupIndices = []
         shieldTimeRemaining = 0
         saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
@@ -978,6 +1021,7 @@ final class GameSession {
     @discardableResult
     private func commandBaseFlipper(_ target: ROBBaseFlipperPosition) -> Bool {
         guard isRunning, target != baseFlipperTarget else { return false }
+        guard !isClimbingLedge || target == .rear else { return false }
         guard !isHackingDoor, !isHackingCamera else {
             message = "Finish the security task before using the base lift."
             return false
@@ -989,8 +1033,8 @@ final class GameSession {
         energy -= Self.baseFlipperEnergyCost
         baseFlipperTarget = target
         message = target == .forward
-            ? "Rear-shaft poles spinning through 360°. Finish the lift cycle, then drive into the orange ledge lip."
-            : "Flipper reversing through 360° to stabilize the deck and level the torso."
+            ? "Flippers lowering: the front rises while the rear stays grounded. Drive forward to mount the ledge."
+            : "Flippers raising. On the ledge, the rear follows the front up and ROB levels out."
         report(message)
         return true
     }
@@ -1009,7 +1053,8 @@ final class GameSession {
         shieldTimeRemaining = max(0, shieldTimeRemaining - delta)
         updateBaseFlipper(delta)
         let hasDriveEnergy = energy > 0.05
-        let ledgeDriveScale = isOnLedge && !isLedgeStabilized ? 0.42 : 1.0
+        let rearAssistDuration = Double((Self.baseFlipperRearAssistAngle - Self.baseFlipperForwardAngle) / Self.baseFlipperMotorSpeed)
+        let ledgeDriveScale = isClimbingLedge ? min(1, Double(Self.robotContactSpan * cos(Self.flipperGroundPitch(Self.baseFlipperForwardAngle))) / (rearAssistDuration * Double(Self.baseDriveSpeed) * driveSpeedMultiplier) * 0.75) : 1.0
         let targetLeft = hasDriveEnergy ? max(-1, min(1, forwardDemand - steeringDemand * 0.72)) * ledgeDriveScale : 0
         let targetRight = hasDriveEnergy ? max(-1, min(1, forwardDemand + steeringDemand * 0.72)) * ledgeDriveScale : 0
         let smoothing = min(1, delta * 8)
@@ -1024,6 +1069,7 @@ final class GameSession {
             robotPosition.y,
             robotPosition.z - cos(robotHeading) * linear
         )
+        beginLedgeClimbIfNeeded(proposedPosition, movingForward: linear > 0)
         var resolvedPosition = resolveRobotMovement(from: oldPosition, to: proposedPosition)
         let movementWasLimited = simd_distance(resolvedPosition, proposedPosition) > 0.000_1
         if movementWasLimited {
@@ -1047,7 +1093,7 @@ final class GameSession {
             }
             let slidAlongWall = simd_distance(oldPosition, resolvedPosition) > 0.000_1
             message = blockedByLedge
-                ? "Ledge too high for the treads. Complete the forward 360° flipper cycle, then keep driving into the orange lip."
+                ? "Lower the flippers to lift the front, then drive into the orange ledge lip."
                 : blockedByDoor
                 ? (hasKey ? "Use the orange hack panel beside the door." : "Route blocked. Find the access key before hacking the doorway.")
                 : blockedByRobot
@@ -1060,8 +1106,13 @@ final class GameSession {
         let newSurfaceHeight = puzzle.surfaceHeight(at: [resolvedPosition.x, resolvedPosition.z])
         resolvedPosition.y = newSurfaceHeight
         robotPosition = resolvedPosition
+        if isClimbingLedge && baseClimbProgress >= 1 {
+            baseClimbLedgeID = nil; baseFlipperTarget = .rear
+        } else if isClimbingLedge && baseClimbProgress < -0.03 {
+            baseClimbLedgeID = nil; baseFlipperTarget = .forward
+        }
         if newSurfaceHeight > oldSurfaceHeight {
-            message = "ROB mounted the ledge. Reverse the 360° flipper cycle to stabilize the rear and level the torso before full-speed travel."
+            message = "Front tracks on the ledge. Flippers are reversing automatically; keep moving forward to lift the rear and level ROB."
             report(message)
         } else if newSurfaceHeight < oldSurfaceHeight {
             message = "ROB descended from the raised deck."
@@ -1108,6 +1159,17 @@ final class GameSession {
         } else {
             baseFlipperAngle += copysign(maximumStep, difference)
         }
+    }
+
+    private func beginLedgeClimbIfNeeded(_ proposed: SIMD3<Float>, movingForward: Bool) {
+        guard !isClimbingLedge, !isOnLedge, movingForward, isBaseFlipperForward, cos(robotHeading) > 0.7 else { return }
+        let reach = Self.robotContactSpan * (cos(baseLiftPitch) - 0.5)
+        let front = SIMD2<Float>(proposed.x - sin(robotHeading) * reach, proposed.z - cos(robotHeading) * reach)
+        guard let ledge = puzzle.ledge(at: front), robotPosition.z >= ledge.approachEdgeZ,
+              ledge.height <= Self.robotContactSpan * sin(baseLiftPitch) else { return }
+        baseClimbLedgeID = ledge.id
+        baseFlipperTarget = .rear
+        message = "Front engaging the step. Flippers raising automatically to support the rear."
     }
 
     private func applyConveyor(_ delta: TimeInterval) {
@@ -1363,7 +1425,7 @@ final class GameSession {
     private func isBlockedLedgeEntry(from start: SIMD2<Float>, to end: SIMD2<Float>) -> Bool {
         guard let destination = puzzle.ledge(at: end), puzzle.ledge(at: start)?.id != destination.id else { return false }
         let movingTowardRaisedDeck = end.y < start.y && start.y >= destination.approachEdgeZ
-        return !movingTowardRaisedDeck || !isBaseFlipperForward
+        return !movingTowardRaisedDeck || (!isBaseFlipperForward && baseClimbLedgeID != destination.id)
     }
     private static func motionStaysOutsideContactFace(
         from start: SIMD2<Float>,

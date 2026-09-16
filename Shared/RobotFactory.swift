@@ -37,7 +37,7 @@ import UIKit
         for marker in Array(robot.children) where marker.name.hasPrefix("\(markerPrefix) ") { marker.removeFromParent() }
         let marker = Entity(); marker.name = markerName; robot.addChild(marker)
         let bodyColor = finishColor(for: profile.finish)
-        let bodyMaterial = SimpleMaterial(color: bodyColor, isMetallic: !arPresentation && profile.material.isMetallic)
+        let bodyMaterial = ROBScanVisualModel.capturedMaterial(tint: profile.finish == .graphite ? .white : bodyColor)
         for name in ["Tri-Wheel Chassis", "Cerebro Torso", "Camera Head", "Left Upper Arm", "Right Upper Arm", "Left Forearm", "Right Forearm"] {
             (robot.findEntity(named: name) as? ModelEntity)?.model?.materials = [bodyMaterial]
         }
@@ -95,15 +95,11 @@ import UIKit
             part("Power Hammer Head", [0.42, 0.2, 0.2], [0.2, -0.64, -0.83], .systemOrange, parent: hammer)
         }
 
-        let gatling = Entity(); gatling.name = "Right Shoulder Gatling"; gatling.position = [0.43, 1.08, -0.05]; torso.addChild(gatling)
-        cylinder("Gatling Pan Servo", radius: 0.13, height: 0.1, position: [0, -0.14, 0.02], color: .darkGray, parent: gatling)
-        let tilt = Entity(); tilt.name = "Gatling Tilt Servo"; gatling.addChild(tilt)
-        cylinder("Gatling Tilt Axle", radius: 0.08, height: 0.3, position: [0, 0, 0], color: .gray, sideways: true, parent: tilt)
-        part("Gatling Housing", [0.24, 0.2, 0.38], [0, 0, -0.08], .black, parent: tilt)
-        let barrelCluster = Entity(); barrelCluster.name = "Gatling Barrel Cluster"; tilt.addChild(barrelCluster)
-        for x: Float in [-0.055, 0.055] { for y: Float in [-0.055, 0.055] { cylinder("Gatling Barrel", radius: 0.018, height: 0.52, position: [x, y, -0.36], color: .black, faceForward: true, parent: barrelCluster) } }
-        let lockLamp = ModelEntity(mesh: .generateSphere(radius: 0.055), materials: [UnlitMaterial(color: .systemRed)]); lockLamp.name = "Gatling Lock Indicator"; lockLamp.position = [0, 0.15, -0.22]; tilt.addChild(lockLamp)
-        let blueEmitter = ModelEntity(mesh: .generateSphere(radius: 0.042), materials: [UnlitMaterial(color: .systemBlue)]); blueEmitter.name = "Virtual Blue Balloon Beam Emitter"; blueEmitter.position = [0, -0.13, -0.23]; tilt.addChild(blueEmitter)
+        // Use the shoulder laser captured in the scan. Only the virtual light
+        // effects are added here; the housing and its pivots come from the rig.
+        let laserMuzzle = root.findEntity(named: "Shoulder Laser Muzzle")!
+        let lockLamp = ModelEntity(mesh: .generateSphere(radius: 0.012), materials: [UnlitMaterial(color: .systemRed)]); lockLamp.name = "Gatling Lock Indicator"; laserMuzzle.addChild(lockLamp)
+        let blueEmitter = ModelEntity(mesh: .generateSphere(radius: 0.009), materials: [UnlitMaterial(color: .systemBlue)]); blueEmitter.name = "Virtual Blue Balloon Beam Emitter"; blueEmitter.position = [0, -0.018, 0]; laserMuzzle.addChild(blueEmitter)
 
         let twinBlasters = Entity(); twinBlasters.name = "Twin Blasters"; twinBlasters.position = [0, 0.98, -0.04]; torso.addChild(twinBlasters)
         for side: Float in [-1, 1] {
@@ -122,7 +118,7 @@ import UIKit
         }
         let arcCore = ModelEntity(mesh: .generateSphere(radius: 0.08), materials: [UnlitMaterial(color: .systemCyan)]); arcCore.name = "Arc Cannon Core"; arcCore.position = [0, 0.02, -0.34]; arcCannon.addChild(arcCore)
 
-        let shot = Entity(); shot.name = "Shoulder Laser Shot"; shot.position = [0.43, 1.08, -0.28]; torso.addChild(shot)
+        let shot = Entity(); shot.name = "Shoulder Laser Shot"; shot.position = laserMuzzle.position(relativeTo: torso); torso.addChild(shot)
         let beam = ModelEntity(mesh: .generateBox(size: [1, 1, 0.55], cornerRadius: 0.04), materials: [UnlitMaterial(color: .systemBlue)]); beam.name = "Shoulder Laser Beam"; beam.isEnabled = false; shot.addChild(beam)
         for side: Float in [-1, 1] {
             let prefix = side < 0 ? "Left" : "Right"
@@ -132,7 +128,8 @@ import UIKit
         }
 
         root.components.set(InputTargetComponent())
-        root.generateCollisionShapes(recursive: true)
+        // The captured surfaces use the existing simple gameplay collision box below.
+        // Avoid generating expensive convex hulls for display-only scan triangles.
         root.collision = CollisionComponent(shapes: [
             .generateBox(size: [1.18, 1.85, 1.35]).offsetBy(translation: [0, 0.86, -0.18]),
         ])
@@ -297,13 +294,13 @@ import UIKit
         if robot.children.first(where: { $0.name == appearanceName }) == nil {
             for marker in Array(robot.children) where marker.name.hasPrefix("Applied Appearance ") { marker.removeFromParent() }
             let marker = Entity(); marker.name = appearanceName; robot.addChild(marker)
-            let bodyMaterial = SimpleMaterial(color: componentMode ? finishColor(for: .graphite) : finishColor(for: session.robotFinish), isMetallic: !arPresentation && session.droidProfile.material.isMetallic)
+            let bodyMaterial = ROBScanVisualModel.capturedMaterial(tint: componentMode || session.robotFinish == .graphite ? .white : finishColor(for: session.robotFinish))
             for name in ["Tri-Wheel Chassis", "Cerebro Torso", "Camera Head"] {
                 (robot.findEntity(named: name) as? ModelEntity)?.model?.materials = [bodyMaterial]
             }
             for side in ["Left", "Right"] {
                 let color: UIColor = componentMode ? (side == "Left" ? .systemGreen : .systemBlue) : finishColor(for: session.robotFinish)
-                let material = SimpleMaterial(color: color, isMetallic: !arPresentation)
+                let material = ROBScanVisualModel.capturedMaterial(tint: !componentMode && session.robotFinish == .graphite ? .white : color)
                 for name in ["\(side) Upper Arm", "\(side) Forearm"] {
                     (robot.findEntity(named: name) as? ModelEntity)?.model?.materials = [material]
                 }
@@ -347,10 +344,10 @@ import UIKit
         robot.findEntity(named: "Right ROB Speaker Cone")?.scale = [1 + (speakerPulse - 1) * 0.78, 1, 1 + (speakerPulse - 1) * 0.78]
         let progress = Float(1 - session.saberAnimation), arc = sin(progress * .pi)
         let torso = robot.findEntity(named: "Torso Assembly")
-        let supportHeight = ROBScanVisualModel.flipperSupportHeight(angle: session.baseFlipperAngle, pitch: session.baseLiftPitch)
+        let supportHeight = session.baseLiftHeight - session.robotPosition.y
+        let rearPivotZ: Float = 0.212725 * ROBScanVisualModel.presentationScale
         robot.findEntity(named: "Drive Base Assembly")?.position.y = supportHeight
-        torso?.position.y = session.baseLiftHeight + supportHeight
-        for marker in robot.children where marker.name.hasPrefix("Applied Appearance ") { marker.position.y = session.baseLiftHeight + supportHeight }
+        torso?.position = [0, supportHeight + rearPivotZ * sin(session.baseLiftPitch), rearPivotZ * (1 - cos(session.baseLiftPitch))]
         var torsoYaw: Float = 0
         if let style = session.saberStyle, session.saberAnimation > 0 {
             switch style {
@@ -360,7 +357,11 @@ import UIKit
             case .hammerSmash: torsoYaw = 0
             }
         }
-        torso?.orientation = simd_quatf(angle: torsoYaw, axis: [0, 1, 0])
+        torso?.orientation = simd_quatf(angle: session.baseLiftPitch, axis: [1, 0, 0]) * simd_quatf(angle: torsoYaw, axis: [0, 1, 0])
+        for marker in robot.children where marker.name.hasPrefix("Applied Appearance ") {
+            marker.position = torso?.position ?? .zero
+            marker.orientation = torso?.orientation ?? simd_quatf(angle: 0, axis: [0, 1, 0])
+        }
         for (name, side) in [("Left Arm Assembly", Float(-1)), ("Right Arm Assembly", Float(1))] {
             guard let arm = robot.findEntity(named: name) else { continue }
             guard let style = session.saberStyle, session.saberAnimation > 0 else { arm.orientation = simd_quatf(angle: 0, axis: [0, 1, 0]); continue }
@@ -391,7 +392,9 @@ import UIKit
             let pulse = 0.9 + Float(sin(session.elapsed * 9)) * 0.18
             lamp.scale = .init(repeating: pulse)
         }
-        robot.findEntity(named: "Gatling Barrel Cluster")?.orientation = simd_quatf(angle: Float(session.elapsed) * 7 + Float(session.laserCharge) * 12, axis: [0, 0, 1])
+        if let muzzle = robot.findEntity(named: "Shoulder Laser Muzzle") {
+            robot.findEntity(named: "Shoulder Laser Shot")?.position = muzzle.position(relativeTo: torso)
+        }
         let projectileEntities: [ROBLaserBarrel: (shot: String, beam: String)] = [
             .center: ("Shoulder Laser Shot", "Shoulder Laser Beam"),
             .left: ("Left Blaster Laser Shot", "Left Blaster Laser Beam"),
