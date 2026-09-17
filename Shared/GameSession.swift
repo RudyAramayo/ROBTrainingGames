@@ -197,9 +197,9 @@ enum ROBRangedWeapon: String, CaseIterable, Identifiable, Sendable {
     func energyCost(charge: Double) -> Double {
         let charge = min(1, max(0, charge))
         return switch self {
-        case .shoulderGatling: 4 + charge * 8
-        case .twinBlasters: 5 + charge * 9
-        case .arcCannon: 8 + charge * 14
+        case .shoulderGatling: 8 + charge * 16
+        case .twinBlasters: 10 + charge * 18
+        case .arcCannon: 16 + charge * 28
         }
     }
     func damage(charge: Double) -> Int {
@@ -332,7 +332,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.16.5"
+    static let gameplayRulesetVersion = "2026.09.16.6"
     static let laserRechargeDelay = 1.5
     static let robotCollisionRadius: Float = 0.54
     static let baseDriveSpeed: Float = 1.2
@@ -356,21 +356,21 @@ final class GameSession {
     let shieldPickupStrength = 24
     let repairPickupStrength = 35
     let levels = [
-        ROBLevel(id: 1, name: "Calibration Ledge", lesson: "Lower the flippers to raise the front, then drive onto the ledge. The flippers reverse automatically as the rear climbs and ROB levels out.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 900, requiresKey: false, challenge: "Use the flipper to mount the raised deck, evade three active enemies, collect five cells, and reach the dock."),
-        ROBLevel(id: 2, name: "Key Workshop", lesson: "A key changes the state of a matching locked door.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 1_100, requiresKey: true, challenge: "Find the cyan key while a three-robot patrol guards the workshop door."),
-        ROBLevel(id: 3, name: "Crossroads", lesson: "Plan a route before entering a narrow passage.", cellCount: 6, enemyKinds: [.spider, .fax, .spider], enemyShields: 2, timeBonus: 1_300, requiresKey: true, challenge: "Choose the safe branch, secure the key, then break through the center patrol."),
-        ROBLevel(id: 4, name: "Sensor Hall", lesson: "Wide clearance is often faster than scraping along obstacles.", cellCount: 6, enemyKinds: [.spider, .fax, .spider, .fax], enemyShields: 2, timeBonus: 1_500, requiresKey: false, challenge: "Use the expanded hall to separate four sentries guarding the cells."),
-        ROBLevel(id: 5, name: "Amber Armory", lesson: "A seven-joint arm trades reach for a larger collision envelope.", cellCount: 6, enemyKinds: [.fax, .spider, .fax, .spider], enemyShields: 3, timeBonus: 1_700, requiresKey: true, challenge: "Recover the armory key and chain wide saber swings without touching enemies."),
-        ROBLevel(id: 6, name: "Switchback Foundry", lesson: "Slow before turning so both treads can follow the planned curve.", cellCount: 7, enemyKinds: [.spider, .fax, .spider, .fax, .spider], enemyShields: 3, timeBonus: 1_900, requiresKey: true, challenge: "Navigate alternating turns while five guards coordinate their attacks."),
-        ROBLevel(id: 7, name: "Twin Sentinel Bay", lesson: "Keep one escape route open while engaging moving obstacles.", cellCount: 7, enemyKinds: [.fax, .fax, .spider, .spider, .fax], enemyShields: 3, timeBonus: 2_100, requiresKey: false, challenge: "Separate the sentinel wave and keep moving through crossfire."),
-        ROBLevel(id: 8, name: "Power Relay", lesson: "Complete prerequisites in the right order: key, door, cells, then dock.", cellCount: 7, enemyKinds: [.spider, .fax, .spider, .fax, .spider], enemyShields: 4, timeBonus: 2_300, requiresKey: true, challenge: "Unlock the relay room before clearing its reinforced defenders."),
-        ROBLevel(id: 9, name: "Guardian Maze", lesson: "Reliable autonomy needs state, perception, and a recoverable plan.", cellCount: 8, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 4, timeBonus: 2_600, requiresKey: true, challenge: "Find the key in the outer loop and survive the six-robot guardian wave."),
-        ROBLevel(id: 10, name: "Mission Control", lesson: "Combine driving, sequencing, tool use, and safe separation.", cellCount: 8, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 4, timeBonus: 3_000, requiresKey: true, challenge: "Complete the full safety sequence under alternating ranged and melee attacks."),
-        ROBLevel(id: 11, name: "Reactor Run", lesson: "A target lock is useful only when the route remains safe.", cellCount: 8, enemyKinds: [.spider, .spider, .fax, .spider, .fax, .fax], enemyShields: 4, timeBonus: 3_300, requiresKey: false, challenge: "Cross the reactor floor while charging shoulder shots between lunges."),
-        ROBLevel(id: 12, name: "Eclipse Hangar", lesson: "Scan, prioritize, and reposition before committing to an attack.", cellCount: 8, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 4, timeBonus: 3_600, requiresKey: true, challenge: "Open the hangar partition and defeat a balanced six-robot squad."),
-        ROBLevel(id: 13, name: "Quantum Causeway", lesson: "Short control cycles preserve options in crowded spaces.", cellCount: 9, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 5, timeBonus: 3_900, requiresKey: true, challenge: "Use spin attacks to make room without stopping in the causeway."),
-        ROBLevel(id: 14, name: "Siege Foundry", lesson: "Threat management matters more than attacking the nearest target.", cellCount: 9, enemyKinds: [.fax, .fax, .spider, .fax, .spider, .spider, .fax], enemyShields: 5, timeBonus: 4_200, requiresKey: true, challenge: "Break the foundry siege by charging shots only when the lane is clear."),
-        ROBLevel(id: 15, name: "Final Citadel", lesson: "Integrate mobility, target lock, timing, and tool choice.", cellCount: 10, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 5, timeBonus: 4_800, requiresKey: true, challenge: "Clear the eight-robot citadel wave and complete the expanded campaign."),
+        ROBLevel(id: 1, name: "Calibration Ledge", lesson: "Lower the flippers to raise the front, then drive onto the ledge. The flippers reverse automatically as the rear climbs and ROB levels out.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 4, timeBonus: 900, requiresKey: false, challenge: "Use the flipper to mount the raised deck, evade three active enemies, collect five cells, and reach the dock."),
+        ROBLevel(id: 2, name: "Key Workshop", lesson: "A key changes the state of a matching locked door.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 4, timeBonus: 1_100, requiresKey: true, challenge: "Find the cyan key while a three-robot patrol guards the workshop door."),
+        ROBLevel(id: 3, name: "Crossroads", lesson: "Plan a route before entering a narrow passage.", cellCount: 6, enemyKinds: [.spider, .fax, .spider], enemyShields: 4, timeBonus: 1_300, requiresKey: true, challenge: "Choose the safe branch, secure the key, then break through the center patrol."),
+        ROBLevel(id: 4, name: "Sensor Hall", lesson: "Wide clearance is often faster than scraping along obstacles.", cellCount: 6, enemyKinds: [.spider, .fax, .spider, .fax], enemyShields: 4, timeBonus: 1_500, requiresKey: false, challenge: "Use the expanded hall to separate four sentries guarding the cells."),
+        ROBLevel(id: 5, name: "Amber Armory", lesson: "A seven-joint arm trades reach for a larger collision envelope.", cellCount: 6, enemyKinds: [.fax, .spider, .fax, .spider], enemyShields: 6, timeBonus: 1_700, requiresKey: true, challenge: "Recover the armory key and chain wide saber swings without touching enemies."),
+        ROBLevel(id: 6, name: "Switchback Foundry", lesson: "Slow before turning so both treads can follow the planned curve.", cellCount: 7, enemyKinds: [.spider, .fax, .spider, .fax, .spider], enemyShields: 6, timeBonus: 1_900, requiresKey: true, challenge: "Navigate alternating turns while five guards coordinate their attacks."),
+        ROBLevel(id: 7, name: "Twin Sentinel Bay", lesson: "Keep one escape route open while engaging moving obstacles.", cellCount: 7, enemyKinds: [.fax, .fax, .spider, .spider, .fax], enemyShields: 6, timeBonus: 2_100, requiresKey: false, challenge: "Separate the sentinel wave and keep moving through crossfire."),
+        ROBLevel(id: 8, name: "Power Relay", lesson: "Complete prerequisites in the right order: key, door, cells, then dock.", cellCount: 7, enemyKinds: [.spider, .fax, .spider, .fax, .spider], enemyShields: 8, timeBonus: 2_300, requiresKey: true, challenge: "Unlock the relay room before clearing its reinforced defenders."),
+        ROBLevel(id: 9, name: "Guardian Maze", lesson: "Reliable autonomy needs state, perception, and a recoverable plan.", cellCount: 8, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 8, timeBonus: 2_600, requiresKey: true, challenge: "Find the key in the outer loop and survive the six-robot guardian wave."),
+        ROBLevel(id: 10, name: "Mission Control", lesson: "Combine driving, sequencing, tool use, and safe separation.", cellCount: 8, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 8, timeBonus: 3_000, requiresKey: true, challenge: "Complete the full safety sequence under alternating ranged and melee attacks."),
+        ROBLevel(id: 11, name: "Reactor Run", lesson: "A target lock is useful only when the route remains safe.", cellCount: 8, enemyKinds: [.spider, .spider, .fax, .spider, .fax, .fax], enemyShields: 8, timeBonus: 3_300, requiresKey: false, challenge: "Cross the reactor floor while charging shoulder shots between lunges."),
+        ROBLevel(id: 12, name: "Eclipse Hangar", lesson: "Scan, prioritize, and reposition before committing to an attack.", cellCount: 8, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 8, timeBonus: 3_600, requiresKey: true, challenge: "Open the hangar partition and defeat a balanced six-robot squad."),
+        ROBLevel(id: 13, name: "Quantum Causeway", lesson: "Short control cycles preserve options in crowded spaces.", cellCount: 9, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 10, timeBonus: 3_900, requiresKey: true, challenge: "Use spin attacks to make room without stopping in the causeway."),
+        ROBLevel(id: 14, name: "Siege Foundry", lesson: "Threat management matters more than attacking the nearest target.", cellCount: 9, enemyKinds: [.fax, .fax, .spider, .fax, .spider, .spider, .fax], enemyShields: 10, timeBonus: 4_200, requiresKey: true, challenge: "Break the foundry siege by charging shots only when the lane is clear."),
+        ROBLevel(id: 15, name: "Final Citadel", lesson: "Integrate mobility, target lock, timing, and tool choice.", cellCount: 10, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 10, timeBonus: 4_800, requiresKey: true, challenge: "Clear the eight-robot citadel wave and complete the expanded campaign."),
     ]
     let components = [
         ROBComponent(id: "base", name: "Tri-Wheel Tracked Base", summary: "Three-wheel triangular tread pods expose the road wheels while a drive mixer preserves independent left and right tread speeds.", color: 0x263746),
@@ -941,7 +941,7 @@ final class GameSession {
             origin.y = puzzle.surfaceHeight(at: [origin.x, origin.z])
             let isBoss = level.id.isMultiple(of: 5) && index == 0
             let bossTier = level.id / 5
-            let shields = isBoss ? 15 + bossTier * 15 : level.enemyShields
+            let shields = isBoss ? 30 + bossTier * 30 : level.enemyShields
             return TrainingEnemy(id: index, kind: kind, isBoss: isBoss, isMiniBoss: false, position: origin, origin: origin, shields: shields, maxShields: shields, nextAttack: 1.6 + Double(index) * 0.65, nextSkitterSound: 0.8 + Double(index) * 0.38)
         }
     }
@@ -1346,12 +1346,12 @@ final class GameSession {
             isMiniBoss: true,
             position: origin,
             origin: origin,
-            shields: 3,
-            maxShields: 3,
+            shields: 6,
+            maxShields: 6,
             nextAttack: elapsed + 1.8,
             nextSkitterSound: elapsed + 0.5
         ))
-        message = "Security camera caught ROB! A three-shield mini boss has been released — disable it or escape into shadow."
+        message = "Security camera caught ROB! A six-shield mini boss has been released — disable it or escape into shadow."
     }
 
     private func updateDoorHack(_ delta: TimeInterval) {

@@ -34,7 +34,7 @@ Run the shared campaign tests on an iOS Simulator with `xcodebuild test -scheme 
 
 ## Cross-platform gameplay sync
 
-`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. `Shared/ROBDroidProfile.swift` is the native half of the portable customization format; its field keys, allowlists, Base64URL encoding, and FNV-1a checksum must remain byte-compatible with the website's `assets/js/rob-droid-profile.mjs`. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.16.5`.
+`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. `Shared/ROBDroidProfile.swift` is the native half of the portable customization format; its field keys, allowlists, Base64URL encoding, and FNV-1a checksum must remain byte-compatible with the website's `assets/js/rob-droid-profile.mjs`. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.16.6`.
 
 Before App Store submission, add production icons/screenshots, signing, privacy review, age rating, support URLs, and device testing. Keep lessons synchronized with `Presentation/ROB-Books/ROBOT_GAME_CURRICULUM.md` as the books evolve.
 
@@ -79,4 +79,6 @@ The captured base is aligned with the flipper rig. The virtual training laser
 uses the captured shoulder housing and a named muzzle attachment, with no
 additional housing. These attachment points are visual game effects only.
 
-The basic targeting computer uses manual forward aim with a 0.8-second firing cycle and 1.8-second full charge. The existing 1,200-point upgrade enables automatic locks for all lasers, two independent Twin Blaster locks, a 0.25-second cycle, and 1.25-second full charge. Shots consume 4–12 energy (Gatling), 5–14 per Twin Blaster volley, and 8–22 (Arc Cannon), including misses. Passive charging pauses while charging a laser and for 1.5 seconds after firing. Nearby battles also charge four energy per shot and show a battery meter; each rebuild restores 100 energy.
+The basic targeting computer uses manual forward aim with a 0.8-second firing cycle and 1.8-second full charge. The existing 1,200-point upgrade enables automatic locks for all lasers, two independent Twin Blaster locks, a 0.25-second cycle, and 1.25-second full charge. Shots consume 8–24 energy (Gatling), 10–28 per Twin Blaster volley, and 16–44 (Arc Cannon), including misses. Passive charging pauses while charging a laser and for 1.5 seconds after firing. Nearby battles also charge eight energy per shot and show a battery meter; each rebuild restores 100 energy.
+
+Enemy durability is doubled: regular campaign robots have 4–10 shield hit points, security mini bosses have 6, and the bosses on levels 5, 10, and 15 have 60, 90, and 120.
