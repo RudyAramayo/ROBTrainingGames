@@ -332,7 +332,7 @@ struct MissionUpgradeIntermission: View {
                     Text("Install the Plasma Booster before the rocket stages.").foregroundStyle(.cyan)
                     Button("Replay this level to earn booster points") { session.replayForBoosterPoints() }
                 }
-                Text("Defeats earn 40 skill points per robot, 60 per mini boss, and 200 per boss. Level clears earn 100–450. Hits, pickups, hacks, and time bonuses add score only.")
+                Text("Defeats earn 20 skill points per robot, 30 per mini boss, and 100 per boss. Level clears earn 50–190. Hits, pickups, hacks, and time bonuses add score only.")
                     .foregroundStyle(.secondary)
                 Label("\(session.upgradePoints) skill points available", systemImage: "star.circle.fill")
                     .font(.headline.monospacedDigit())

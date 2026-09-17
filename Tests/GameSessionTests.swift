@@ -66,12 +66,12 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.level.id, 1)
         XCTAssertTrue(game.isUpgradeIntermission)
         XCTAssertFalse(game.isRunning)
-        XCTAssertEqual(game.upgradePoints, 100)
+        XCTAssertEqual(game.upgradePoints, 50)
 
         XCTAssertFalse(game.canPurchaseUpgrade(.speedBoost))
         game.purchaseUpgrade(.speedBoost)
         XCTAssertEqual(game.speedUpgradeLevel, 0)
-        XCTAssertEqual(game.upgradePoints, 100)
+        XCTAssertEqual(game.upgradePoints, 50)
 
         game.continueAfterUpgradeIntermission()
         XCTAssertEqual(game.level.id, 2)
@@ -863,11 +863,11 @@ final class GameSessionTests: XCTestCase {
             game.saberAttack()
             XCTAssertEqual(game.enemies[0].shields, 4 - strike)
             XCTAssertEqual(game.enemies[0].isActive, strike < 4)
-            XCTAssertEqual(game.upgradePoints, strike < 4 ? 0 : 40)
+            XCTAssertEqual(game.upgradePoints, strike < 4 ? 0 : 20)
             game.tick(0.9)
         }
         game.saberAttack()
-        XCTAssertEqual(game.upgradePoints, 40, "A defeated target cannot pay out again")
+        XCTAssertEqual(game.upgradePoints, 20, "A defeated target cannot pay out again")
     }
 
     func testKyberCrystalsIncreaseSaberDamageAndRequireLaterLevels() {
@@ -943,10 +943,10 @@ final class GameSessionTests: XCTestCase {
         game.collectedCells = game.level.cellCount; game.doorOpen = true
         for index in game.enemies.indices { game.enemies[index].isActive = false }
         game.nextLevel()
-        XCTAssertEqual(game.upgradePoints, 450)
+        XCTAssertEqual(game.upgradePoints, 190)
         let score = game.score
         game.nextLevel()
-        XCTAssertEqual(game.upgradePoints, 450)
+        XCTAssertEqual(game.upgradePoints, 190)
         XCTAssertEqual(game.score, score)
     }
 
@@ -1014,6 +1014,35 @@ final class GameSessionTests: XCTestCase {
         XCTAssertGreaterThan(game.leftTread, 0)
         XCTAssertLessThan(game.rightTread, 0)
         XCTAssertLessThan(game.robotHeading, 0)
+    }
+
+    func testSpeedUpgradesPreserveSlowerSteeringWhileIncreasingTravel() {
+        var turns: [Float] = [], distances: [Float] = []
+        for rank in [0, 3] {
+            let suite = "ROBSteering.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suite)!
+            defer { defaults.removePersistentDomain(forName: suite) }
+            defaults.set(rank, forKey: "robSpeedUpgradeLevel")
+            let game = GameSession(audioEnabled: false, progressStore: defaults)
+            game.begin()
+            for index in game.enemies.indices { game.enemies[index].isActive = false }
+            let start = game.robotPosition
+            game.setTreads(left: -1, right: 1)
+            for _ in 0..<60 { game.tick(1.0 / 60) }
+            turns.append(game.robotHeading)
+            XCTAssertGreaterThan(game.robotHeading, .pi / 2)
+            XCTAssertLessThan(game.robotHeading, 2.2, "Full joystick turn stays below 126 degrees per second")
+            XCTAssertEqual(simd_distance(game.robotPosition, start), 0, accuracy: 0.001)
+
+            game.begin()
+            for index in game.enemies.indices { game.enemies[index].isActive = false }
+            let driveStart = game.robotPosition
+            game.setDrive(forward: 1, steering: 0)
+            for _ in 0..<30 { game.tick(1.0 / 60) }
+            distances.append(simd_distance(game.robotPosition, driveStart))
+        }
+        XCTAssertEqual(turns[0], turns[1], accuracy: 0.001)
+        XCTAssertGreaterThan(distances[1], distances[0] * 2.7)
     }
 
     func testFaxRobotFiresTrackedProjectile() {

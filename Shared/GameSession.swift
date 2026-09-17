@@ -73,7 +73,7 @@ struct TrainingEnemy: Identifiable, Sendable {
     var combatScale: Float { isMiniBoss ? 1.15 : isBoss ? 1.35 : 1 }
     var collisionRadius: Float { (kind == .spider ? 0.36 : 0.42) * combatScale }
     var defeatReward: Int { isMiniBoss ? 500 : isBoss ? 1_000 : 300 }
-    var skillReward: Int { isMiniBoss ? 60 : isBoss ? 200 : 40 }
+    var skillReward: Int { isMiniBoss ? 30 : isBoss ? 100 : 20 }
 }
 
 struct TrainingEnemyBolt: Identifiable, Sendable {
@@ -319,7 +319,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
     }
     var summary: String {
         switch self {
-        case .speedBoost: "Raises tread speed by 60% per upgrade."
+        case .speedBoost: "Raises forward and reverse speed by 60% per upgrade with steady steering."
         case .energyCapacity: "Adds 60 energy and dramatically improves cells and passive charging."
         case .weaponPower: "Adds one damage to laser hits."
         case .targetingComputer: "Replaces slow manual aim with fast automatic lock-on for every laser, including two independent Twin Blaster locks."
@@ -343,12 +343,13 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.16.8"
+    static let gameplayRulesetVersion = "2026.09.17.1"
     static let skillPointsStorageKey = "robSkillPoints"
-    static func levelSkillReward(_ levelNumber: Int) -> Int { 100 + max(0, min(14, levelNumber - 1)) * 25 }
+    static func levelSkillReward(_ levelNumber: Int) -> Int { 50 + max(0, min(14, levelNumber - 1)) * 10 }
     static let laserRechargeDelay = 1.5
     static let robotCollisionRadius: Float = 0.54
     static let baseDriveSpeed: Float = 1.2
+    static let baseTurnSpeed: Float = 1.1
     static let securityCameraHalfAngle: Float = .pi / 5
     static let securityCameraHackRange: Float = 1.55
     static let flipperHackDuration = 2.2
@@ -1182,7 +1183,7 @@ final class GameSession {
         let speedMultiplier = Float(driveSpeedMultiplier)
         let linear = Float((leftTread + rightTread) * 0.5) * Float(delta) * Self.baseDriveSpeed * speedMultiplier
         leftWheelAngle -= Float(leftTread) * Float(delta) * 6.75 * speedMultiplier; rightWheelAngle -= Float(rightTread) * Float(delta) * 6.75 * speedMultiplier
-        robotHeading += Float(rightTread - leftTread) * Float(delta) * 1.48 * speedMultiplier
+        robotHeading += Float(rightTread - leftTread) * Float(delta) * Self.baseTurnSpeed
         let oldPosition = robotPosition
         let proposedPosition = SIMD3<Float>(
             robotPosition.x - sin(robotHeading) * linear,
