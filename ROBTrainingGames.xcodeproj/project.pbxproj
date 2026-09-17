@@ -45,6 +45,7 @@
 		8E92EDF0CC8A176364702C1A /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A494856CC93CF9C98076DE8A /* GameSession.swift */; };
 		8F5D5EA3ADB8F70CFA08BA08 /* SoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */; };
 		9037DF571D43ABB1EBD7890F /* arena-wall-material.png in Resources */ = {isa = PBXBuildFile; fileRef = 4922F873A21CB27EAB947293 /* arena-wall-material.png */; };
+		929BCC5700FEFAE14031A54D /* ROBPickup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93F0B9722FFB695AD07E27B7 /* ROBPickup.swift */; };
 		A7A686A5F2F3606393BB6100 /* ROBScanVisualModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA05B06A5408585BE01003AD /* ROBScanVisualModel.swift */; };
 		B0D1FEF0D8A64D0B703D8DE8 /* level-complete.m4a in Resources */ = {isa = PBXBuildFile; fileRef = DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */; };
 		B479C490CB965B8F26E64DA9 /* ROBMeleeAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EA69B164FD2EF18A1B96053 /* ROBMeleeAnimation.swift */; };
@@ -63,6 +64,7 @@
 		DC7292D634DC32D0DEF4E9F2 /* rob-captured-colors.png in Resources */ = {isa = PBXBuildFile; fileRef = 636AB4F7184016C1F1FFE1E3 /* rob-captured-colors.png */; };
 		DFCB9518DD1D2EC5D31C7920 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */; };
 		E1D33E988ED8F791EF94FE5F /* RobotVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDE8CFB55658390DC53F88E /* RobotVoice.swift */; };
+		E7B1F004B1A3794FB523EEDF /* ROBPickup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93F0B9722FFB695AD07E27B7 /* ROBPickup.swift */; };
 		E9B9388B53785C61398E060A /* ROBMeleeAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EA69B164FD2EF18A1B96053 /* ROBMeleeAnimation.swift */; };
 		EA3E975013B58A8EE59C33C5 /* VisionBattleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABE91633954BD6C01063CB9A /* VisionBattleView.swift */; };
 		F201505C71E8425292651D0E /* rob-visual.json in Resources */ = {isa = PBXBuildFile; fileRef = 1F4FFDAEF58AAB063DB13583 /* rob-visual.json */; };
@@ -100,6 +102,7 @@
 		636AB4F7184016C1F1FFE1E3 /* rob-captured-colors.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "rob-captured-colors.png"; sourceTree = "<group>"; };
 		765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "rob-training-key-art.png"; sourceTree = "<group>"; };
 		8D19BBDDC5D490212B965846 /* VisionDashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionDashboard.swift; sourceTree = "<group>"; };
+		93F0B9722FFB695AD07E27B7 /* ROBPickup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBPickup.swift; sourceTree = "<group>"; };
 		96C1B68B72E191DB240B3A84 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		98A698093E163C5AD99F842C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A037348E135227A957A0365B /* ROBBattleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBBattleViews.swift; sourceTree = "<group>"; };
@@ -175,6 +178,7 @@
 				BE8EABD4931412AA8A676C80 /* RobotFactory.swift */,
 				DDDE8CFB55658390DC53F88E /* RobotVoice.swift */,
 				D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */,
+				93F0B9722FFB695AD07E27B7 /* ROBPickup.swift */,
 				BA05B06A5408585BE01003AD /* ROBScanVisualModel.swift */,
 				B7CEC87C449627DA35A84AF5 /* ROBSupportMotion.swift */,
 				AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */,
@@ -395,6 +399,7 @@
 				C6FBCB0085DFD40CE43C914C /* ROBBattleScene.swift in Sources */,
 				56139969000D808D035216D7 /* ROBDroidProfile.swift in Sources */,
 				E9B9388B53785C61398E060A /* ROBMeleeAnimation.swift in Sources */,
+				929BCC5700FEFAE14031A54D /* ROBPickup.swift in Sources */,
 				A7A686A5F2F3606393BB6100 /* ROBScanVisualModel.swift in Sources */,
 				5C9B0C7729137271D9DFF5D0 /* ROBSupportMotion.swift in Sources */,
 				CB6811B4AEFB9E8FD157EA1D /* ROBTrainingVisionApp.swift in Sources */,
@@ -432,6 +437,7 @@
 				01DBFA2260BE112F576CCBD9 /* ROBBattleViews.swift in Sources */,
 				BCE7428318AAB4F4CF5BEC3E /* ROBDroidProfile.swift in Sources */,
 				B479C490CB965B8F26E64DA9 /* ROBMeleeAnimation.swift in Sources */,
+				E7B1F004B1A3794FB523EEDF /* ROBPickup.swift in Sources */,
 				22479D156C786D5582584DB6 /* ROBScanVisualModel.swift in Sources */,
 				4C4608EFD0FCB8B6CEC448AD /* ROBSupportMotion.swift in Sources */,
 				6CFB7C4FCE1E8C49F724F115 /* ROBTrainingiOSApp.swift in Sources */,
@@ -523,7 +529,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 975CAGD5EW;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -590,7 +596,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 975CAGD5EW;
 				ENABLE_NS_ASSERTIONS = NO;

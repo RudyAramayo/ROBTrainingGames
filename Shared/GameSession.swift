@@ -283,6 +283,7 @@ struct PuzzleGeometry: Sendable {
     let securityCameras: [PuzzleSecurityCamera]
     let shadowZones: [PuzzleBarrier]
     let ledges: [PuzzleLedge]
+    var cargoPickup: SIMD2<Float> = .zero
 
     func ledge(at point: SIMD2<Float>) -> PuzzleLedge? {
         ledges.filter { $0.contains(point) }.max { $0.height < $1.height }
@@ -343,7 +344,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.17.1"
+    static let gameplayRulesetVersion = "2026.09.17.2"
     static let skillPointsStorageKey = "robSkillPoints"
     static func levelSkillReward(_ levelNumber: Int) -> Int { 50 + max(0, min(14, levelNumber - 1)) * 10 }
     static let laserRechargeDelay = 1.5
@@ -459,6 +460,31 @@ final class GameSession {
     private(set) var baseClimbLedgeID: Int?
     private var supportMotion = ROBSupportMotion()
     private(set) var torsoLeanAngle: Float = 0
+    private(set) var pickupTask = ROBPickupTask(position: .zero)
+    private(set) var pickupLeanAmount: Float = 0
+    private(set) var pickupLeanRequested = false
+    var cargoKind: ROBCargoKind { ROBCargoKind.allCases[levelIndex % ROBCargoKind.allCases.count] }
+    var isCarryingCargo: Bool { pickupTask.phase == .carrying }
+    var isCargoDelivered: Bool { pickupTask.phase == .delivered }
+    var isPickupGrounded: Bool { isBaseGrounded && !isClimbingLedge && abs(baseLiftPitch) < 0.08 }
+    var pickupActive: Bool { pickupLeanAmount > 0.001 || isCarryingCargo }
+    var cargoObjective: String {
+        isCargoDelivered ? "\(cargoKind.name) delivered" : isCarryingCargo
+            ? "Place the \(cargoKind.name) on the \(cargoKind.destination)"
+            : "Lean, grasp the \(cargoKind.name), and deliver it"
+    }
+    var cargoDestination: SIMD3<Float> {
+        [puzzle.dock.x, puzzle.surfaceHeight(at: puzzle.dock) + 0.12 * 1.35 + 0.04, puzzle.dock.y]
+    }
+    var cargoHandPosition: SIMD3<Float> {
+        let scale: Float = 1.35
+        let body = ROBBodyKinematics.torsoPose(basePitch: baseLiftPitch, leanAngle: torsoLeanAngle,
+                                              rearHeight: baseLiftHeight, rootHeight: robotPosition.y, scale: scale)
+        let armPitch = -(baseLiftPitch + torsoLeanAngle) + (isCarryingCargo ? (1 - pickupLeanAmount) * 0.45 : 0)
+        let arm = SIMD3<Float>(0.208, 0.962, 0.018) * scale
+            + simd_quatf(angle: armPitch, axis: [1, 0, 0]).act(SIMD3<Float>(0.084, -0.527, -0.013) * scale)
+        return robotPosition + simd_quatf(angle: robotHeading, axis: [0, 1, 0]).act(body.position + body.orientation.act(arm))
+    }
     var lastSituation = "ROB systems ready."
     var situationCount = 0
     private(set) var highestCompletedLevel = 0
@@ -635,7 +661,7 @@ final class GameSession {
     var canFinish: Bool {
         let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
         let landedAtSummit = !isRocketAirborne && simd_distance(point, puzzle.dock) < 0.55 && abs(robotPosition.y - puzzle.surfaceHeight(at: puzzle.dock)) < 0.3
-        return collectedCells == level.cellCount && remainingEnemies == 0 && (!level.requiresKey || doorOpen) && (!level.requiresBooster || landedAtSummit)
+        return isCargoDelivered && collectedCells == level.cellCount && remainingEnemies == 0 && (!level.requiresKey || doorOpen) && (!level.requiresBooster || landedAtSummit)
     }
     @ObservationIgnored private var puzzleCache: [Int: PuzzleGeometry] = [:]
     var puzzle: PuzzleGeometry {
@@ -905,6 +931,11 @@ final class GameSession {
             }
             let shieldPickups = (0..<(level.id >= 8 ? 2 : 1)).map { _ in takePickup() }
             let repairPickups = (0..<(level.id >= 10 ? 2 : 1)).map { _ in takePickup() }
+            let cargoCandidates = [Float(1.2), 2.2, 3.2, 4.2].map { SIMD2<Float>(-margin + $0, margin - 0.5) }
+            guard let cargoPickup = cargoCandidates.first(where: { point in
+                reserved.allSatisfy { simd_distance(point, $0) > 0.68 }
+                    && blockers.allSatisfy { !intersects([point.x, 0, point.y], barrier: $0, radius: robotCollisionRadius) }
+            }) else { preconditionFailure("No clear cargo approach in \(level.name)") }
             return PuzzleGeometry(
                 arenaHalfExtent: half,
                 key: key,
@@ -918,7 +949,8 @@ final class GameSession {
                 conveyors: environment.conveyors,
                 securityCameras: environment.cameras,
                 shadowZones: environment.shadows,
-                ledges: ledges
+                ledges: ledges,
+                cargoPickup: cargoPickup
             )
         }
         guard level.requiresKey else {
@@ -1051,6 +1083,8 @@ final class GameSession {
         baseFlipperAngle = Self.baseFlipperRearAngle; baseFlipperTarget = .rear; baseClimbLedgeID = nil
         rocketHeld = false; rocketFlight = ROBRocketFlight()
         supportMotion = ROBSupportMotion(); torsoLeanAngle = 0
+        pickupLeanRequested = false; pickupLeanAmount = 0
+        pickupTask = ROBPickupTask(position: [puzzle.cargoPickup.x, puzzle.surfaceHeight(at: puzzle.cargoPickup) + 0.12 * 1.35, puzzle.cargoPickup.y])
         collectedCellIndices = []; collectedShieldPickupIndices = []; collectedRepairPickupIndices = []
         shieldTimeRemaining = 0
         saberAnimation = 0; saberStyle = nil; saberComboCount = 0; lastSaberAttackTime = -.infinity
@@ -1122,9 +1156,51 @@ final class GameSession {
         steeringDemand = (right - left) / 1.44
     }
     func stopDrive() { setDrive(forward: 0, steering: 0); leftTread = 0; rightTread = 0 }
+    func togglePickupLean() {
+        guard isRunning else { return }
+        guard isPickupGrounded, !isHackingDoor, !isHackingCamera, saberAnimation == 0 else {
+            message = "Finish the current action and settle on level ground before leaning to grasp."; return
+        }
+        pickupLeanRequested.toggle()
+        message = pickupLeanRequested ? "Leaning down. Align the right hand using slow tread movements, stop, then Grab."
+            : "Standing for travel. Carried cargo stays in the right hand."
+    }
+
+    func interactCargo() {
+        let hand = cargoHandPosition
+        let drop = SIMD3<Float>(hand.x, puzzle.surfaceHeight(at: [hand.x, hand.z]) + 0.12 * 1.35, hand.z)
+        let target = isCarryingCargo ? drop : pickupTask.position
+        let clear = meleePathIsClear(to: [target.x, target.z], padding: 0)
+        let dropClear = abs(hand.x) < puzzle.arenaHalfExtent - 0.2 && abs(hand.z) < puzzle.arenaHalfExtent - 0.2
+            && projectileBlockers.allSatisfy { !Self.intersects(hand, barrier: $0, radius: 0.14 * 1.35) }
+        let destination = cargoDestination
+        let result = pickupTask.interact(running: isRunning && !isHackingDoor && !isHackingCamera && saberAnimation == 0,
+                                         grounded: isPickupGrounded, lean: pickupLeanAmount, speed: max(abs(leftTread), abs(rightTread)),
+                                         hand: hand, destination: destination, dropPosition: drop, scale: 1.35, clear: clear, dropClear: dropClear)
+        switch result {
+        case .inactive: return
+        case .land: message = "Settle on level ground before picking up or placing cargo."
+        case .stop: message = "Release both treads before grasping or placing."
+        case .lean: message = "Lean down with C or Lean, then use Grab / Place."
+        case .outOfReach: message = "Bring the right hand closer to the object. Crouched driving moves slowly for alignment."
+        case .blocked: message = "A wall or closed door blocks the grasp."
+        case .unsafeDrop: message = "Move to clear floor or the marked destination before placing."
+        case .pickedUp:
+            pickupLeanRequested = false; play("pickup")
+            message = "\(cargoKind.name) grasped. Carry it to the \(cargoKind.destination), then lean and Place."
+        case .dropped: message = "\(cargoKind.name) set down. Pick it up again to finish the delivery."
+        case .delivered:
+            awardMissionPoints(ROBPickupTask.reward); play("pickup")
+            message = "\(cargoKind.name) placed on the \(cargoKind.destination). Delivery complete!"
+        }
+        report(message)
+    }
+
     func setRocketHeld(_ held: Bool) {
         if !held { rocketHeld = false; return }
         guard isRunning, hasRocketBooster, energy >= 1, !isHackingDoor, !isHackingCamera else { return }
+        pickupLeanRequested = false
+        guard pickupLeanAmount <= 0.05 else { message = "Standing upright before boost. Press Boost again when ready."; return }
         rocketHeld = true
         baseClimbLedgeID = nil; baseFlipperTarget = .rear; baseFlipperAngle = Self.baseFlipperRearAngle
     }
@@ -1136,6 +1212,7 @@ final class GameSession {
     func activateBaseFlipper() -> Bool { moveBaseFlipperForward() }
     @discardableResult
     private func commandBaseFlipper(_ target: ROBBaseFlipperPosition) -> Bool {
+        pickupLeanRequested = false
         guard isRunning, target != baseFlipperTarget else { return false }
         guard isBaseGrounded else { return false }
         guard !isClimbingLedge || target == .rear else { return false }
@@ -1180,7 +1257,7 @@ final class GameSession {
         let targetRight = hasDriveEnergy ? max(-1, min(1, forwardDemand + steeringDemand * 0.72)) * ledgeDriveScale : 0
         let smoothing = min(1, delta * 8)
         leftTread += (targetLeft - leftTread) * smoothing; rightTread += (targetRight - rightTread) * smoothing
-        let speedMultiplier = Float(driveSpeedMultiplier)
+        let speedMultiplier = Float(driveSpeedMultiplier) * ROBPickupTask.driveMultiplier(lean: pickupLeanAmount, carrying: isCarryingCargo)
         let linear = Float((leftTread + rightTread) * 0.5) * Float(delta) * Self.baseDriveSpeed * speedMultiplier
         leftWheelAngle -= Float(leftTread) * Float(delta) * 6.75 * speedMultiplier; rightWheelAngle -= Float(rightTread) * Float(delta) * 6.75 * speedMultiplier
         robotHeading += Float(rightTread - leftTread) * Float(delta) * Self.baseTurnSpeed
@@ -1237,6 +1314,9 @@ final class GameSession {
             updateGroundSupport(delta, previousHeight: previousRearHeight, previousPitch: previousBasePitch, forward: linear)
         }
         torsoLeanAngle = ROBBodyKinematics.advanceLean(torsoLeanAngle, basePitch: baseLiftPitch, delta: delta)
+        if !isPickupGrounded { pickupLeanRequested = false }
+        pickupLeanAmount = ROBPickupTask.advanceLean(pickupLeanAmount, requested: pickupLeanRequested, delta: delta)
+        torsoLeanAngle = torsoLeanAngle * (1 - pickupLeanAmount) + ROBPickupTask.leanAngle * pickupLeanAmount
         if !wasFlying && newSurfaceHeight > oldSurfaceHeight {
             message = "Front tracks on the ledge. Flippers are reversing automatically; keep moving forward to lift the rear and level ROB."
             report(message)
@@ -1910,6 +1990,7 @@ final class GameSession {
         let cellsLeft = level.cellCount - collectedCells
         if cellsLeft > 0 { requirements.append("collect \(cellsLeft) more energy \(cellsLeft == 1 ? "cell" : "cells")") }
         if remainingEnemies > 0 { requirements.append("disable \(remainingEnemies) more \(remainingEnemies == 1 ? "target" : "targets")") }
+        if !isCargoDelivered { requirements.append("deliver the \(cargoKind.name)") }
         return requirements.joined(separator: " and ")
     }
     private func updateLaserLock() {
@@ -2016,6 +2097,7 @@ final class GameSession {
     }
     func saberAttack() {
         guard isRunning, saberAnimation == 0 else { return }
+        guard !isCarryingCargo, pickupLeanAmount <= 0.02 else { message = "Place the cargo and stand upright before using melee weapons."; return }
         if meleeWeapon == .powerHammer {
             saberComboCount = 0; lastSaberAttackTime = elapsed; saberAnimation = 1; saberStyle = .hammerSmash
             let forward = SIMD2<Float>(-sin(robotHeading), -cos(robotHeading))

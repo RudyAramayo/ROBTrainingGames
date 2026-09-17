@@ -337,9 +337,9 @@ import UIKit
         robot.findEntity(named: "Right Shoulder Gatling")?.isEnabled = session.rangedWeapon == .shoulderGatling
         robot.findEntity(named: "Twin Blasters")?.isEnabled = session.rangedWeapon == .twinBlasters
         robot.findEntity(named: "Arc Cannon")?.isEnabled = session.rangedWeapon == .arcCannon
-        robot.findEntity(named: "Left Lightsaber")?.isEnabled = session.meleeWeapon == .dualSabers
-        robot.findEntity(named: "Right Lightsaber")?.isEnabled = session.meleeWeapon == .dualSabers
-        robot.findEntity(named: "Power Hammer")?.isEnabled = session.meleeWeapon == .powerHammer
+        robot.findEntity(named: "Left Lightsaber")?.isEnabled = session.meleeWeapon == .dualSabers && !session.pickupActive
+        robot.findEntity(named: "Right Lightsaber")?.isEnabled = session.meleeWeapon == .dualSabers && !session.pickupActive
+        robot.findEntity(named: "Power Hammer")?.isEnabled = session.meleeWeapon == .powerHammer && !session.pickupActive
         if let shieldField = robot.findEntity(named: "ROB Shield Field") {
             shieldField.isEnabled = session.isShieldActive
             shieldField.components.set(OpacityComponent(opacity: Float(session.shieldActivationFraction)))
@@ -380,6 +380,10 @@ import UIKit
             arm.orientation = simd_quatf(angle: attack.armYaw, axis: [0, 1, 0])
                 * simd_quatf(angle: side * attack.armRoll, axis: [0, 0, 1])
                 * simd_quatf(angle: side > 0 ? attack.hammerPitch : 0, axis: [1, 0, 0])
+            if session.pickupActive {
+                let holding = session.isCarryingCargo && side > 0 ? (1 - session.pickupLeanAmount) * Float(0.45) : 0
+                arm.orientation = simd_quatf(angle: -(session.baseLiftPitch + session.torsoLeanAngle) + holding, axis: [1, 0, 0])
+            }
         }
         let scanningHeading = Float(sin(session.elapsed * 0.85)) * 0.9
         let relativeHeading = session.laserLockHeading.map { $0 - session.robotHeading - torsoYaw } ?? (session.hasAutoTargeting ? scanningHeading : -torsoYaw)
@@ -683,7 +687,50 @@ import UIKit
             room.addChild(root)
         }
         let dock = ModelEntity(mesh: .generateBox(size: [0.7, 0.025, 0.7], cornerRadius: 0.08), materials: [SimpleMaterial(color: .systemOrange, isMetallic: false)]); dock.name = "Puzzle Dock"; dock.position = [puzzle.dock.x, puzzle.surfaceHeight(at: puzzle.dock) + 0.03, puzzle.dock.y]; room.addChild(dock)
+        let cargoKind = ROBCargoKind.allCases[max(0, level) % ROBCargoKind.allCases.count]
+        let cargo = makeMissionCargo(cargoKind); cargo.name = "Mission Cargo"
+        cargo.position = [puzzle.cargoPickup.x, puzzle.surfaceHeight(at: puzzle.cargoPickup) + 0.12 * 1.35, puzzle.cargoPickup.y]; room.addChild(cargo)
+        let destination = makeCargoDestination(cargoKind); destination.name = "Cargo Destination"
+        destination.position = [puzzle.dock.x, puzzle.surfaceHeight(at: puzzle.dock) + 0.04, puzzle.dock.y]; room.addChild(destination)
         return room
+    }
+
+    static func makeMissionCargo(_ kind: ROBCargoKind) -> Entity {
+        let root = Entity(); root.scale = .init(repeating: 1.35)
+        func add(_ shape: MeshResource, _ color: UIColor, _ y: Float = 0) {
+            let part = ModelEntity(mesh: shape, materials: [SimpleMaterial(color: color, isMetallic: kind != .chessPawn)])
+            part.position.y = y; root.addChild(part)
+        }
+        switch kind {
+        case .supplyCrate:
+            add(.generateBox(size: [0.24, 0.24, 0.24], cornerRadius: 0.01), .systemTeal)
+            for y in [Float(-0.06), 0.06] { add(.generateBox(size: [0.245, 0.045, 0.245]), .systemYellow, y) }
+        case .batteryModule:
+            add(.generateCylinder(height: 0.24, radius: 0.095), .systemTeal)
+            add(.generateCylinder(height: 0.025, radius: 0.08), .systemYellow, 0.13)
+            add(.generateCylinder(height: 0.025, radius: 0.10), .systemYellow)
+        case .chessPawn:
+            let ivory = UIColor(red: 0.95, green: 0.91, blue: 0.79, alpha: 1)
+            add(.generateCylinder(height: 0.035, radius: 0.11), ivory, -0.10)
+            add(.generateCylinder(height: 0.15, radius: 0.048), ivory, -0.01)
+            add(.generateSphere(radius: 0.065), ivory, 0.10)
+        }
+        return root
+    }
+
+    static func makeCargoDestination(_ kind: ROBCargoKind) -> Entity {
+        let root = Entity(); root.scale = .init(repeating: 1.35)
+        let board = ModelEntity(mesh: .generateBox(size: [0.48, 0.014, 0.48]), materials: [SimpleMaterial(color: .systemTeal, isMetallic: false)])
+        root.addChild(board)
+        if kind == .chessPawn {
+            for x in 0..<4 { for z in 0..<4 {
+                let square = ModelEntity(mesh: .generateBox(size: [0.118, 0.009, 0.118]), materials: [SimpleMaterial(color: (x + z).isMultiple(of: 2) ? .white : .darkGray, isMetallic: false)])
+                square.position = [(Float(x) - 1.5) * 0.12, 0.012, (Float(z) - 1.5) * 0.12]; root.addChild(square)
+            } }
+        }
+        let target = ModelEntity(mesh: .generateCylinder(height: 0.008, radius: 0.15), materials: [UnlitMaterial(color: UIColor.systemGreen.withAlphaComponent(0.7))])
+        target.position.y = 0.024; root.addChild(target)
+        return root
     }
 
     static let puzzleKeySurfaceOffset: Float = 0.001
@@ -784,6 +831,7 @@ import UIKit
     }
 
     static func applyPuzzleState(to room: Entity, session: GameSession) {
+        room.findEntity(named: "Mission Cargo")?.position = session.isCarryingCargo ? session.cargoHandPosition : session.pickupTask.position
         room.findEntity(named: "Puzzle Key")?.isEnabled = !session.hasKey
         let beaconPulse = 1 + max(0, Float(sin(session.elapsed * 4.4))) * 0.32
         room.findEntity(named: "Puzzle Key Beacon")?.scale = [beaconPulse, 1, beaconPulse]

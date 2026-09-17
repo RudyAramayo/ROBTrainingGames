@@ -1,12 +1,20 @@
 # ROB Training Submission Checklist
 
-Status: **iOS 1.0 (3) uploaded; processing verification and App Review replacement pending App Store Connect sign-in**
+Status: **iOS 1.0 (4) validated and prepared for archive/upload; App Review replacement pending**
 
 Updated: September 17, 2026
 
 The latest iOS source was archived as version 1.0 build 3 and uploaded successfully on September 17, 2026 at 7:40 AM Pacific. Xcode reported `Uploaded package is processing`, `Upload succeeded`, and `EXPORT SUCCEEDED`. This does **not** establish that processing is complete, that build 3 is selected for App Review, or that the app is publicly available.
 
 The browser's App Store Connect session expired while inspecting the release. Sign-in is required to verify processing, replace build 2 in the pending review submission, save the updated 24-mission store text, and resubmit with automatic release. The source metadata is prepared in `AppStore/metadata.md`; those edits have not yet been saved to the portal. Apple Vision Pro remains a separate draft on hold. Unchecked hardware and manual checks below remain unverified; automated and simulator checks do not establish those results.
+
+## September 17 build 4 preparation
+
+- Added matching 24-level lean/grasp/carry/delivery objectives, including chess-pawn placement; ruleset `2026.09.17.2`.
+- All 116 iOS Simulator tests passed with zero failures/skips; new tests cover interaction guards, all 24 pickup/delivery stances, scoring once, reset and visible-hand agreement.
+- The visionOS Simulator build passed, including controller stick-click actions. Vision distribution remains on hold.
+- Results: `/Users/rob/Downloads/ROBTraining-Releases/2026-09-17-build-4/ValidationTests.xcresult`; Vision compile log is in the same folder.
+- Archive/upload and actual Apple processing/review status will be recorded after the release source commit. No new public release is claimed by these validations.
 
 ## Release records
 

@@ -21,6 +21,8 @@ final class VisionGameControllerInput: NSObject {
         var hackPressed = false
         var menuPressed = false
         var rocketPressed = false
+        var leanPressed = false
+        var grabPressed = false
     }
 
     private(set) var isConnected = false
@@ -40,6 +42,8 @@ final class VisionGameControllerInput: NSObject {
     @ObservationIgnored private var hackWasPressed = false
     @ObservationIgnored private var menuWasPressed = false
     @ObservationIgnored private var rocketWasPressed = false
+    @ObservationIgnored private var leanWasPressed = false
+    @ObservationIgnored private var grabWasPressed = false
 
     func start(session: GameSession) {
         self.session = session
@@ -85,6 +89,8 @@ final class VisionGameControllerInput: NSObject {
         laserWasPressed = false
         hackWasPressed = false
         menuWasPressed = false
+        leanWasPressed = false
+        grabWasPressed = false
         publish()
     }
 
@@ -139,6 +145,8 @@ final class VisionGameControllerInput: NSObject {
         state.hackPressed = gamepad.buttonB.isPressed
         state.menuPressed = gamepad.buttonMenu.isPressed
         state.rocketPressed = gamepad.leftShoulder.isPressed
+        state.leanPressed = gamepad.leftThumbstickButton?.isPressed == true
+        state.grabPressed = gamepad.rightThumbstickButton?.isPressed == true
         states[id] = state
         publish()
     }
@@ -185,6 +193,12 @@ final class VisionGameControllerInput: NSObject {
         let hackPressed = states.values.contains(where: \.hackPressed)
         let menuPressed = states.values.contains(where: \.menuPressed)
         let rocketPressed = states.values.contains(where: \.rocketPressed)
+        let leanPressed = states.values.contains(where: \.leanPressed)
+        let grabPressed = states.values.contains(where: \.grabPressed)
+        if leanPressed && !leanWasPressed { session?.togglePickupLean() }
+        if grabPressed && !grabWasPressed { session?.interactCargo() }
+        leanWasPressed = leanPressed
+        grabWasPressed = grabPressed
         if rocketPressed != rocketWasPressed { session?.setRocketHeld(rocketPressed) }
         rocketWasPressed = rocketPressed
         if saberPressed && !saberWasPressed { session?.saberAttack() }

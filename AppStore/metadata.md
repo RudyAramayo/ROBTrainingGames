@@ -4,7 +4,7 @@
 
 - Seller-facing brand: Orbitus Robotics
 - Version: 1.0
-- iOS release build: 3 (see `submission-checklist.md` for submission status)
+- iOS release build: 4 (see `submission-checklist.md` for submission status)
 - Price: Free
 - Primary language: English (U.S.)
 - Primary category: Education
@@ -42,6 +42,7 @@ ROB Training includes:
 • 24 progressively harder missions, including nine elevated booster stages
 • A detailed captured ROB model with balanced flipper climbs and moving shoulder laser
 • Energy-powered plasma boosters, targeting upgrades, and Kyber Crystal saber upgrades
+• Lean, grasp and deliver crates, batteries and chess pieces in every mission
 • Independent tread controls plus keyboard support
 • Active spider and sentry robots that move and fight back
 • Dual-saber combos and a chargeable virtual pan-tilt training laser
@@ -75,6 +76,7 @@ ROB Training Vision includes:
 
 • A dedicated spatial workshop for Apple Vision Pro
 • 24 shared missions synchronized with ROB Training on iPhone and iPad
+• Lean, grasp and deliver crates, batteries and chess pieces
 • A detailed captured ROB model with balanced flipper climbs and moving shoulder laser
 • Energy-powered plasma boosters, targeting upgrades, and Kyber Crystal saber upgrades
 • Full-scale ROB placement and component inspection
@@ -92,3 +94,10 @@ Explore the real ROB project at https://www.orbitusrobotics.com.
 ## Review notes
 
 No account is required. Native missions work offline. On the Play tab, choose Start Full-Screen Mission and use the matching left and right tread joysticks to drive. The X button returns to the menu and pauses the mission. Trigger three consecutive Saber attacks to see the spin. Hold Laser to charge, then release to fire; automatic locking requires the Targeting Computer upgrade. The 24-level campaign adds nine booster stages. The Plasma Booster unlocks after Level 3 and costs 900 earned skill points; players can replay a completed level to earn upgrades. There are no in-app purchases. The Learn tab includes a learning guide and opens our web-based Circuit Quest in Safari; the linked web activities require internet. The optional Battle tab requests local-network access so nearby copies of ROB Training can discover one another; traffic remains inside the encrypted local Multipeer Connectivity session. Battle supports deathmatch and Capture the Flag for up to four players. AR Lab uses the camera after opening that tab and accepting camera permission. ROB Voice is optional and requests microphone and speech-recognition permission only after Talk to ROB is selected. Scores are stored locally; no public leaderboard or account is required.
+
+## Build 4 review note addition
+
+Each level now also requires delivery of its marked cargo. Tap Lean, align the
+right hand using the treads, stop, and tap Grab. Carry the object to its pad or
+chess square, lean again and tap Place. C and G provide keyboard equivalents.
+The model motion is simulated; no robot connection or hardware command exists.

@@ -339,6 +339,14 @@ private struct VisionControlDeck: View {
                         Text(session.baseFlipperDescription)
                             .font(.caption.bold())
                             .foregroundStyle(session.isLedgeStabilized ? .green : .orange)
+                        HStack {
+                            Button(session.pickupLeanRequested ? "Stand · C" : "Lean · C") { session.togglePickupLean() }
+                                .disabled(!session.isRunning || !session.isPickupGrounded)
+                            Button(session.isCarryingCargo ? "Place · G" : "Grab · G") { session.interactCargo() }
+                                .disabled(!session.isRunning || session.isCargoDelivered)
+                        }
+                        .buttonStyle(.borderedProminent).tint(.mint)
+                        Text(session.cargoObjective).font(.callout).foregroundStyle(.mint)
                         if session.hasFlipperHackTargets {
                             Button(session.flipperHackDescription, systemImage: "dot.radiowaves.left.and.right") {
                                 session.startFlipperHack()

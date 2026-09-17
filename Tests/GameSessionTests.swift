@@ -30,12 +30,118 @@ final class GameSessionTests: XCTestCase {
         XCTAssertGreaterThan(partial.right, 0)
     }
 
+    private func alignLeanedHand(_ game: GameSession, with target: SIMD3<Float>, file: StaticString = #filePath, line: UInt = #line) {
+        game.stopDrive()
+        for _ in 0..<60 where game.saberAnimation > 0 { game.tick(1.0 / 60) }
+        if !game.pickupLeanRequested { game.togglePickupLean() }
+        for _ in 0..<40 { game.tick(1.0 / 60) }
+        let targetFloor = game.puzzle.surfaceHeight(at: [target.x, target.z])
+        var found = false
+        for heading in [Float.pi, 0, Float.pi / 2, -Float.pi / 2] {
+            game.robotHeading = heading
+            let offset = game.cargoHandPosition - game.robotPosition
+            let stance = SIMD3<Float>(target.x - offset.x, targetFloor, target.z - offset.z)
+            if game.isRobotPositionClear(stance), abs(game.puzzle.surfaceHeight(at: [stance.x, stance.z]) - targetFloor) < 0.01 {
+                game.robotPosition = stance; found = true; break
+            }
+        }
+        XCTAssertTrue(found, "No clear same-height grasp stance on level \(game.level.id)", file: file, line: line)
+        for _ in 0..<3 { game.tick(1.0 / 60) }
+        XCTAssertTrue(game.isPickupGrounded, file: file, line: line)
+        XCTAssertEqual(game.pickupLeanAmount, 1, accuracy: 0.001, file: file, line: line)
+        XCTAssertLessThanOrEqual(simd_distance(game.cargoHandPosition, target), ROBPickupTask.reach * 1.35, file: file, line: line)
+    }
+
+    private func deliverCurrentCargo(_ game: GameSession, file: StaticString = #filePath, line: UInt = #line) {
+        if !game.isRunning { game.begin() }
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        game.doorOpen = true
+        alignLeanedHand(game, with: game.pickupTask.position, file: file, line: line)
+        game.interactCargo()
+        XCTAssertTrue(game.isCarryingCargo, game.message, file: file, line: line)
+        alignLeanedHand(game, with: game.cargoDestination, file: file, line: line)
+        let scoreBeforeDelivery = game.score
+        game.interactCargo()
+        XCTAssertTrue(game.isCargoDelivered, game.message, file: file, line: line)
+        XCTAssertEqual(game.score, scoreBeforeDelivery + ROBPickupTask.reward, file: file, line: line)
+    }
+
     private func completeCurrentLevel(_ game: GameSession) {
+        deliverCurrentCargo(game)
         game.collectedCells = game.level.cellCount
         game.doorOpen = true
         for index in game.enemies.indices { game.enemies[index].isActive = false }
+        game.robotPosition = [game.puzzle.dock.x, game.puzzle.surfaceHeight(at: game.puzzle.dock), game.puzzle.dock.y]
         game.nextLevel()
         if game.isUpgradeIntermission { game.continueAfterUpgradeIntermission() }
+    }
+
+    func testCargoInteractionRequiresAStoppedGroundedLeanAndSupportsDropRecovery() {
+        var task = ROBPickupTask(position: [0, 0.16, 0])
+        let destination = SIMD3<Float>(2, 0.2, 0)
+        func attempt(grounded: Bool = true, lean: Float = 1, speed: Double = 0,
+                     hand: SIMD3<Float> = [0, 0.2, 0], clear: Bool = true, dropClear: Bool = true) -> ROBPickupTask.Event {
+            task.interact(running: true, grounded: grounded, lean: lean, speed: speed,
+                          hand: hand, destination: destination, dropPosition: [hand.x, 0.16, hand.z],
+                          scale: 1.35, clear: clear, dropClear: dropClear)
+        }
+        XCTAssertEqual(attempt(grounded: false), .land)
+        XCTAssertEqual(attempt(lean: 0.5), .lean)
+        XCTAssertEqual(attempt(speed: 0.2), .stop)
+        XCTAssertEqual(attempt(hand: [0, 1, 0]), .outOfReach)
+        XCTAssertEqual(attempt(clear: false), .blocked)
+        XCTAssertEqual(task.phase, .waiting)
+        XCTAssertEqual(attempt(), .pickedUp)
+        XCTAssertEqual(attempt(dropClear: false), .unsafeDrop)
+        XCTAssertEqual(task.phase, .carrying)
+        XCTAssertEqual(attempt(hand: [1, 0.2, 0]), .dropped)
+        XCTAssertEqual(task.position, [1, 0.16, 0])
+        XCTAssertEqual(attempt(hand: [1, 0.2, 0]), .pickedUp)
+        XCTAssertEqual(attempt(hand: destination), .delivered)
+        XCTAssertEqual(attempt(hand: destination), .inactive)
+        XCTAssertEqual(task.position, destination)
+    }
+
+    func testAllCargoMissionsHaveReachableGraspAndDeliveryStancesAndResetCleanly() {
+        let game = GameSession(audioEnabled: false)
+        for index in game.levels.indices {
+            game.levelIndex = index; game.begin()
+            XCTAssertEqual(game.cargoKind, ROBCargoKind.allCases[index % 3])
+            XCTAssertFalse(game.canFinish)
+            deliverCurrentCargo(game)
+            let deliveredScore = game.score
+            game.interactCargo()
+            XCTAssertEqual(game.score, deliveredScore)
+            let room = RobotFactory.makeTrainingRoom(level: index, puzzle: game.puzzle)
+            RobotFactory.applyPuzzleState(to: room, session: game)
+            XCTAssertEqual(room.findEntity(named: "Mission Cargo")?.position, game.cargoDestination)
+            game.begin()
+            XCTAssertEqual(game.pickupTask.phase, .waiting)
+            XCTAssertFalse(game.pickupLeanRequested)
+            XCTAssertEqual(game.pickupLeanAmount, 0)
+        }
+    }
+
+    func testCargoFollowsTheVisibleRightHandAndTheChassisStaysOnTheFloor() {
+        let game = GameSession(audioEnabled: false); game.begin()
+        for i in game.enemies.indices { game.enemies[i].isActive = false }
+        alignLeanedHand(game, with: game.pickupTask.position)
+        let robot = RobotFactory.makeROB()
+        robot.position = game.robotPosition
+        robot.orientation = simd_quatf(angle: game.robotHeading, axis: [0, 1, 0])
+        RobotFactory.applyWeapons(to: robot, session: game)
+        let hand = robot.findEntity(named: "Right Gripper Palm")
+        XCTAssertNotNil(hand)
+        if let hand {
+            XCTAssertLessThan(simd_distance(hand.position(relativeTo: nil), game.cargoHandPosition), 0.001)
+        }
+        XCTAssertEqual(game.baseLiftPitch, 0, accuracy: 0.001)
+        XCTAssertEqual(game.robotPosition.y, 0, accuracy: 0.001)
+        game.interactCargo()
+        for _ in 0..<45 { game.tick(1.0 / 60) }
+        XCTAssertTrue(game.isCarryingCargo)
+        XCTAssertEqual(game.pickupLeanAmount, 0, accuracy: 0.001)
+        XCTAssertGreaterThan(game.cargoHandPosition.y, 0.4)
     }
 
     func testCalibrationMatchesBrowserCampaign() {
@@ -58,6 +164,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertNil(game.puzzle.key)
         XCTAssertTrue(game.doorOpen)
 
+        deliverCurrentCargo(game)
         game.collectedCells = game.level.cellCount
         for index in game.enemies.indices { game.enemies[index].isActive = false }
         game.robotPosition = [game.puzzle.dock.x, 0, game.puzzle.dock.y]
@@ -939,6 +1046,7 @@ final class GameSessionTests: XCTestCase {
     func testFinalLevelPaysItsSkillRewardOnlyOnce() {
         let game = GameSession(audioEnabled: false)
         game.levelIndex = game.levels.count - 1; game.begin()
+        deliverCurrentCargo(game)
         game.robotPosition = [game.puzzle.dock.x, game.puzzle.surfaceHeight(at: game.puzzle.dock), game.puzzle.dock.y]
         game.collectedCells = game.level.cellCount; game.doorOpen = true
         for index in game.enemies.indices { game.enemies[index].isActive = false }
@@ -2752,6 +2860,7 @@ extension GameSessionTests {
             XCTAssertFalse(game.canFinish, "Cannot finish underneath the summit dock")
         }
         game.levelIndex = 14; game.begin()
+        deliverCurrentCargo(game)
         game.collectedCells = game.level.cellCount; game.doorOpen = true
         for i in game.enemies.indices { game.enemies[i].isActive = false }
         game.nextLevel(); game.continueAfterUpgradeIntermission()

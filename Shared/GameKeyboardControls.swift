@@ -20,6 +20,8 @@ struct GameKeyboardControls: ViewModifier {
                         if press.key == "e" { session.activateShield() }
                         if press.key == "f" { session.moveBaseFlipperForward() }
                         if press.key == "b" { session.moveBaseFlipperBackward() }
+                        if press.key == "c" { session.togglePickupLean() }
+                        if press.key == "g" { session.interactCargo() }
                         if press.key == .space { session.saberAttack() }
                     }
                 } else {
@@ -50,7 +52,7 @@ struct GameKeyboardControls: ViewModifier {
     }
 
     private static let supportedKeys: Set<KeyEquivalent> = [
-        "w", "a", "s", "d", "q", "e", "f", "b", "r", .upArrow, .downArrow, .leftArrow, .rightArrow, .space,
+        "w", "a", "s", "d", "q", "e", "f", "b", "r", "c", "g", .upArrow, .downArrow, .leftArrow, .rightArrow, .space,
     ]
 }
 

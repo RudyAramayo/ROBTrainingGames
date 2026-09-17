@@ -34,7 +34,7 @@ Run the shared campaign tests on an iOS Simulator with `xcodebuild test -scheme 
 
 ## Cross-platform gameplay sync
 
-`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. `Shared/ROBDroidProfile.swift` is the native half of the portable customization format; its field keys, allowlists, Base64URL encoding, and FNV-1a checksum must remain byte-compatible with the website's `assets/js/rob-droid-profile.mjs`. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.17.1`.
+`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. `Shared/ROBDroidProfile.swift` is the native half of the portable customization format; its field keys, allowlists, Base64URL encoding, and FNV-1a checksum must remain byte-compatible with the website's `assets/js/rob-droid-profile.mjs`. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.17.2`.
 
 App Store delivery is part of every released game update; pushing source or updating the website alone does not finish a release. Increment `CURRENT_PROJECT_VERSION` in `project.yml`, regenerate the Xcode project, run the shared campaign tests, and commit the release source before archiving. Archive `ROBTrainingiOS` in Release for `generic/platform=iOS` with `-allowProvisioningUpdates`, then use `xcodebuild -exportArchive` with `AppStore/ExportOptions-Upload.plist` to upload that signed archive. Verify Apple processing, attach the new build to the intended App Store version, synchronize `AppStore/metadata.md`, and complete submission. Record the source commit, build, validation, and actual Apple status in `AppStore/submission-checklist.md`; an upload is not a public release. ROB Training Vision has a separate App Store record and remains on hold until its release is requested. Production icons/screenshots, signing, privacy answers, age rating, support URLs, and device validation must match the submitted build. Keep lessons synchronized with `Presentation/ROB-Books/ROBOT_GAME_CURRICULUM.md` as the books evolve.
 
@@ -92,3 +92,17 @@ The campaign now has 24 levels with longer routes and additional slalom obstacle
 Browser objectives are checked against a connected route with full chassis turning clearance; cells previously authored inside walls are relocated. Door partitions retain wide approach lanes, the cell objective displays a collected/required count, and wall-turn separation prevents corner traps. The Continue button resumes at the next unlocked level after loading an update.
 
 Steering uses a separate 1.1-radian-per-second tread-differential rate: about 91°/s with keyboard steering and 126°/s with fully opposed joysticks. Speed upgrades increase forward/reverse travel while the turn rate stays the same.
+
+## Lean and deliver
+
+Each campaign level includes a supply crate, battery module or chess pawn and a
+marked destination. Use C / Lean to lower the right hand, move slowly into reach,
+stop both treads and use G / Grab. ROB stands while carrying; lean again and
+Place on the target. A wrong drop can be picked up again. Delivery adds 350
+arcade points once and is required for mission completion. iOS and visionOS
+provide Lean/Grab buttons; Vision gamepads also use left/right stick clicks.
+
+The shared pickup state machine rejects grabs while airborne, moving, upright,
+out of reach or blocked. The captured arms hang during the torso lean and the
+carried object follows the visible right palm. These game poses use illustrative
+geometry, not calibrated B1 commands or a measured LACT stroke-to-angle map.

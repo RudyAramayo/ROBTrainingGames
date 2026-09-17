@@ -111,6 +111,8 @@ private struct MissionLaunchView: View {
                             }
                             .font(.headline)
                             Text(session.level.challenge).font(.subheadline).foregroundStyle(.secondary)
+                            Label(session.cargoObjective, systemImage: session.isCargoDelivered ? "checkmark.circle.fill" : "shippingbox.fill")
+                                .font(.subheadline).foregroundStyle(.mint)
                             CombatHealthBars(session: session, compact: true)
                             HStack {
                                 Label("\(session.collectedCells)/\(session.level.cellCount) cells", systemImage: "bolt.fill")
@@ -400,6 +402,7 @@ struct MissionCornerHUD: View {
             .font(.caption2.bold())
             .monospacedDigit()
             miniMeter(icon: "heart.fill", value: Double(session.health), maximum: Double(session.maxHealth), color: healthColor, label: "ROB health")
+            Text(session.cargoObjective).font(.caption.bold()).foregroundStyle(.mint).fixedSize(horizontal: false, vertical: true)
             miniMeter(icon: "shield.fill", value: Double(session.shields), maximum: Double(session.maxShields), color: .cyan, label: "ROB shields")
             miniMeter(icon: "bolt.batteryblock.fill", value: session.energy, maximum: session.maxEnergy, color: session.energyFraction < 0.2 ? .orange : .mint, label: "System energy")
             Text("\(session.hasAutoTargeting ? "AUTO TARGETING" : "BASIC MANUAL AIM") · \(Int(ceil(session.currentLaserEnergyCost))) E / SHOT")
@@ -491,6 +494,16 @@ struct MobileTankControls: View {
         HStack(alignment: .bottom, spacing: 0) {
             HStack(alignment: .bottom, spacing: 4) {
                 VStack(spacing: 5) {
+                    HUDActionButton(systemImage: session.pickupLeanRequested ? "figure.stand" : "arrow.down.to.line",
+                                    tint: .mint, size: actionSize,
+                                    accessibilityLabel: session.pickupLeanRequested ? "Stand upright" : "Lean down to grasp",
+                                    disabled: !session.isRunning || !session.isPickupGrounded,
+                                    action: session.togglePickupLean)
+                    HUDActionButton(systemImage: session.isCarryingCargo ? "tray.and.arrow.down.fill" : "hand.raised.fingers.spread.fill",
+                                    tint: .teal, size: actionSize,
+                                    accessibilityLabel: session.isCarryingCargo ? "Place cargo" : "Grab cargo with the right hand",
+                                    disabled: !session.isRunning || session.isCargoDelivered,
+                                    action: session.interactCargo)
                     RocketBoosterButton(session: session, compact: true)
                     HUDActionButton(
                         systemImage: "arrow.down.circle.fill",
