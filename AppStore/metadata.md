@@ -4,7 +4,7 @@
 
 - Seller-facing brand: Orbitus Robotics
 - Version: 1.0
-- iOS build submitted for review: 2
+- iOS release build: 3 (see `submission-checklist.md` for submission status)
 - Price: Free
 - Primary language: English (U.S.)
 - Primary category: Education
@@ -26,18 +26,22 @@
 - SKU: ROB-TRAINING-IOS-1
 - Name: ROB Training
 - Subtitle: Drive, battle, learn ROB
-- Promotional text: Take command of ROB in fifteen hands-on robotics missions with tri-wheel driving, active enemies, dual sabers, target-lock lasers, and on-device voice.
+- Promotional text: Command ROB through 24 robotics missions. Climb ledges, unlock blue-plasma boosters, and earn targeting and saber upgrades through tougher battles.
 - Keywords: robotics,education,STEM,robot,spatial,training,missions,engineering,AR,simulation
 
 ### Description
 
-Meet ROB, the Orbitus Robotics training robot, and master fifteen increasingly challenging missions built around driving, sensing, safety, combat timing, and route planning.
+Meet ROB, the Orbitus Robotics training robot, and master 24 increasingly challenging missions built around driving, sensing, safety, combat timing, and route planning.
 
-Drive ROB's independent tri-wheel treads through expanded training rooms. Collect energy cells, find keys, open locked partitions, evade moving spider and sentry robots, and reach Mission Control. Chain wide dual-arm saber swings into a full spin attack, or wait for the virtual pan-tilt gatling to lock before charging a blue training shot.
+Drive ROB's independent tri-wheel treads through expanded training rooms. Collect energy cells, find keys, open locked partitions, evade moving spider and sentry robots, and reach Mission Control. Raise the front treads with the flippers, mount a ledge, and counter-rotate to lift the rear while the torso balances. Unlock a blue-plasma booster to reach higher platforms, managing the same energy reserve used by driving and lasers.
+
+Chain wide dual-arm saber swings into a full spin attack. Aim the virtual shoulder laser manually at first, then earn the Targeting Computer upgrade for automatic locks. Upgrade Kyber Crystals to increase saber damage, and plan your spending as stronger enemies and scarcer skill points raise the challenge.
 
 ROB Training includes:
 
-• Fifteen progressively harder missions
+• 24 progressively harder missions, including nine elevated booster stages
+• A detailed captured ROB model with balanced flipper climbs and moving shoulder laser
+• Energy-powered plasma boosters, targeting upgrades, and Kyber Crystal saber upgrades
 • Independent tread controls plus keyboard support
 • Active spider and sentry robots that move and fight back
 • Dual-saber combos and a chargeable virtual pan-tilt training laser
@@ -58,19 +62,21 @@ Discover the real ROB project, books, videos, and engineering work at https://ww
 - SKU: ROB-TRAINING-VISION-1
 - Name: ROB Training Vision
 - Subtitle: ROB training in your space
-- Promotional text: Bring ROB into your space for fifteen spatial robotics missions with full-scale inspection, moving sentries, saber combos, target-lock lasers, and on-device voice.
+- Promotional text: Bring ROB into your space for 24 robotics missions with balanced ledge climbs, blue-plasma boosters, tougher enemies, and earned targeting and saber upgrades.
 - Keywords: robotics,spatial,education,STEM,robot,Vision Pro,training,missions,engineering,simulation
 
 ### Description
 
 Bring ROB into your space with a dedicated Apple Vision Pro robotics workshop from Orbitus Robotics.
 
-Enter a full-scale immersive training room, command ROB through fifteen increasingly difficult missions, and inspect the systems that make the robot work. Drive independent tri-wheel treads, collect energy cells, unlock partitions, defend against moving spider and sentry robots, and combine dual-saber attacks with a scanning virtual pan-tilt training laser.
+Enter a full-scale immersive training room, command ROB through 24 increasingly difficult missions, and inspect the systems that make the robot work. Drive independent tri-wheel treads, collect energy cells, unlock partitions, and climb ledges with balanced flipper motion. Unlock energy-powered blue-plasma boosters for higher platforms. Defend against moving spider and sentry robots, earn Kyber Crystal saber upgrades, and upgrade the manually aimed shoulder laser's targeting computer to enable automatic locks.
 
 ROB Training Vision includes:
 
 • A dedicated spatial workshop for Apple Vision Pro
-• Fifteen shared missions synchronized with ROB Training on iPhone and iPad
+• 24 shared missions synchronized with ROB Training on iPhone and iPad
+• A detailed captured ROB model with balanced flipper climbs and moving shoulder laser
+• Energy-powered plasma boosters, targeting upgrades, and Kyber Crystal saber upgrades
 • Full-scale ROB placement and component inspection
 • Moving enemies that pursue, lunge, circle, and return fire
 • Wide saber swings, a fully extended spin attack, and chargeable laser shots
@@ -85,4 +91,4 @@ Explore the real ROB project at https://www.orbitusrobotics.com.
 
 ## Review notes
 
-No account is required. Native missions work offline. On the Play tab, choose Start Full-Screen Mission and use the matching left and right tread joysticks to drive. The X button returns to the menu and pauses the mission. Trigger three consecutive Saber attacks to see the spin. Hold Laser to charge, then release to fire. The Learn tab includes a learning guide and opens our web-based Circuit Quest in Safari; the linked web activities require internet. The optional Battle tab requests local-network access so nearby copies of ROB Training can discover one another; traffic remains inside the encrypted local Multipeer Connectivity session. Battle supports deathmatch and Capture the Flag for up to four players. AR Lab uses the camera after opening that tab and accepting camera permission. ROB Voice is optional and requests microphone and speech-recognition permission only after Talk to ROB is selected. Scores are stored locally; no public leaderboard or account is required.
+No account is required. Native missions work offline. On the Play tab, choose Start Full-Screen Mission and use the matching left and right tread joysticks to drive. The X button returns to the menu and pauses the mission. Trigger three consecutive Saber attacks to see the spin. Hold Laser to charge, then release to fire; automatic locking requires the Targeting Computer upgrade. The 24-level campaign adds nine booster stages. The Plasma Booster unlocks after Level 3 and costs 900 earned skill points; players can replay a completed level to earn upgrades. There are no in-app purchases. The Learn tab includes a learning guide and opens our web-based Circuit Quest in Safari; the linked web activities require internet. The optional Battle tab requests local-network access so nearby copies of ROB Training can discover one another; traffic remains inside the encrypted local Multipeer Connectivity session. Battle supports deathmatch and Capture the Flag for up to four players. AR Lab uses the camera after opening that tab and accepting camera permission. ROB Voice is optional and requests microphone and speech-recognition permission only after Talk to ROB is selected. Scores are stored locally; no public leaderboard or account is required.
