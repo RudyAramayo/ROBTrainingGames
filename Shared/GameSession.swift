@@ -33,7 +33,8 @@ struct ROBLevel: Identifiable, Sendable {
     let requiresKey: Bool
     let challenge: String
     var enemyCount: Int { enemyKinds.count }
-    var arenaHalfExtent: Float { 5.2 + min(Float(id - 1) * 0.08, 0.8) }
+    var requiresBooster: Bool { id >= 16 }
+    var arenaHalfExtent: Float { 7.4 + min(Float(id - 1) * 0.08, 0.8) }
 }
 
 enum TrainingEnemyKind: String, Sendable {
@@ -284,7 +285,7 @@ struct PuzzleGeometry: Sendable {
     let ledges: [PuzzleLedge]
 
     func ledge(at point: SIMD2<Float>) -> PuzzleLedge? {
-        ledges.first { $0.contains(point) }
+        ledges.filter { $0.contains(point) }.max { $0.height < $1.height }
     }
 
     func surfaceHeight(at point: SIMD2<Float>) -> Float {
@@ -303,6 +304,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
     case weaponPower
     case targetingComputer
     case kyberCrystals
+    case rocketBooster
 
     var id: String { rawValue }
     var displayName: String {
@@ -312,6 +314,7 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
         case .weaponPower: "Laser Power"
         case .targetingComputer: "Targeting Computer"
         case .kyberCrystals: "Kyber Crystals"
+        case .rocketBooster: "Plasma Booster"
         }
     }
     var summary: String {
@@ -320,11 +323,12 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
         case .energyCapacity: "Adds 60 energy and dramatically improves cells and passive charging."
         case .weaponPower: "Adds one damage to laser hits."
         case .targetingComputer: "Replaces slow manual aim with fast automatic lock-on for every laser, including two independent Twin Blaster locks."
+        case .rocketBooster: "Hold to rise on blue plasma, steer in flight, then release to land. Uses 18 energy per second; recharge after landing."
         case .kyberCrystals: "Adds one saber damage per rank, from 1 to 4. Ranks 2 and 3 require clearing levels 5 and 10."
         }
     }
-    var maximumLevel: Int { self == .targetingComputer ? 1 : 3 }
-    func requiredCompletedLevel(for level: Int) -> Int { self == .kyberCrystals ? level * 5 : 0 }
+    var maximumLevel: Int { (self == .targetingComputer || self == .rocketBooster) ? 1 : 3 }
+    func requiredCompletedLevel(for level: Int) -> Int { self == .rocketBooster ? 3 : self == .kyberCrystals ? level * 5 : 0 }
     func cost(for level: Int) -> Int {
         switch self {
         case .speedBoost: 700 + level * 650
@@ -332,13 +336,14 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
         case .weaponPower: 900 + level * 800
         case .targetingComputer: 1_200
         case .kyberCrystals: 600 + level * 1_000
+        case .rocketBooster: 900
         }
     }
 }
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.16.7"
+    static let gameplayRulesetVersion = "2026.09.16.8"
     static let skillPointsStorageKey = "robSkillPoints"
     static func levelSkillReward(_ levelNumber: Int) -> Int { 100 + max(0, min(14, levelNumber - 1)) * 25 }
     static let laserRechargeDelay = 1.5
@@ -364,21 +369,30 @@ final class GameSession {
     let shieldPickupStrength = 24
     let repairPickupStrength = 35
     let levels = [
-        ROBLevel(id: 1, name: "Calibration Ledge", lesson: "Lower the flippers to raise the front, then drive onto the ledge. The flippers reverse automatically as the rear climbs and ROB levels out.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 4, timeBonus: 900, requiresKey: false, challenge: "Use the flipper to mount the raised deck, evade three active enemies, collect five cells, and reach the dock."),
-        ROBLevel(id: 2, name: "Key Workshop", lesson: "A key changes the state of a matching locked door.", cellCount: 5, enemyKinds: [.spider, .fax, .spider], enemyShields: 4, timeBonus: 1_100, requiresKey: true, challenge: "Find the cyan key while a three-robot patrol guards the workshop door."),
-        ROBLevel(id: 3, name: "Crossroads", lesson: "Plan a route before entering a narrow passage.", cellCount: 6, enemyKinds: [.spider, .fax, .spider], enemyShields: 4, timeBonus: 1_300, requiresKey: true, challenge: "Choose the safe branch, secure the key, then break through the center patrol."),
-        ROBLevel(id: 4, name: "Sensor Hall", lesson: "Wide clearance is often faster than scraping along obstacles.", cellCount: 6, enemyKinds: [.spider, .fax, .spider, .fax], enemyShields: 4, timeBonus: 1_500, requiresKey: false, challenge: "Use the expanded hall to separate four sentries guarding the cells."),
-        ROBLevel(id: 5, name: "Amber Armory", lesson: "A seven-joint arm trades reach for a larger collision envelope.", cellCount: 6, enemyKinds: [.fax, .spider, .fax, .spider], enemyShields: 6, timeBonus: 1_700, requiresKey: true, challenge: "Recover the armory key and chain wide saber swings without touching enemies."),
-        ROBLevel(id: 6, name: "Switchback Foundry", lesson: "Slow before turning so both treads can follow the planned curve.", cellCount: 7, enemyKinds: [.spider, .fax, .spider, .fax, .spider], enemyShields: 6, timeBonus: 1_900, requiresKey: true, challenge: "Navigate alternating turns while five guards coordinate their attacks."),
-        ROBLevel(id: 7, name: "Twin Sentinel Bay", lesson: "Keep one escape route open while engaging moving obstacles.", cellCount: 7, enemyKinds: [.fax, .fax, .spider, .spider, .fax], enemyShields: 6, timeBonus: 2_100, requiresKey: false, challenge: "Separate the sentinel wave and keep moving through crossfire."),
-        ROBLevel(id: 8, name: "Power Relay", lesson: "Complete prerequisites in the right order: key, door, cells, then dock.", cellCount: 7, enemyKinds: [.spider, .fax, .spider, .fax, .spider], enemyShields: 8, timeBonus: 2_300, requiresKey: true, challenge: "Unlock the relay room before clearing its reinforced defenders."),
-        ROBLevel(id: 9, name: "Guardian Maze", lesson: "Reliable autonomy needs state, perception, and a recoverable plan.", cellCount: 8, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 8, timeBonus: 2_600, requiresKey: true, challenge: "Find the key in the outer loop and survive the six-robot guardian wave."),
-        ROBLevel(id: 10, name: "Mission Control", lesson: "Combine driving, sequencing, tool use, and safe separation.", cellCount: 8, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 8, timeBonus: 3_000, requiresKey: true, challenge: "Complete the full safety sequence under alternating ranged and melee attacks."),
-        ROBLevel(id: 11, name: "Reactor Run", lesson: "A target lock is useful only when the route remains safe.", cellCount: 8, enemyKinds: [.spider, .spider, .fax, .spider, .fax, .fax], enemyShields: 8, timeBonus: 3_300, requiresKey: false, challenge: "Cross the reactor floor while charging shoulder shots between lunges."),
-        ROBLevel(id: 12, name: "Eclipse Hangar", lesson: "Scan, prioritize, and reposition before committing to an attack.", cellCount: 8, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 8, timeBonus: 3_600, requiresKey: true, challenge: "Open the hangar partition and defeat a balanced six-robot squad."),
-        ROBLevel(id: 13, name: "Quantum Causeway", lesson: "Short control cycles preserve options in crowded spaces.", cellCount: 9, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 10, timeBonus: 3_900, requiresKey: true, challenge: "Use spin attacks to make room without stopping in the causeway."),
-        ROBLevel(id: 14, name: "Siege Foundry", lesson: "Threat management matters more than attacking the nearest target.", cellCount: 9, enemyKinds: [.fax, .fax, .spider, .fax, .spider, .spider, .fax], enemyShields: 10, timeBonus: 4_200, requiresKey: true, challenge: "Break the foundry siege by charging shots only when the lane is clear."),
-        ROBLevel(id: 15, name: "Final Citadel", lesson: "Integrate mobility, target lock, timing, and tool choice.", cellCount: 10, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 10, timeBonus: 4_800, requiresKey: true, challenge: "Clear the eight-robot citadel wave and complete the expanded campaign."),
+        ROBLevel(id: 1, name: "Calibration Ledge", lesson: "Lower the flippers to raise the front, then drive onto the ledge. The flippers reverse automatically as the rear climbs and ROB levels out.", cellCount: 7, enemyKinds: [.spider, .fax, .spider], enemyShields: 4, timeBonus: 900, requiresKey: false, challenge: "Use the flipper to mount the raised deck, evade three active enemies, collect seven cells, and reach the dock."),
+        ROBLevel(id: 2, name: "Key Workshop", lesson: "A key changes the state of a matching locked door.", cellCount: 7, enemyKinds: [.spider, .fax, .spider], enemyShields: 4, timeBonus: 1_100, requiresKey: true, challenge: "Find the cyan key while a three-robot patrol guards the workshop door."),
+        ROBLevel(id: 3, name: "Crossroads", lesson: "Plan a route before entering a narrow passage.", cellCount: 8, enemyKinds: [.spider, .fax, .spider], enemyShields: 4, timeBonus: 1_300, requiresKey: true, challenge: "Choose the safe branch, secure the key, then break through the center patrol."),
+        ROBLevel(id: 4, name: "Sensor Hall", lesson: "Wide clearance is often faster than scraping along obstacles.", cellCount: 8, enemyKinds: [.spider, .fax, .spider, .fax], enemyShields: 4, timeBonus: 1_500, requiresKey: false, challenge: "Use the expanded hall to separate four sentries guarding the cells."),
+        ROBLevel(id: 5, name: "Amber Armory", lesson: "A seven-joint arm trades reach for a larger collision envelope.", cellCount: 8, enemyKinds: [.fax, .spider, .fax, .spider], enemyShields: 6, timeBonus: 1_700, requiresKey: true, challenge: "Recover the armory key and chain wide saber swings without touching enemies."),
+        ROBLevel(id: 6, name: "Switchback Foundry", lesson: "Slow before turning so both treads can follow the planned curve.", cellCount: 9, enemyKinds: [.spider, .fax, .spider, .fax, .spider], enemyShields: 6, timeBonus: 1_900, requiresKey: true, challenge: "Navigate alternating turns while five guards coordinate their attacks."),
+        ROBLevel(id: 7, name: "Twin Sentinel Bay", lesson: "Keep one escape route open while engaging moving obstacles.", cellCount: 9, enemyKinds: [.fax, .fax, .spider, .spider, .fax], enemyShields: 6, timeBonus: 2_100, requiresKey: false, challenge: "Separate the sentinel wave and keep moving through crossfire."),
+        ROBLevel(id: 8, name: "Power Relay", lesson: "Complete prerequisites in the right order: key, door, cells, then dock.", cellCount: 9, enemyKinds: [.spider, .fax, .spider, .fax, .spider], enemyShields: 8, timeBonus: 2_300, requiresKey: true, challenge: "Unlock the relay room before clearing its reinforced defenders."),
+        ROBLevel(id: 9, name: "Guardian Maze", lesson: "Reliable autonomy needs state, perception, and a recoverable plan.", cellCount: 10, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 8, timeBonus: 2_600, requiresKey: true, challenge: "Find the key in the outer loop and survive the six-robot guardian wave."),
+        ROBLevel(id: 10, name: "Mission Control", lesson: "Combine driving, sequencing, tool use, and safe separation.", cellCount: 10, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 8, timeBonus: 3_000, requiresKey: true, challenge: "Complete the full safety sequence under alternating ranged and melee attacks."),
+        ROBLevel(id: 11, name: "Reactor Run", lesson: "A target lock is useful only when the route remains safe.", cellCount: 10, enemyKinds: [.spider, .spider, .fax, .spider, .fax, .fax], enemyShields: 8, timeBonus: 3_300, requiresKey: false, challenge: "Cross the reactor floor while charging shoulder shots between lunges."),
+        ROBLevel(id: 12, name: "Eclipse Hangar", lesson: "Scan, prioritize, and reposition before committing to an attack.", cellCount: 10, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 8, timeBonus: 3_600, requiresKey: true, challenge: "Open the hangar partition and defeat a balanced six-robot squad."),
+        ROBLevel(id: 13, name: "Quantum Causeway", lesson: "Short control cycles preserve options in crowded spaces.", cellCount: 11, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 10, timeBonus: 3_900, requiresKey: true, challenge: "Use spin attacks to make room without stopping in the causeway."),
+        ROBLevel(id: 14, name: "Siege Foundry", lesson: "Threat management matters more than attacking the nearest target.", cellCount: 11, enemyKinds: [.fax, .fax, .spider, .fax, .spider, .spider, .fax], enemyShields: 10, timeBonus: 4_200, requiresKey: true, challenge: "Break the foundry siege by charging shots only when the lane is clear."),
+        ROBLevel(id: 15, name: "Final Citadel", lesson: "Integrate mobility, target lock, timing, and tool choice.", cellCount: 12, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 10, timeBonus: 4_800, requiresKey: true, challenge: "Clear the eight-robot citadel wave and unlock the nine-stage rocket campaign."),
+        ROBLevel(id: 16, name: "Plasma Launch Yard", lesson: "Budget energy for ascent, steer above the deck, and release thrust to land before recharging.", cellCount: 16, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 12, timeBonus: 5100, requiresKey: false, challenge: "Clear the extended slalom, collect cells on both blue landing pads, and boost to the summit dock."),
+        ROBLevel(id: 17, name: "Skybridge Depot", lesson: "Budget energy for ascent, steer above the deck, and release thrust to land before recharging.", cellCount: 16, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 12, timeBonus: 5400, requiresKey: false, challenge: "Clear the extended slalom, collect cells on both blue landing pads, and boost to the summit dock."),
+        ROBLevel(id: 18, name: "Blue Jet Refinery", lesson: "Budget energy for ascent, steer above the deck, and release thrust to land before recharging.", cellCount: 16, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 12, timeBonus: 5700, requiresKey: false, challenge: "Clear the extended slalom, collect cells on both blue landing pads, and boost to the summit dock."),
+        ROBLevel(id: 19, name: "Cloudbreak Relay", lesson: "Budget energy for ascent, steer above the deck, and release thrust to land before recharging.", cellCount: 16, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 14, timeBonus: 6000, requiresKey: false, challenge: "Clear the extended slalom, collect cells on both blue landing pads, and boost to the summit dock."),
+        ROBLevel(id: 20, name: "Orbital Liftworks", lesson: "Budget energy for ascent, steer above the deck, and release thrust to land before recharging.", cellCount: 16, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 14, timeBonus: 6300, requiresKey: false, challenge: "Clear the extended slalom, collect cells on both blue landing pads, and boost to the summit dock."),
+        ROBLevel(id: 21, name: "Ion Storm Crossing", lesson: "Budget energy for ascent, steer above the deck, and release thrust to land before recharging.", cellCount: 16, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 14, timeBonus: 6600, requiresKey: false, challenge: "Clear the extended slalom, collect cells on both blue landing pads, and boost to the summit dock."),
+        ROBLevel(id: 22, name: "Elevated Bastion", lesson: "Budget energy for ascent, steer above the deck, and release thrust to land before recharging.", cellCount: 16, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 16, timeBonus: 6900, requiresKey: false, challenge: "Clear the extended slalom, collect cells on both blue landing pads, and boost to the summit dock."),
+        ROBLevel(id: 23, name: "Starport Gauntlet", lesson: "Budget energy for ascent, steer above the deck, and release thrust to land before recharging.", cellCount: 16, enemyKinds: [.fax, .spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax, .spider], enemyShields: 16, timeBonus: 7200, requiresKey: false, challenge: "Clear the extended slalom, collect cells on both blue landing pads, and boost to the summit dock."),
+        ROBLevel(id: 24, name: "Plasma Summit", lesson: "Budget energy for ascent, steer above the deck, and release thrust to land before recharging.", cellCount: 16, enemyKinds: [.spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax, .spider, .fax], enemyShields: 16, timeBonus: 7500, requiresKey: false, challenge: "Clear the extended slalom, collect cells on both blue landing pads, and boost to the summit dock."),
     ]
     let components = [
         ROBComponent(id: "base", name: "Tri-Wheel Tracked Base", summary: "Three-wheel triangular tread pods expose the road wheels while a drive mixer preserves independent left and right tread speeds.", color: 0x263746),
@@ -456,6 +470,12 @@ final class GameSession {
     private(set) var energyUpgradeLevel = 0
     private(set) var weaponUpgradeLevel = 0
     private(set) var targetingComputerUpgradeLevel = 0
+    private(set) var rocketBoosterUpgradeLevel = 0
+    private(set) var rocketHeld = false
+    private var rocketFlight = ROBRocketFlight()
+    var hasRocketBooster: Bool { rocketBoosterUpgradeLevel > 0 }
+    var isRocketAirborne: Bool { rocketFlight.airborne }
+    var isRocketThrusting: Bool { isRunning && rocketFlight.thrusting }
     private(set) var kyberCrystalUpgradeLevel = 0
     private var hasAwardedLevelCompletion = false
     private var nextBoltID = 0
@@ -498,7 +518,7 @@ final class GameSession {
     var isClimbingLedge: Bool { baseClimbLedgeID != nil }
     var isFalling: Bool { supportMotion.phase == .falling }
     var isAtLedgeEdge: Bool { supportMotion.phase == .edge }
-    var isBaseGrounded: Bool { supportMotion.phase == .grounded }
+    var isBaseGrounded: Bool { !isRocketAirborne && !rocketHeld && supportMotion.phase == .grounded }
     private var climbLedge: PuzzleLedge? { puzzle.ledges.first { $0.id == baseClimbLedgeID } }
     var baseClimbProgress: Float {
         guard let ledge = climbLedge else { return 0 }
@@ -518,6 +538,7 @@ final class GameSession {
         return max(0, ledge.height - Self.robotContactSpan * sin(baseLiftPitch))
     }
     var baseLiftPitch: Float {
+        if isRocketAirborne { return 0 }
         if let ledge = climbLedge {
             let supportedPitch = asin(min(1, ledge.height / Self.robotContactSpan))
             let t = min(1, max(0, (baseClimbProgress - 0.75) / 0.25))
@@ -541,6 +562,7 @@ final class GameSession {
         return supportMotion.phase == .grounded ? Self.flipperGroundPitch(baseFlipperAngle) : supportMotion.pitch
     }
     var baseFlipperDescription: String {
+        if isRocketAirborne { return isRocketThrusting ? "Plasma ascent · 18 energy/s" : "Coasting to landing · hold booster to rise" }
         if isFalling { return "Descending · LACT balancing" }
         if isAtLedgeEdge { return "Edge support · LACT balancing" }
         if isClimbingLedge { return "Rear support · leveling" }
@@ -609,8 +631,17 @@ final class GameSession {
         guard let target = secondaryLockedEnemy else { return nil }
         return atan2(-(target.position.x - robotPosition.x), -(target.position.z - robotPosition.z))
     }
-    var canFinish: Bool { collectedCells == level.cellCount && remainingEnemies == 0 && (!level.requiresKey || doorOpen) }
-    var puzzle: PuzzleGeometry { Self.puzzleGeometry(for: level) }
+    var canFinish: Bool {
+        let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
+        let landedAtSummit = !isRocketAirborne && simd_distance(point, puzzle.dock) < 0.55 && abs(robotPosition.y - puzzle.surfaceHeight(at: puzzle.dock)) < 0.3
+        return collectedCells == level.cellCount && remainingEnemies == 0 && (!level.requiresKey || doorOpen) && (!level.requiresBooster || landedAtSummit)
+    }
+    @ObservationIgnored private var puzzleCache: [Int: PuzzleGeometry] = [:]
+    var puzzle: PuzzleGeometry {
+        if let cached = puzzleCache[level.id] { return cached }
+        let geometry = Self.puzzleGeometry(for: level); puzzleCache[level.id] = geometry
+        return geometry
+    }
 
     init(audioEnabled: Bool = true, progressStore: UserDefaults? = nil) {
         self.audioEnabled = audioEnabled
@@ -636,6 +667,7 @@ final class GameSession {
             energyUpgradeLevel = min(ROBUpgrade.energyCapacity.maximumLevel, max(0, store.integer(forKey: "robEnergyUpgradeLevel")))
             weaponUpgradeLevel = min(ROBUpgrade.weaponPower.maximumLevel, max(0, store.integer(forKey: "robWeaponUpgradeLevel")))
             targetingComputerUpgradeLevel = min(ROBUpgrade.targetingComputer.maximumLevel, max(0, store.integer(forKey: "robTargetingComputerUpgradeLevel")))
+            rocketBoosterUpgradeLevel = min(1, max(0, store.integer(forKey: "robRocketBoosterUpgradeLevel")))
             kyberCrystalUpgradeLevel = min(ROBUpgrade.kyberCrystals.maximumLevel, max(0, store.integer(forKey: "robKyberCrystalUpgradeLevel")))
             if let savedCode = store.string(forKey: ROBDroidProfile.storageKey),
                let savedProfile = try? ROBDroidProfileCode.decode(savedCode) {
@@ -660,6 +692,7 @@ final class GameSession {
         case .weaponPower: weaponUpgradeLevel
         case .targetingComputer: targetingComputerUpgradeLevel
         case .kyberCrystals: kyberCrystalUpgradeLevel
+        case .rocketBooster: rocketBoosterUpgradeLevel
         }
     }
     func upgradeCost(_ upgrade: ROBUpgrade) -> Int? {
@@ -687,6 +720,9 @@ final class GameSession {
         case .targetingComputer:
             targetingComputerUpgradeLevel += 1
             progressStore?.set(targetingComputerUpgradeLevel, forKey: "robTargetingComputerUpgradeLevel")
+        case .rocketBooster:
+            rocketBoosterUpgradeLevel = 1
+            progressStore?.set(1, forKey: "robRocketBoosterUpgradeLevel")
         case .kyberCrystals:
             kyberCrystalUpgradeLevel += 1
             progressStore?.set(kyberCrystalUpgradeLevel, forKey: "robKyberCrystalUpgradeLevel")
@@ -784,7 +820,7 @@ final class GameSession {
         let half = level.arenaHalfExtent, margin = half - 0.8
         let ledgeApproachEdge: Float = -1.25
         let ledgeNorthEdge = -half + 0.12
-        let ledges = [
+        var ledges = [
             PuzzleLedge(
                 id: 0,
                 center: [0, (ledgeNorthEdge + ledgeApproachEdge) / 2],
@@ -792,6 +828,14 @@ final class GameSession {
                 height: 0.34
             ),
         ]
+        if level.requiresBooster {
+            let offset = Float((level.id - 16) % 3) * 0.16
+            ledges += [
+                PuzzleLedge(id: 1, center: [-margin * 0.55, -margin * 0.55], size: [2.6, 2.6], height: 1.55 + offset),
+                PuzzleLedge(id: 2, center: [margin * 0.55, -margin * 0.55], size: [2.6, 2.6], height: 2.1 + offset),
+                PuzzleLedge(id: 3, center: [0, -margin + 0.5], size: [2.8, 2.2], height: 2.7 + offset),
+            ]
+        }
         let columns: [Float] = [-margin, -margin * 0.45, 0, margin * 0.45]
         let cells = (0..<level.cellCount).map { index in
             SIMD2<Float>(columns[index % columns.count], -margin + Float(index / columns.count) * 2.0)
@@ -805,6 +849,12 @@ final class GameSession {
             dock: SIMD2<Float>,
             hackTerminal: SIMD2<Float>?
         ) -> PuzzleGeometry {
+            let barriers = barriers + [
+                PuzzleBarrier(center: [-2.4, half - 2.0], size: [half * 0.7, 0.24]),
+                PuzzleBarrier(center: [2.4, half - 3.8], size: [half * 0.7, 0.24]),
+            ]
+            let dock: SIMD2<Float> = level.requiresBooster ? [0, -margin + 0.5] : dock
+            let cells = (level.requiresBooster ? Array(ledges.dropFirst().prefix(2)).map(\.center) : []) + cells
             let blockers = barriers + (door.map { [$0] } ?? [])
             var reserved = [dock]
             if let key { reserved.append(key) }
@@ -813,9 +863,15 @@ final class GameSession {
             let gridCandidates = gridSteps.flatMap { y in gridSteps.map { x in SIMD2<Float>(x * margin, y * margin) } }
             let gridRotation = level.id * 3 % gridCandidates.count
             let orderedGrid = Array(gridCandidates[gridRotation...]) + Array(gridCandidates[..<gridRotation])
+            func clearsRaisedSides(_ point: SIMD2<Float>) -> Bool {
+                let floor = ledges.filter { $0.contains(point) }.map(\.height).max() ?? 0
+                return !ledges.contains { ledge in
+                    ledge.height > floor + 0.01 && intersects([point.x, 0, point.y], barrier: PuzzleBarrier(center: ledge.center, size: ledge.size), radius: robotCollisionRadius)
+                }
+            }
             var safeCells: [SIMD2<Float>] = []
             for candidate in cells + orderedGrid where safeCells.count < level.cellCount {
-                guard reserved.allSatisfy({ simd_distance(candidate, $0) > 0.68 }) else { continue }
+                guard clearsRaisedSides(candidate), reserved.allSatisfy({ simd_distance(candidate, $0) > 0.68 }) else { continue }
                 guard blockers.allSatisfy({
                     !intersects(SIMD3<Float>(candidate.x, 0, candidate.y), barrier: $0, radius: robotCollisionRadius)
                 }) else { continue }
@@ -833,7 +889,7 @@ final class GameSession {
             let rotation = level.id % candidates.count
             let ordered = Array(candidates[rotation...]) + Array(candidates[..<rotation])
             var available = ordered.filter { candidate in
-                abs(candidate.x) < margin && abs(candidate.y) < margin
+                clearsRaisedSides(candidate) && abs(candidate.x) < margin && abs(candidate.y) < margin
                     && reserved.allSatisfy { simd_distance(candidate, $0) > 0.68 }
                     && blockers.allSatisfy {
                         !intersects(SIMD3<Float>(candidate.x, 0, candidate.y), barrier: $0, radius: robotCollisionRadius)
@@ -865,7 +921,7 @@ final class GameSession {
             )
         }
         guard level.requiresKey else {
-            let zigzag = (0..<min(5, max(2, level.id / 3 + 1))).map { index in
+            let zigzag = (0..<(level.requiresBooster ? 2 : min(5, max(2, level.id / 3 + 1)))).map { index in
                 PuzzleBarrier(center: [index.isMultiple(of: 2) ? -1.35 : 1.35, 1.8 - Float(index) * zigzagSpacing], size: [half * 1.05, 0.24])
             }
             return makeGeometry(
@@ -963,15 +1019,20 @@ final class GameSession {
     private func configuredEnemies() -> [TrainingEnemy] {
         let margin = puzzle.arenaHalfExtent - 0.85
         let candidates: [SIMD3<Float>] = [
-            [-margin, 0, margin * 0.35], [margin, 0, -margin * 0.7], [-margin * 0.85, 0, -margin],
+            [-margin, 0, margin * 0.35], [-margin + 2, 0, margin - 2.8], [-margin * 0.85, 0, -margin],
             [margin * 0.8, 0, margin * 0.25], [0, 0, -margin], [margin, 0, margin * 0.72],
             [-margin * 0.35, 0, -margin * 0.45], [margin * 0.32, 0, -margin * 0.2],
         ]
         let blockers = puzzle.barriers + (puzzle.door.map { [$0] } ?? [])
-        let available = candidates.filter { candidate in
-            simd_distance(SIMD2<Float>(candidate.x, candidate.z), SIMD2<Float>(0, margin)) > 1.8 && !blockers.contains(where: { Self.intersects(candidate, barrier: $0, radius: 0.28) })
+        let additionalCandidates = (-5...5).flatMap { z in (-5...5).map { x in SIMD3<Float>(Float(x) * margin / 5, 0, Float(z) * margin / 5) } }
+        let available = (candidates + additionalCandidates).filter { candidate in
+            simd_distance(SIMD2<Float>(candidate.x, candidate.z), SIMD2<Float>(0, margin)) > 1.8 && puzzle.surfaceHeight(at: [candidate.x, candidate.z]) < 0.5 && !blockers.contains(where: { Self.intersects(candidate, barrier: $0, radius: 0.28) })
         }
-        let spawns = available.isEmpty ? candidates : available
+        var spawns: [SIMD3<Float>] = []
+        for candidate in available where spawns.count < level.enemyCount {
+            if spawns.allSatisfy({ simd_distance($0, candidate) > 1.35 }) { spawns.append(candidate) }
+        }
+        if spawns.isEmpty { spawns = candidates }
         return level.enemyKinds.enumerated().map { index, kind in
             var origin = spawns[index % spawns.count]
             origin.y = puzzle.surfaceHeight(at: [origin.x, origin.z])
@@ -987,6 +1048,7 @@ final class GameSession {
         elapsed = 0; collectedCells = 0
         hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingCameraID = nil; hackingProgress = 0; securityAlertRemaining = 0; disabledSecurityCameraIDs = []
         baseFlipperAngle = Self.baseFlipperRearAngle; baseFlipperTarget = .rear; baseClimbLedgeID = nil
+        rocketHeld = false; rocketFlight = ROBRocketFlight()
         supportMotion = ROBSupportMotion(); torsoLeanAngle = 0
         collectedCellIndices = []; collectedShieldPickupIndices = []; collectedRepairPickupIndices = []
         shieldTimeRemaining = 0
@@ -995,12 +1057,7 @@ final class GameSession {
         forwardDemand = 0; steeringDemand = 0; leftTread = 0; rightTread = 0
         energy = maxEnergy; wasEnergyDepleted = false
         let layout = puzzle
-        let startingX: Float
-        if let door = layout.door, door.size.x < door.size.y {
-            startingX = door.center.x - door.size.x / 2 - Self.robotCollisionRadius - 0.35
-        } else {
-            startingX = 0
-        }
+        let startingX = -layout.arenaHalfExtent + 0.8
         robotPosition = SIMD3<Float>(startingX, 0, layout.arenaHalfExtent - 0.8); robotHeading = 0; leftWheelAngle = 0; rightWheelAngle = 0
         enemyBolts = []; nextBoltID = 0; wasAtDock = false; enemies = configuredEnemies()
         updateLaserLock()
@@ -1027,6 +1084,7 @@ final class GameSession {
     func pause() -> Bool {
         guard isRunning else { return false }
         stopDrive()
+        setRocketHeld(false)
         isChargingLaser = false
         laserCharge = 0
         shieldTimeRemaining = 0
@@ -1063,6 +1121,12 @@ final class GameSession {
         steeringDemand = (right - left) / 1.44
     }
     func stopDrive() { setDrive(forward: 0, steering: 0); leftTread = 0; rightTread = 0 }
+    func setRocketHeld(_ held: Bool) {
+        if !held { rocketHeld = false; return }
+        guard isRunning, hasRocketBooster, energy >= 1, !isHackingDoor, !isHackingCamera else { return }
+        rocketHeld = true
+        baseClimbLedgeID = nil; baseFlipperTarget = .rear; baseFlipperAngle = Self.baseFlipperRearAngle
+    }
     @discardableResult
     func moveBaseFlipperForward() -> Bool { commandBaseFlipper(.forward) }
     @discardableResult
@@ -1125,7 +1189,7 @@ final class GameSession {
             robotPosition.y,
             robotPosition.z - cos(robotHeading) * linear
         )
-        beginLedgeClimbIfNeeded(proposedPosition, movingForward: linear > 0)
+        if !isRocketAirborne && !rocketHeld { beginLedgeClimbIfNeeded(proposedPosition, movingForward: linear > 0) }
         let resolvedPosition = resolveRobotMovement(from: oldPosition, to: proposedPosition)
         let movementWasLimited = simd_distance(resolvedPosition, proposedPosition) > 0.000_1
         if movementWasLimited {
@@ -1160,21 +1224,29 @@ final class GameSession {
         }
         let oldSurfaceHeight = puzzle.surfaceHeight(at: [oldPosition.x, oldPosition.z])
         robotPosition = resolvedPosition
-        applyConveyor(delta)
+        if !isRocketAirborne && !rocketHeld { applyConveyor(delta) }
         let newSurfaceHeight = puzzle.surfaceHeight(at: [robotPosition.x, robotPosition.z])
-        updateGroundSupport(delta, previousHeight: previousRearHeight, previousPitch: previousBasePitch, forward: linear)
+        let wasFlying = isRocketAirborne || rocketHeld
+        if wasFlying {
+            let result = rocketFlight.advanced(height: robotPosition.y, floor: newSurfaceHeight, energy: energy, held: rocketHeld, installed: hasRocketBooster, delta: delta, scale: 1.35)
+            rocketFlight = result.motion; robotPosition.y = result.height; energy = result.energy
+            supportMotion = ROBSupportMotion(height: robotPosition.y)
+            if energy <= 0.05 { rocketHeld = false }
+        } else {
+            updateGroundSupport(delta, previousHeight: previousRearHeight, previousPitch: previousBasePitch, forward: linear)
+        }
         torsoLeanAngle = ROBBodyKinematics.advanceLean(torsoLeanAngle, basePitch: baseLiftPitch, delta: delta)
-        if newSurfaceHeight > oldSurfaceHeight {
+        if !wasFlying && newSurfaceHeight > oldSurfaceHeight {
             message = "Front tracks on the ledge. Flippers are reversing automatically; keep moving forward to lift the rear and level ROB."
             report(message)
-        } else if newSurfaceHeight < oldSurfaceHeight {
+        } else if !wasFlying && newSurfaceHeight < oldSurfaceHeight {
             message = "ROB is leaving the deck. The LACT counter-leans while the treads descend."
             report(message)
         }
         let driveLoad = (abs(leftTread) + abs(rightTread)) * 0.5
-        if hasDriveEnergy && driveLoad > 0.01 {
+        if !wasFlying && hasDriveEnergy && driveLoad > 0.01 {
             energy = max(0, energy - delta * (4.4 + driveLoad * 2.2))
-        } else if !isHackingDoor && !isHackingCamera && !isBaseFlipperActive && !isChargingLaser && elapsed - lastLaserShotTime >= Self.laserRechargeDelay {
+        } else if !wasFlying && isBaseGrounded && !isHackingDoor && !isHackingCamera && !isBaseFlipperActive && !isChargingLaser && elapsed - lastLaserShotTime >= Self.laserRechargeDelay {
             energy = min(maxEnergy, energy + delta * passiveEnergyRecharge)
         }
         if energy <= 0.05, !wasEnergyDepleted {
@@ -1436,6 +1508,9 @@ final class GameSession {
         let wallInset: Float = 0.09 + Self.robotCollisionRadius
         let movementLimit = puzzle.arenaHalfExtent - wallInset
         guard abs(position.x) <= movementLimit, abs(position.z) <= movementLimit else { return false }
+        guard !puzzle.ledges.contains(where: { ledge in
+            ledge.height > 0.5 && position.y < ledge.height - 0.02 && Self.intersects(position, barrier: PuzzleBarrier(center: ledge.center, size: ledge.size), radius: Self.robotCollisionRadius)
+        }) else { return false }
         return !robotMovementBlockers.contains { Self.intersects(position, barrier: $0, radius: Self.robotCollisionRadius) }
     }
     func isRobotPositionClear(_ position: SIMD3<Float>) -> Bool {
@@ -1485,7 +1560,7 @@ final class GameSession {
             )
         }) else { return false }
         return enemies.allSatisfy { enemy in
-            !enemy.isActive || Self.circleMotionIsClear(
+            !enemy.isActive || abs(start.y - enemy.position.y) > 0.7 || Self.circleMotionIsClear(
                 from: start2D,
                 to: end2D,
                 center: SIMD2<Float>(enemy.position.x, enemy.position.z),
@@ -1501,7 +1576,7 @@ final class GameSession {
     }
     private func isBlockedLedgeEntry(from start: SIMD2<Float>, to end: SIMD2<Float>) -> Bool {
         guard let destination = puzzle.ledge(at: end), puzzle.ledge(at: start)?.id != destination.id else { return false }
-        if isFalling && robotPosition.y >= destination.height { return false }
+        if robotPosition.y >= destination.height - 0.02 { return false }
         let movingTowardRaisedDeck = end.y < start.y && start.y >= destination.approachEdgeZ
         return !movingTowardRaisedDeck || baseClimbLedgeID != destination.id
     }
@@ -1668,6 +1743,7 @@ final class GameSession {
     }
     private func isEnemyMoveClear(from start: SIMD3<Float>, to end: SIMD3<Float>, enemy: TrainingEnemy) -> Bool {
         let radius = enemy.collisionRadius
+        guard !puzzle.ledges.contains(where: { $0.height > 0.5 && Self.intersects(end, barrier: PuzzleBarrier(center: $0.center, size: $0.size), radius: radius) }) else { return false }
         let movementLimit = puzzle.arenaHalfExtent - 0.09 - radius
         guard abs(end.x) <= movementLimit, abs(end.z) <= movementLimit else { return false }
         let start2D = SIMD2<Float>(start.x, start.z)
@@ -1762,7 +1838,7 @@ final class GameSession {
             let facing = robotPosition - enemy.position; enemy.heading = atan2(-facing.x, -facing.z)
             moveEnemy(&enemy, toward: target, speed: speed, delta: delta); enemies[index] = enemy
             let contactRadius = Self.robotCollisionRadius + enemy.collisionRadius + 0.035
-            if simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(enemy.position.x, enemy.position.z)) <= contactRadius {
+            if abs(robotPosition.y - enemy.position.y) < 0.7 && simd_distance(SIMD2<Float>(robotPosition.x, robotPosition.z), SIMD2<Float>(enemy.position.x, enemy.position.z)) <= contactRadius {
                 if enemy.kind == .spider { playSpider(.impact) } else { playEnemyAttack(.fax) }
                 if enemyContact(enemy.kind == .spider ? "\(enemy.displayName) lunge" : "\(enemy.displayName) collision", damage: enemy.contactDamage) { return }
             }
@@ -1782,7 +1858,7 @@ final class GameSession {
                 center: [robotPosition.x, robotPosition.z],
                 radius: 0.32
             )
-            if let robotImpact, wallImpact.map({ robotImpact < $0 }) ?? true {
+            if abs(bolt.position.y - (robotPosition.y + 0.55)) < 0.7, let robotImpact, wallImpact.map({ robotImpact < $0 }) ?? true {
                 playEnemyAttack(.fax)
                 enemyBolts = survivingBolts
                 enemyContact(bolt.sourceName, damage: bolt.damage)
@@ -1804,18 +1880,18 @@ final class GameSession {
     private func resolveSpatialObjectives() {
         let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
         if let key = puzzle.key, !hasKey, simd_distance(point, key) < 0.48 { collectKey() }
-        for (index, cell) in puzzle.cells.enumerated() where !collectedCellIndices.contains(index) && simd_distance(point, cell) < 0.45 {
+        for (index, cell) in puzzle.cells.enumerated() where !collectedCellIndices.contains(index) && simd_distance(point, cell) < 0.45 && abs(robotPosition.y - puzzle.surfaceHeight(at: cell)) < 0.4 {
             collectedCellIndices.insert(index); collectCell()
         }
         for (index, pickup) in puzzle.shieldPickups.enumerated()
-            where shields < maxShields && !collectedShieldPickupIndices.contains(index) && simd_distance(point, pickup) < 0.48 {
+            where shields < maxShields && !collectedShieldPickupIndices.contains(index) && simd_distance(point, pickup) < 0.48 && abs(robotPosition.y - puzzle.surfaceHeight(at: pickup)) < 0.4 {
             collectedShieldPickupIndices.insert(index); collectShieldPickup()
         }
         for (index, pickup) in puzzle.repairPickups.enumerated()
-            where health < maxHealth && !collectedRepairPickupIndices.contains(index) && simd_distance(point, pickup) < 0.48 {
+            where health < maxHealth && !collectedRepairPickupIndices.contains(index) && simd_distance(point, pickup) < 0.48 && abs(robotPosition.y - puzzle.surfaceHeight(at: pickup)) < 0.4 {
             collectedRepairPickupIndices.insert(index); collectRepairPickup()
         }
-        let atDock = simd_distance(point, puzzle.dock) < 0.55
+        let atDock = !isRocketAirborne && simd_distance(point, puzzle.dock) < 0.55 && abs(robotPosition.y - puzzle.surfaceHeight(at: puzzle.dock)) < 0.4
         if atDock && canFinish {
             nextLevel()
             return
@@ -2088,6 +2164,8 @@ final class GameSession {
         weaponUpgradeLevel = 0
         targetingComputerUpgradeLevel = 0
         kyberCrystalUpgradeLevel = 0
+        rocketBoosterUpgradeLevel = 0
+        progressStore?.set(0, forKey: "robRocketBoosterUpgradeLevel")
         progressStore?.set(0, forKey: Self.skillPointsStorageKey)
         progressStore?.set(0, forKey: "robSpeedUpgradeLevel")
         progressStore?.set(0, forKey: "robEnergyUpgradeLevel")
@@ -2122,6 +2200,7 @@ final class GameSession {
         let reward: String?
         if earnedNewProgress {
             switch completedLevel {
+            case 3: reward = "Plasma Booster available: 900 skill points in the workshop!"
             case 5: reward = "Twin Blasters unlocked in the ROB workshop!"
             case 10: reward = "Power Hammer unlocked in the ROB workshop!"
             case 15: reward = "Arc Cannon unlocked in the ROB workshop!"
@@ -2143,13 +2222,20 @@ final class GameSession {
         } else {
             isPaused = false; isRunning = false; isUpgradeIntermission = false
             if audioEnabled { TechnoMusicEngine.shared.stop() }
-            message = [reward, "Fifteen-level campaign complete!"].compactMap { $0 }.joined(separator: " ")
+            message = [reward, "Twenty-four-level campaign complete!"].compactMap { $0 }.joined(separator: " ")
             report(message)
         }
         play("level-complete")
     }
+    var needsBoosterForNextLevel: Bool { levelIndex + 1 < levels.count && levels[levelIndex + 1].requiresBooster && !hasRocketBooster }
+    func replayForBoosterPoints() {
+        guard isUpgradeIntermission else { return }
+        isUpgradeIntermission = false
+        begin()
+    }
     func continueAfterUpgradeIntermission() {
         guard isUpgradeIntermission, levelIndex < levels.count - 1 else { return }
+        guard !needsBoosterForNextLevel else { message = "Install the 900-point Plasma Booster before deploying, or replay this level to earn more points."; return }
         levelIndex += 1
         if audioEnabled { TechnoMusicEngine.shared.setLevel(levelIndex) }
         enemyAttackCount = 0

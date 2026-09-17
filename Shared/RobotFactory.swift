@@ -142,6 +142,20 @@ import UIKit
         shieldField.scale = [1, 0.92, 1]
         shieldField.isEnabled = false
         root.addChild(shieldField)
+        let boosters = Entity(); boosters.name = "Plasma Booster"; root.addChild(boosters)
+        for side: Float in [-1, 1] {
+            let name = side < 0 ? "Left" : "Right"
+            let pod = ModelEntity(mesh: .generateCylinder(height: 0.4, radius: 0.115), materials: [SimpleMaterial(color: .darkGray, isMetallic: true)])
+            pod.position = [side * 0.39, 0.68, 0.37]; boosters.addChild(pod)
+            let jet = Entity(); jet.name = "\(name) Plasma Jet"; jet.position = [side * 0.39, 0.47, 0.37]; boosters.addChild(jet)
+            let glow = ModelEntity(mesh: .generateCone(height: 0.64, radius: 0.12), materials: [UnlitMaterial(color: .systemBlue)])
+            glow.position.y = -0.32; glow.orientation = simd_quatf(angle: .pi, axis: [0, 0, 1]); jet.addChild(glow)
+            let core = ModelEntity(mesh: .generateCone(height: 0.5, radius: 0.065), materials: [UnlitMaterial(color: .cyan)])
+            core.position.y = -0.22; core.orientation = glow.orientation; jet.addChild(core)
+            jet.isEnabled = false
+        }
+        boosters.isEnabled = false
+
         return root
     }
 
@@ -313,6 +327,12 @@ import UIKit
             "Face Smiley Right Corner",
         ] {
             (robot.findEntity(named: name) as? ModelEntity)?.model?.materials = [smileMaterial]
+        }
+        robot.findEntity(named: "Plasma Booster")?.isEnabled = session.hasRocketBooster
+        for (index, side) in ["Left", "Right"].enumerated() {
+            let jet = robot.findEntity(named: "\(side) Plasma Jet")
+            jet?.isEnabled = session.isRocketThrusting
+            jet?.scale.y = 0.8 + Float(sin(session.elapsed * 37 + Double(index) * 2)) * 0.12
         }
         robot.findEntity(named: "Right Shoulder Gatling")?.isEnabled = session.rangedWeapon == .shoulderGatling
         robot.findEntity(named: "Twin Blasters")?.isEnabled = session.rangedWeapon == .twinBlasters
@@ -554,13 +574,14 @@ import UIKit
                 mesh: .generateBox(size: [ledge.size.x, 0.025, ledge.size.y], cornerRadius: 0.02),
                 materials: [arenaFloorMaterial(arPresentation: arPresentation)]
             )
+            if ledge.height > 0.5 { deck.model?.materials = [SimpleMaterial(color: .systemBlue, isMetallic: true)] }
             deck.name = "Ledge Deck \(ledge.id)"
             deck.position = [ledge.center.x, ledge.height + 0.0125, ledge.center.y]
             room.addChild(deck)
 
             let lip = ModelEntity(
                 mesh: .generateBox(size: [ledge.size.x, 0.055, 0.11], cornerRadius: 0.018),
-                materials: [SimpleMaterial(color: .systemOrange, isMetallic: true)]
+                materials: [SimpleMaterial(color: ledge.height > 0.5 ? .cyan : .systemOrange, isMetallic: true)]
             )
             lip.name = "Ledge Lip \(ledge.id)"
             lip.position = [ledge.center.x, ledge.height + 0.04, ledge.approachEdgeZ]

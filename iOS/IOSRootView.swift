@@ -328,6 +328,10 @@ struct MissionUpgradeIntermission: View {
                     .foregroundStyle(.green)
                 Text("Upgrade Bay")
                     .font(.largeTitle.bold())
+                if session.needsBoosterForNextLevel {
+                    Text("Install the Plasma Booster before the rocket stages.").foregroundStyle(.cyan)
+                    Button("Replay this level to earn booster points") { session.replayForBoosterPoints() }
+                }
                 Text("Defeats earn 40 skill points per robot, 60 per mini boss, and 200 per boss. Level clears earn 100–450. Hits, pickups, hacks, and time bonuses add score only.")
                     .foregroundStyle(.secondary)
                 Label("\(session.upgradePoints) skill points available", systemImage: "star.circle.fill")
@@ -348,6 +352,7 @@ struct MissionUpgradeIntermission: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.cyan)
                 .controlSize(.large)
+                .disabled(session.needsBoosterForNextLevel)
             }
             .padding(22)
         }
@@ -486,6 +491,7 @@ struct MobileTankControls: View {
         HStack(alignment: .bottom, spacing: 0) {
             HStack(alignment: .bottom, spacing: 4) {
                 VStack(spacing: 5) {
+                    RocketBoosterButton(session: session, compact: true)
                     HUDActionButton(
                         systemImage: "arrow.down.circle.fill",
                         tint: .orange,
@@ -1189,6 +1195,7 @@ private struct UpgradeOption: View {
         case .weaponPower: "scope"
         case .targetingComputer: "viewfinder.circle"
         case .kyberCrystals: "diamond.fill"
+        case .rocketBooster: "flame.fill"
         }
     }
 }

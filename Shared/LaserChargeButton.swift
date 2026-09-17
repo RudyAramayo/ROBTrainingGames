@@ -157,3 +157,28 @@ struct LaserChargeButton: View {
         return session.lockedEnemy == nil ? Color.gray.opacity(0.72) : Color.red.opacity(0.78)
     }
 }
+
+
+struct RocketBoosterButton: View {
+    @Bindable var session: GameSession
+    var compact = false
+    @Environment(\.scenePhase) private var scenePhase
+    var body: some View {
+        Button { session.setRocketHeld(!session.rocketHeld) } label: {
+            Label(session.rocketHeld ? "Land" : compact ? "Boost" : "Booster · 18 E/s", systemImage: "flame.fill")
+                .font(.caption.bold())
+                .padding(compact ? 10 : 12)
+                .foregroundStyle(.white)
+                .background(session.isRocketThrusting ? Color.blue : Color.blue.opacity(0.45), in: Capsule())
+        }
+            .buttonStyle(.plain)
+            .disabled(!session.isRunning || !session.hasRocketBooster)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel("Toggle Plasma Booster; tap again to land")
+            .accessibilityValue(session.hasRocketBooster ? "18 energy per second" : "Buy the booster after Level 3")
+            .accessibilityAction(named: "Start thrust") { session.setRocketHeld(true) }
+            .accessibilityAction(named: "Stop thrust") { session.setRocketHeld(false) }
+            .onChange(of: scenePhase) { _, phase in if phase != .active { session.setRocketHeld(false) } }
+            .onDisappear { session.setRocketHeld(false) }
+    }
+}

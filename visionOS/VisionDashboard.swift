@@ -305,6 +305,7 @@ private struct VisionControlDeck: View {
                     Divider().frame(height: 164)
                     VStack(spacing: 10) {
                         HStack(spacing: 8) {
+                            RocketBoosterButton(session: session, compact: true)
                             LaserChargeButton(session: session, title: session.rangedWeapon.displayName, compact: true)
                             Button {
                                 session.activateShield()
@@ -418,12 +419,16 @@ private struct VisionUpgradeIntermission: View {
                     .disabled(!session.canPurchaseUpgrade(upgrade))
                 }
             }
+            if session.needsBoosterForNextLevel {
+                Button("Replay this level to earn booster points") { session.replayForBoosterPoints() }
+            }
             Text(session.message).font(.caption).foregroundStyle(.cyan).lineLimit(2)
             Button("Deploy to Level \(session.level.id + 1)", systemImage: "play.fill") {
                 session.continueAfterUpgradeIntermission()
             }
             .buttonStyle(.borderedProminent)
             .tint(.cyan)
+            .disabled(session.needsBoosterForNextLevel)
         }
         .onAppear { session.stopDrive() }
     }
@@ -578,7 +583,7 @@ private struct VisionLoadoutMenu: View {
                     Button { session.purchaseUpgrade(upgrade) } label: {
                         Label(
                             (cost.map { "\(upgrade.displayName) L\(level) · \($0) points" } ?? "\(upgrade.displayName) · MAX") + (session.upgradeLockReason(upgrade).map { " · \($0)" } ?? ""),
-                            systemImage: upgrade == .kyberCrystals ? "diamond.fill" : upgrade == .speedBoost ? "speedometer" : upgrade == .energyCapacity ? "battery.100percent.bolt" : "scope"
+                            systemImage: upgrade == .rocketBooster ? "flame.fill" : upgrade == .kyberCrystals ? "diamond.fill" : upgrade == .speedBoost ? "speedometer" : upgrade == .energyCapacity ? "battery.100percent.bolt" : "scope"
                         )
                     }
                     .disabled(!session.canPurchaseUpgrade(upgrade))

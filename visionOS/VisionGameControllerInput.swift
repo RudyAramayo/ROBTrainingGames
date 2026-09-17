@@ -20,6 +20,7 @@ final class VisionGameControllerInput: NSObject {
         var laserPressed = false
         var hackPressed = false
         var menuPressed = false
+        var rocketPressed = false
     }
 
     private(set) var isConnected = false
@@ -38,6 +39,7 @@ final class VisionGameControllerInput: NSObject {
     @ObservationIgnored private var laserWasPressed = false
     @ObservationIgnored private var hackWasPressed = false
     @ObservationIgnored private var menuWasPressed = false
+    @ObservationIgnored private var rocketWasPressed = false
 
     func start(session: GameSession) {
         self.session = session
@@ -77,6 +79,8 @@ final class VisionGameControllerInput: NSObject {
         states.removeAll()
         if laserWasPressed { session?.releaseLaserCharge() }
         session?.stopDrive()
+        session?.setRocketHeld(false)
+        rocketWasPressed = false
         saberWasPressed = false
         laserWasPressed = false
         hackWasPressed = false
@@ -132,8 +136,9 @@ final class VisionGameControllerInput: NSObject {
         state.secondStickY = gamepad.rightThumbstick.yAxis.value
         state.saberPressed = gamepad.buttonA.isPressed || gamepad.buttonX.isPressed
         state.laserPressed = gamepad.rightTrigger.value > 0.2 || gamepad.rightShoulder.isPressed
-        state.hackPressed = gamepad.buttonB.isPressed || gamepad.leftShoulder.isPressed
+        state.hackPressed = gamepad.buttonB.isPressed
         state.menuPressed = gamepad.buttonMenu.isPressed
+        state.rocketPressed = gamepad.leftShoulder.isPressed
         states[id] = state
         publish()
     }
@@ -144,6 +149,7 @@ final class VisionGameControllerInput: NSObject {
         let trigger = Self.isPressed(["Trigger", GCInputRightTrigger, GCInputLeftTrigger], in: profile)
         let primary = Self.isPressed(["Button A", GCInputButtonA], in: profile)
         let secondary = Self.isPressed(["Button B", GCInputButtonB], in: profile)
+        state.rocketPressed = Self.isPressed(["Grip", "Squeeze", "Button X", GCInputButtonX], in: profile)
         switch state.side {
         case .left:
             state.saberPressed = trigger
@@ -178,6 +184,9 @@ final class VisionGameControllerInput: NSObject {
         let laserPressed = states.values.contains(where: \.laserPressed)
         let hackPressed = states.values.contains(where: \.hackPressed)
         let menuPressed = states.values.contains(where: \.menuPressed)
+        let rocketPressed = states.values.contains(where: \.rocketPressed)
+        if rocketPressed != rocketWasPressed { session?.setRocketHeld(rocketPressed) }
+        rocketWasPressed = rocketPressed
         if saberPressed && !saberWasPressed { session?.saberAttack() }
         if laserPressed && !laserWasPressed { session?.beginLaserCharge() }
         if !laserPressed && laserWasPressed { session?.releaseLaserCharge() }

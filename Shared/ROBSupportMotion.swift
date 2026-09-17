@@ -1,6 +1,28 @@
 import Foundation
 import simd
 
+// Matches rob-rocket-flight.mjs; all motion is confined to the training game.
+struct ROBRocketFlight {
+    static let energyPerSecond = 18.0
+    var airborne = false
+    var velocity: Float = 0
+    var thrusting = false
+
+    func advanced(height: Float, floor: Float, energy: Double, held: Bool, installed: Bool, delta: TimeInterval, scale: Float = 1) -> (motion: Self, height: Float, energy: Double) {
+        let dt = max(0, delta)
+        let poweredTime = installed && held ? min(dt, max(0, energy) / Self.energyPerSecond) : 0
+        let thrusting = poweredTime > 0
+        if !airborne && !thrusting { return (Self(), height, energy) }
+        var velocity = thrusting ? min(1.4 * scale, velocity + 4 * scale * Float(poweredTime))
+            : max(-1.3 * scale, velocity - 3.2 * scale * Float(dt))
+        var nextHeight = height + velocity * Float(dt)
+        if nextHeight >= 3 * scale { nextHeight = 3 * scale; velocity = min(0, velocity) }
+        let landed = nextHeight <= floor && velocity <= 0
+        return (landed ? Self() : Self(airborne: true, velocity: velocity, thrusting: thrusting),
+                landed ? floor : nextHeight, max(0, energy - poweredTime * Self.energyPerSecond))
+    }
+}
+
 // Matches rob-support-motion.mjs. The hinge is above the upper (third) tread wheel.
 // The reference photo's 8¼ inches is a pose length, not an actuator stroke.
 enum ROBBodyKinematics {

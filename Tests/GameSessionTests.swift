@@ -41,12 +41,12 @@ final class GameSessionTests: XCTestCase {
     func testCalibrationMatchesBrowserCampaign() {
         let game = GameSession(audioEnabled: false)
 
-        XCTAssertEqual(game.level.cellCount, 5)
+        XCTAssertEqual(game.level.cellCount, 7)
         XCTAssertEqual(game.level.enemyShields, 4)
         XCTAssertTrue(game.enemies.allSatisfy { $0.shields == 4 && $0.maxShields == 4 })
         XCTAssertEqual(game.enemies.map(\.kind), [.spider, .fax, .spider])
         XCTAssertEqual(game.remainingEnemies, 3)
-        XCTAssertEqual(game.levels.count, 15)
+        XCTAssertEqual(game.levels.count, 24)
         XCTAssertGreaterThan(game.puzzle.arenaHalfExtent, 5)
     }
 
@@ -87,7 +87,7 @@ final class GameSessionTests: XCTestCase {
         game.tick(1.0 / 30.0)
 
         XCTAssertEqual(game.level.id, 1)
-        XCTAssertTrue(game.message.contains("5 more energy cells"))
+        XCTAssertTrue(game.message.contains("7 more energy cells"))
         XCTAssertTrue(game.message.contains("3 more targets"))
         XCTAssertFalse(game.message.localizedCaseInsensitiveContains("key"))
     }
@@ -600,7 +600,7 @@ final class GameSessionTests: XCTestCase {
             if let terminal = game.puzzle.hackTerminal { objectives.append(terminal) }
             for objective in objectives {
                 XCTAssertTrue(
-                    game.isRobotPositionClear([objective.x, 0, objective.y]),
+                    game.isRobotPositionClear([objective.x, game.puzzle.surfaceHeight(at: objective), objective.y]),
                     "Level \(game.level.id) places an objective outside ROB's navigable space at \(objective)"
                 )
             }
@@ -938,7 +938,8 @@ final class GameSessionTests: XCTestCase {
 
     func testFinalLevelPaysItsSkillRewardOnlyOnce() {
         let game = GameSession(audioEnabled: false)
-        game.levelIndex = 14; game.begin()
+        game.levelIndex = game.levels.count - 1; game.begin()
+        game.robotPosition = [game.puzzle.dock.x, game.puzzle.surfaceHeight(at: game.puzzle.dock), game.puzzle.dock.y]
         game.collectedCells = game.level.cellCount; game.doorOpen = true
         for index in game.enemies.indices { game.enemies[index].isActive = false }
         game.nextLevel()
@@ -2633,5 +2634,102 @@ final class GameSessionTests: XCTestCase {
         )
         XCTAssertEqual(profile.sections, [.treads, .baseFlipper, .voiceAudio, .showReady])
         XCTAssertEqual(try ROBDroidProfileCode.decode(ROBDroidProfileCode.encode(profile)), profile)
+    }
+}
+
+@MainActor
+extension GameSessionTests {
+    func testPlasmaBoosterRequiresProgressAndPersistsPurchase() {
+        let name = "ROBRocket.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(900, forKey: GameSession.skillPointsStorageKey)
+        let locked = GameSession(audioEnabled: false, progressStore: defaults)
+        locked.purchaseUpgrade(.rocketBooster)
+        XCTAssertFalse(locked.hasRocketBooster)
+        XCTAssertEqual(locked.upgradePoints, 900)
+        defaults.set(3, forKey: "robHighestCompletedLevel")
+        let game = GameSession(audioEnabled: false, progressStore: defaults)
+        game.purchaseUpgrade(.rocketBooster)
+        XCTAssertTrue(game.hasRocketBooster)
+        XCTAssertEqual(game.upgradePoints, 0)
+        XCTAssertTrue(GameSession(audioEnabled: false, progressStore: defaults).hasRocketBooster)
+        XCTAssertFalse(game.canPurchaseUpgrade(.rocketBooster))
+    }
+
+    func testRocketConsumesEnergyStopsOnPauseAndLandsWithoutAirborneRecharge() {
+        let defaults = UserDefaults(suiteName: "ROBRocketFlightTests")!
+        defer { defaults.removePersistentDomain(forName: "ROBRocketFlightTests") }
+        defaults.set(1, forKey: "robRocketBoosterUpgradeLevel")
+        let game = GameSession(audioEnabled: false, progressStore: defaults)
+        game.begin(); for i in game.enemies.indices { game.enemies[i].isActive = false }
+        game.setRocketHeld(true)
+        for _ in 0..<60 { game.tick(1.0 / 60) }
+        XCTAssertTrue(game.isRocketAirborne)
+        XCTAssertTrue(game.isRocketThrusting)
+        XCTAssertGreaterThan(game.robotPosition.y, 1)
+        XCTAssertEqual(game.energy, 82, accuracy: 0.001)
+        let robot = RobotFactory.makeROB(); RobotFactory.applyWeapons(to: robot, session: game)
+        XCTAssertTrue(robot.findEntity(named: "Left Plasma Jet")?.isEnabled == true)
+        XCTAssertTrue(game.pause())
+        XCTAssertFalse(game.rocketHeld)
+        XCTAssertFalse(game.isRocketThrusting)
+        let height = game.robotPosition.y; game.tick(1)
+        XCTAssertEqual(game.robotPosition.y, height)
+        game.resume()
+        for _ in 0..<300 where game.isRocketAirborne { game.tick(1.0 / 60) }
+        XCTAssertFalse(game.isRocketAirborne)
+        XCTAssertEqual(game.robotPosition.y, 0, accuracy: 0.001)
+        XCTAssertEqual(game.energy, 82, accuracy: 0.001)
+        RobotFactory.applyWeapons(to: robot, session: game)
+        XCTAssertTrue(robot.findEntity(named: "Left Plasma Jet")?.isEnabled == false)
+    }
+
+    func testBoosterClearsTallPlatformSideAndLandsOnItsTop() {
+        let defaults = UserDefaults(suiteName: "ROBRocketLandingTests")!
+        defer { defaults.removePersistentDomain(forName: "ROBRocketLandingTests") }
+        defaults.set(1, forKey: "robRocketBoosterUpgradeLevel")
+        let game = GameSession(audioEnabled: false, progressStore: defaults)
+        game.levelIndex = 15; game.begin()
+        for i in game.enemies.indices { game.enemies[i].isActive = false }
+        let platform = game.puzzle.ledges[1]
+        game.robotPosition = [platform.center.x, 0.34, platform.approachEdgeZ + 0.8]
+        XCTAssertFalse(game.isRobotPositionClear([platform.center.x, 0.34, platform.center.y]))
+        game.setRocketHeld(true)
+        for _ in 0..<100 { game.tick(1.0 / 60) }
+        XCTAssertGreaterThan(game.robotPosition.y, platform.height)
+        game.setDrive(forward: 1, steering: 0)
+        for _ in 0..<85 { game.tick(1.0 / 60) }
+        game.stopDrive(); game.setRocketHeld(false)
+        for _ in 0..<300 where game.isRocketAirborne { game.tick(1.0 / 60) }
+        XCTAssertTrue(platform.contains([game.robotPosition.x, game.robotPosition.z]))
+        XCTAssertEqual(game.robotPosition.y, platform.height, accuracy: 0.01)
+        XCTAssertTrue(game.isBaseGrounded)
+        XCTAssertTrue(game.moveBaseFlipperForward())
+    }
+
+    func testRocketStagesHaveElevatedObjectivesAndRequireEquipmentBeforeDeployment() {
+        let game = GameSession(audioEnabled: false)
+        for index in 15..<24 {
+            game.levelIndex = index; game.begin()
+            XCTAssertEqual(game.puzzle.ledges.count, 4)
+            XCTAssertEqual(game.puzzle.cells.count, 16)
+            XCTAssertGreaterThan(game.puzzle.surfaceHeight(at: game.puzzle.dock), 2.5)
+            XCTAssertTrue(game.puzzle.ledges.dropFirst().prefix(2).allSatisfy { ledge in game.puzzle.cells.contains(where: ledge.contains) })
+            XCTAssertLessThan(game.puzzle.ledges.map(\.height).max()!, 3 * 1.35)
+            game.collectedCells = game.level.cellCount
+            for i in game.enemies.indices { game.enemies[i].isActive = false }
+            game.robotPosition = [game.puzzle.dock.x, 0.34, game.puzzle.dock.y]
+            XCTAssertFalse(game.canFinish, "Cannot finish underneath the summit dock")
+        }
+        game.levelIndex = 14; game.begin()
+        game.collectedCells = game.level.cellCount; game.doorOpen = true
+        for i in game.enemies.indices { game.enemies[i].isActive = false }
+        game.nextLevel(); game.continueAfterUpgradeIntermission()
+        XCTAssertEqual(game.levelIndex, 14)
+        XCTAssertTrue(game.needsBoosterForNextLevel)
+        game.replayForBoosterPoints()
+        XCTAssertTrue(game.isRunning)
+        XCTAssertFalse(game.isUpgradeIntermission)
     }
 }
