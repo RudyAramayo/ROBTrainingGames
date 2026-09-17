@@ -63,7 +63,7 @@ struct VisionDashboard: View {
                 HStack {
                     Label("Level \(session.level.id)/\(session.levels.count)", systemImage: "flag.checkered")
                     Label("Score \(session.score)", systemImage: "star.fill")
-                    Label("Upgrade points \(session.upgradePoints)", systemImage: "star.circle.fill")
+                    Label("Skill points \(session.upgradePoints)", systemImage: "star.circle.fill")
                     Label("Targets \(session.remainingEnemies)", systemImage: "scope")
                 }
                 .monospacedDigit()
@@ -398,7 +398,7 @@ private struct VisionUpgradeIntermission: View {
             Label("LEVEL \(session.level.id) CLEARED · UPGRADE BAY", systemImage: "flag.checkered.circle.fill")
                 .font(.title3.bold())
                 .foregroundStyle(.green)
-            Label("\(session.upgradePoints) battle points", systemImage: "star.circle.fill")
+            Label("\(session.upgradePoints) skill points", systemImage: "star.circle.fill")
                 .font(.headline.monospacedDigit())
                 .foregroundStyle(.yellow)
             HStack(spacing: 8) {
@@ -412,9 +412,10 @@ private struct VisionUpgradeIntermission: View {
                             Text(upgrade.displayName).font(.caption.bold())
                             Text(cost.map { "L\(level) · \($0)" } ?? "MAX")
                                 .font(.caption2.monospacedDigit())
+                            if let reason = session.upgradeLockReason(upgrade) { Text(reason).font(.caption2).foregroundStyle(.orange) }
                         }
                     }
-                    .disabled(cost == nil || session.upgradePoints < (cost ?? 0))
+                    .disabled(!session.canPurchaseUpgrade(upgrade))
                 }
             }
             Text(session.message).font(.caption).foregroundStyle(.cyan).lineLimit(2)
@@ -576,11 +577,11 @@ private struct VisionLoadoutMenu: View {
                     let cost = session.upgradeCost(upgrade)
                     Button { session.purchaseUpgrade(upgrade) } label: {
                         Label(
-                            cost.map { "\(upgrade.displayName) L\(level) · \($0) points" } ?? "\(upgrade.displayName) · MAX",
-                            systemImage: upgrade == .speedBoost ? "speedometer" : upgrade == .energyCapacity ? "battery.100percent.bolt" : "scope"
+                            (cost.map { "\(upgrade.displayName) L\(level) · \($0) points" } ?? "\(upgrade.displayName) · MAX") + (session.upgradeLockReason(upgrade).map { " · \($0)" } ?? ""),
+                            systemImage: upgrade == .kyberCrystals ? "diamond.fill" : upgrade == .speedBoost ? "speedometer" : upgrade == .energyCapacity ? "battery.100percent.bolt" : "scope"
                         )
                     }
-                    .disabled(cost == nil || session.upgradePoints < (cost ?? 0))
+                    .disabled(!session.canPurchaseUpgrade(upgrade))
                 }
             }
         } label: {

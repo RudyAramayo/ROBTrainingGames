@@ -328,9 +328,9 @@ struct MissionUpgradeIntermission: View {
                     .foregroundStyle(.green)
                 Text("Upgrade Bay")
                     .font(.largeTitle.bold())
-                Text("Battle hits, disabled enemies, collected cells, hacks, and the time bonus all feed the same persistent upgrade pool.")
+                Text("Defeats earn 40 skill points per robot, 60 per mini boss, and 200 per boss. Level clears earn 100–450. Hits, pickups, hacks, and time bonuses add score only.")
                     .foregroundStyle(.secondary)
-                Label("\(session.upgradePoints) battle points available", systemImage: "star.circle.fill")
+                Label("\(session.upgradePoints) skill points available", systemImage: "star.circle.fill")
                     .font(.headline.monospacedDigit())
                     .foregroundStyle(.yellow)
                 ForEach(ROBUpgrade.allCases) { upgrade in
@@ -700,7 +700,7 @@ struct ComponentExplorer: View {
                             }
                             ProgressView(value: Double(session.highestCompletedLevel), total: Double(session.levels.count)).tint(.cyan)
                             Text(nextUnlockText).font(.caption).foregroundStyle(.secondary)
-                            Label("\(session.upgradePoints) spendable mission points", systemImage: "star.circle.fill")
+                            Label("\(session.upgradePoints) skill points", systemImage: "star.circle.fill")
                                 .font(.subheadline.bold()).foregroundStyle(.yellow).monospacedDigit()
                         }
                         .workshopCard()
@@ -1170,12 +1170,13 @@ private struct UpgradeOption: View {
                     Text("L\(level)/\(upgrade.maximumLevel)").font(.caption.bold()).foregroundStyle(.cyan)
                 }
                 Text(upgrade.summary).font(.caption).foregroundStyle(.secondary)
+                if let reason = session.upgradeLockReason(upgrade) { Text(reason).font(.caption.bold()).foregroundStyle(.orange) }
             }
             Spacer(minLength: 6)
             Button(cost.map { "Buy \($0)" } ?? "MAX") { session.purchaseUpgrade(upgrade) }
                 .buttonStyle(.borderedProminent)
                 .tint(.orange)
-                .disabled(cost == nil || session.upgradePoints < (cost ?? 0))
+                .disabled(!session.canPurchaseUpgrade(upgrade))
         }
         .padding(12)
         .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
@@ -1187,6 +1188,7 @@ private struct UpgradeOption: View {
         case .energyCapacity: "battery.100percent.bolt"
         case .weaponPower: "scope"
         case .targetingComputer: "viewfinder.circle"
+        case .kyberCrystals: "diamond.fill"
         }
     }
 }

@@ -67,11 +67,12 @@ struct TrainingEnemy: Identifiable, Sendable {
     var travelDistance: Float = 0
 
     var displayName: String { isMiniBoss ? "Mini Boss \(kind.displayName)" : isBoss ? "Boss \(kind.displayName)" : kind.displayName }
-    var contactDamage: Int { isMiniBoss ? 4 : isBoss ? 10 : (kind == .spider ? 6 : 5) }
+    var contactDamage: Int { isMiniBoss ? 12 : isBoss ? 30 : (kind == .spider ? 18 : 15) }
     var projectileDamage: Int { isMiniBoss ? 3 : isBoss ? 10 : 4 }
     var combatScale: Float { isMiniBoss ? 1.15 : isBoss ? 1.35 : 1 }
     var collisionRadius: Float { (kind == .spider ? 0.36 : 0.42) * combatScale }
     var defeatReward: Int { isMiniBoss ? 500 : isBoss ? 1_000 : 300 }
+    var skillReward: Int { isMiniBoss ? 60 : isBoss ? 200 : 40 }
 }
 
 struct TrainingEnemyBolt: Identifiable, Sendable {
@@ -301,38 +302,45 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
     case energyCapacity
     case weaponPower
     case targetingComputer
+    case kyberCrystals
 
     var id: String { rawValue }
     var displayName: String {
         switch self {
         case .speedBoost: "Speed Boost"
         case .energyCapacity: "Energy Capacity"
-        case .weaponPower: "Weapon Power"
+        case .weaponPower: "Laser Power"
         case .targetingComputer: "Targeting Computer"
+        case .kyberCrystals: "Kyber Crystals"
         }
     }
     var summary: String {
         switch self {
         case .speedBoost: "Raises tread speed by 60% per upgrade."
         case .energyCapacity: "Adds 60 energy and dramatically improves cells and passive charging."
-        case .weaponPower: "Adds one shield point of damage to every hit."
+        case .weaponPower: "Adds one damage to laser hits."
         case .targetingComputer: "Replaces slow manual aim with fast automatic lock-on for every laser, including two independent Twin Blaster locks."
+        case .kyberCrystals: "Adds one saber damage per rank, from 1 to 4. Ranks 2 and 3 require clearing levels 5 and 10."
         }
     }
     var maximumLevel: Int { self == .targetingComputer ? 1 : 3 }
+    func requiredCompletedLevel(for level: Int) -> Int { self == .kyberCrystals ? level * 5 : 0 }
     func cost(for level: Int) -> Int {
         switch self {
         case .speedBoost: 700 + level * 650
         case .energyCapacity: 550 + level * 500
         case .weaponPower: 900 + level * 800
         case .targetingComputer: 1_200
+        case .kyberCrystals: 600 + level * 1_000
         }
     }
 }
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.16.6"
+    static let gameplayRulesetVersion = "2026.09.16.7"
+    static let skillPointsStorageKey = "robSkillPoints"
+    static func levelSkillReward(_ levelNumber: Int) -> Int { 100 + max(0, min(14, levelNumber - 1)) * 25 }
     static let laserRechargeDelay = 1.5
     static let robotCollisionRadius: Float = 0.54
     static let baseDriveSpeed: Float = 1.2
@@ -448,6 +456,8 @@ final class GameSession {
     private(set) var energyUpgradeLevel = 0
     private(set) var weaponUpgradeLevel = 0
     private(set) var targetingComputerUpgradeLevel = 0
+    private(set) var kyberCrystalUpgradeLevel = 0
+    private var hasAwardedLevelCompletion = false
     private var nextBoltID = 0
     private var wasAtDock = false
     private var wasEnergyDepleted = false
@@ -470,6 +480,7 @@ final class GameSession {
     var energyPickupAmount: Double { 70 + Double(energyUpgradeLevel * 20) }
     var passiveEnergyRecharge: Double { 6 + Double(energyUpgradeLevel * 3) }
     var weaponDamageBonus: Int { weaponUpgradeLevel }
+    var saberDamage: Int { 1 + kyberCrystalUpgradeLevel }
     var hasAutoTargeting: Bool { targetingComputerUpgradeLevel > 0 }
     var hasIndependentTwinTargeting: Bool { hasAutoTargeting }
     var laserCycleDuration: TimeInterval { hasAutoTargeting ? 0.25 : 0.8 }
@@ -604,6 +615,7 @@ final class GameSession {
     init(audioEnabled: Bool = true, progressStore: UserDefaults? = nil) {
         self.audioEnabled = audioEnabled
         self.progressStore = progressStore ?? (audioEnabled ? .standard : nil)
+        var economyMigrationMessage: String?
         if let store = self.progressStore {
             highestCompletedLevel = min(levels.count, max(0, store.integer(forKey: "robHighestCompletedLevel")))
             robotFinish = ROBFinish(rawValue: store.string(forKey: "robRobotFinish") ?? "") ?? .graphite
@@ -612,11 +624,19 @@ final class GameSession {
             let savedMelee = ROBMeleeWeapon(rawValue: store.string(forKey: "robMeleeWeapon") ?? "") ?? .dualSabers
             rangedWeapon = savedRanged.requiredCompletedLevel <= highestCompletedLevel ? savedRanged : .shoulderGatling
             meleeWeapon = savedMelee.requiredCompletedLevel <= highestCompletedLevel ? savedMelee : .dualSabers
-            upgradePoints = max(0, store.integer(forKey: "robUpgradePoints"))
+            if store.object(forKey: Self.skillPointsStorageKey) == nil {
+                let legacyPoints = max(0, store.integer(forKey: "robUpgradePoints"))
+                upgradePoints = legacyPoints / 10
+                store.set(upgradePoints, forKey: Self.skillPointsStorageKey)
+                if legacyPoints > 0 { economyMigrationMessage = "Balance update: \(legacyPoints) old points converted to \(upgradePoints) skill points. Earn more by defeating robots and clearing levels." }
+            } else {
+                upgradePoints = max(0, store.integer(forKey: Self.skillPointsStorageKey))
+            }
             speedUpgradeLevel = min(ROBUpgrade.speedBoost.maximumLevel, max(0, store.integer(forKey: "robSpeedUpgradeLevel")))
             energyUpgradeLevel = min(ROBUpgrade.energyCapacity.maximumLevel, max(0, store.integer(forKey: "robEnergyUpgradeLevel")))
             weaponUpgradeLevel = min(ROBUpgrade.weaponPower.maximumLevel, max(0, store.integer(forKey: "robWeaponUpgradeLevel")))
             targetingComputerUpgradeLevel = min(ROBUpgrade.targetingComputer.maximumLevel, max(0, store.integer(forKey: "robTargetingComputerUpgradeLevel")))
+            kyberCrystalUpgradeLevel = min(ROBUpgrade.kyberCrystals.maximumLevel, max(0, store.integer(forKey: "robKyberCrystalUpgradeLevel")))
             if let savedCode = store.string(forKey: ROBDroidProfile.storageKey),
                let savedProfile = try? ROBDroidProfileCode.decode(savedCode) {
                 droidProfile = savedProfile
@@ -628,6 +648,7 @@ final class GameSession {
             }
         }
         configureLevel()
+        if let economyMigrationMessage { message = economyMigrationMessage }
     }
 
     func isUnlocked(_ weapon: ROBRangedWeapon) -> Bool { highestCompletedLevel >= weapon.requiredCompletedLevel }
@@ -638,6 +659,7 @@ final class GameSession {
         case .energyCapacity: energyUpgradeLevel
         case .weaponPower: weaponUpgradeLevel
         case .targetingComputer: targetingComputerUpgradeLevel
+        case .kyberCrystals: kyberCrystalUpgradeLevel
         }
     }
     func upgradeCost(_ upgrade: ROBUpgrade) -> Int? {
@@ -647,8 +669,9 @@ final class GameSession {
     func purchaseUpgrade(_ upgrade: ROBUpgrade) {
         let level = upgradeLevel(upgrade)
         guard level < upgrade.maximumLevel else { message = "\(upgrade.displayName) is already fully upgraded."; return }
+        if let requirement = upgradeLockReason(upgrade) { message = requirement; return }
         let cost = upgrade.cost(for: level)
-        guard upgradePoints >= cost else { message = "\(cost - upgradePoints) more mission points needed for \(upgrade.displayName)."; return }
+        guard upgradePoints >= cost else { message = "\(cost - upgradePoints) more skill points needed for \(upgrade.displayName)."; return }
         upgradePoints -= cost
         switch upgrade {
         case .speedBoost:
@@ -664,10 +687,23 @@ final class GameSession {
         case .targetingComputer:
             targetingComputerUpgradeLevel += 1
             progressStore?.set(targetingComputerUpgradeLevel, forKey: "robTargetingComputerUpgradeLevel")
+        case .kyberCrystals:
+            kyberCrystalUpgradeLevel += 1
+            progressStore?.set(kyberCrystalUpgradeLevel, forKey: "robKyberCrystalUpgradeLevel")
         }
-        progressStore?.set(upgradePoints, forKey: "robUpgradePoints")
+        progressStore?.set(upgradePoints, forKey: Self.skillPointsStorageKey)
         message = "\(upgrade.displayName) upgraded to Level \(level + 1)."
         report(message)
+    }
+    func upgradeLockReason(_ upgrade: ROBUpgrade) -> String? {
+        let level = upgradeLevel(upgrade)
+        guard level < upgrade.maximumLevel else { return nil }
+        let required = upgrade.requiredCompletedLevel(for: level)
+        return highestCompletedLevel < required ? "Clear Level \(required) for the next \(upgrade.displayName) rank." : nil
+    }
+    func canPurchaseUpgrade(_ upgrade: ROBUpgrade) -> Bool {
+        guard let cost = upgradeCost(upgrade), upgradeLockReason(upgrade) == nil else { return false }
+        return upgradePoints >= cost
     }
     func selectFinish(_ finish: ROBFinish) {
         robotFinish = finish
@@ -915,11 +951,11 @@ final class GameSession {
     }
 
     private func report(_ situation: String) { lastSituation = situation; situationCount += 1 }
-    private func awardMissionPoints(_ points: Int) {
-        guard points > 0 else { return }
-        score += points
-        upgradePoints += points
-        progressStore?.set(upgradePoints, forKey: "robUpgradePoints")
+    private func awardMissionPoints(_ points: Int, skillPoints: Int = 0) {
+        score += max(0, points)
+        guard skillPoints > 0 else { return }
+        upgradePoints += skillPoints
+        progressStore?.set(upgradePoints, forKey: Self.skillPointsStorageKey)
     }
     private func play(_ name: String) { if audioEnabled { SoundPlayer.shared.play(name) } }
     private func playEnemyAttack(_ kind: TrainingEnemyKind) { if audioEnabled { SoundPlayer.shared.playEnemyAttack(kind) } }
@@ -947,6 +983,7 @@ final class GameSession {
     }
     private func configureLevel() {
         isUpgradeIntermission = false
+        hasAwardedLevelCompletion = false
         elapsed = 0; collectedCells = 0
         hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingCameraID = nil; hackingProgress = 0; securityAlertRemaining = 0; disabledSecurityCameraIDs = []
         baseFlipperAngle = Self.baseFlipperRearAngle; baseFlipperTarget = .rear; baseClimbLedgeID = nil
@@ -1609,7 +1646,7 @@ final class GameSession {
                     message = "\(projectile.weapon.displayName) struck the wall. Reposition for a clear shot."
                     report(message)
                 case let .enemy(index):
-                    let damage = projectile.weapon.damage(charge: projectile.charge)
+                    let damage = projectile.weapon.damage(charge: projectile.charge) + weaponDamageBonus
                     let secondaryTargets = projectile.weapon == .arcCannon ? enemies.indices.filter { candidate in
                         candidate != index && enemies[candidate].isActive && simd_distance(enemies[candidate].position, enemies[index].position) <= 1.45
                     } : []
@@ -1813,16 +1850,16 @@ final class GameSession {
     }
     private func damageEnemy(at index: Int, weapon: String, amount: Int = 1) {
         guard enemies.indices.contains(index), enemies[index].isActive else { return }
-        let appliedDamage = amount + weaponDamageBonus
+        let appliedDamage = min(enemies[index].shields, max(0, amount))
         enemies[index].shields -= appliedDamage
         awardMissionPoints(50 * appliedDamage)
         if enemies[index].kind == .spider { playSpider(enemies[index].shields <= 0 ? .shutdown : .impact) }
         if enemies[index].shields <= 0 {
             let kind = enemies[index].kind, name = enemies[index].displayName, reward = enemies[index].defeatReward
             enemies[index].isActive = false
-            awardMissionPoints(reward)
+            awardMissionPoints(reward, skillPoints: enemies[index].skillReward)
             if kind == .fax { playEnemyAttack(kind) }
-            message = "\(name) disabled by \(weapon). \(remainingEnemies) targets remain."
+            message = "\(name) disabled by \(weapon). +\(enemies[index].skillReward) skill points. \(remainingEnemies) targets remain."
         } else {
             message = "\(enemies[index].displayName) hit by \(weapon) — \(enemies[index].shields) shields remain."
         }
@@ -1937,7 +1974,7 @@ final class GameSession {
         }
         if hitIndices.isEmpty { message = spin ? "Spin attack cleared space but missed every target." : "Wide saber swing missed. Move within arm range."; report(message) }
         else {
-            for index in hitIndices { damageEnemy(at: index, weapon: spin ? "dual-saber spin" : "dual-saber sweep") }
+            for index in hitIndices { damageEnemy(at: index, weapon: spin ? "dual-saber spin" : "dual-saber sweep", amount: saberDamage) }
             if spin { message = "Spin attack! ROB extended both sabers and struck \(hitIndices.count) targets."; report(message) }
         }
         play("laser")
@@ -2050,11 +2087,13 @@ final class GameSession {
         energyUpgradeLevel = 0
         weaponUpgradeLevel = 0
         targetingComputerUpgradeLevel = 0
-        progressStore?.set(0, forKey: "robUpgradePoints")
+        kyberCrystalUpgradeLevel = 0
+        progressStore?.set(0, forKey: Self.skillPointsStorageKey)
         progressStore?.set(0, forKey: "robSpeedUpgradeLevel")
         progressStore?.set(0, forKey: "robEnergyUpgradeLevel")
         progressStore?.set(0, forKey: "robWeaponUpgradeLevel")
         progressStore?.set(0, forKey: "robTargetingComputerUpgradeLevel")
+        progressStore?.set(0, forKey: "robKyberCrystalUpgradeLevel")
         levelIndex = 0
         configureLevel()
         health = maxHealth
@@ -2072,8 +2111,11 @@ final class GameSession {
             return
         }
         guard canFinish else { message = "Finish every objective before leaving the level."; return }
+        guard !hasAwardedLevelCompletion else { return }
+        hasAwardedLevelCompletion = true
         let completedLevel = level.id
-        awardMissionPoints(max(0, level.timeBonus - Int(elapsed) * 10))
+        let earnedSkillPoints = Self.levelSkillReward(completedLevel)
+        awardMissionPoints(max(0, level.timeBonus - Int(elapsed) * 10), skillPoints: earnedSkillPoints)
         let earnedNewProgress = completedLevel > highestCompletedLevel
         highestCompletedLevel = max(highestCompletedLevel, completedLevel)
         progressStore?.set(highestCompletedLevel, forKey: "robHighestCompletedLevel")
@@ -2094,7 +2136,7 @@ final class GameSession {
             isRunning = false
             isUpgradeIntermission = true
             if audioEnabled { TechnoMusicEngine.shared.stop() }
-            message = [reward, "Level \(completedLevel) cleared. Spend battle points before deploying to Level \(completedLevel + 1)."]
+            message = [reward, "Level \(completedLevel) cleared! +\(earnedSkillPoints) skill points. Choose upgrades before deploying to Level \(completedLevel + 1)."]
                 .compactMap { $0 }
                 .joined(separator: " ")
             report(message)

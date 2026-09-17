@@ -66,11 +66,12 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.level.id, 1)
         XCTAssertTrue(game.isUpgradeIntermission)
         XCTAssertFalse(game.isRunning)
-        XCTAssertEqual(game.upgradePoints, game.level.timeBonus)
+        XCTAssertEqual(game.upgradePoints, 100)
 
+        XCTAssertFalse(game.canPurchaseUpgrade(.speedBoost))
         game.purchaseUpgrade(.speedBoost)
-        XCTAssertEqual(game.speedUpgradeLevel, 1)
-        XCTAssertEqual(game.upgradePoints, game.level.timeBonus - ROBUpgrade.speedBoost.cost(for: 0))
+        XCTAssertEqual(game.speedUpgradeLevel, 0)
+        XCTAssertEqual(game.upgradePoints, 100)
 
         game.continueAfterUpgradeIntermission()
         XCTAssertEqual(game.level.id, 2)
@@ -387,9 +388,13 @@ final class GameSessionTests: XCTestCase {
     }
 
     func testThirdLifeLossWipesPointsAndUpgradesAndReturnsToLevelOne() {
-        let game = GameSession(audioEnabled: false)
+        let suite = "ROBTrialSkills.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(2_000, forKey: GameSession.skillPointsStorageKey)
+        let game = GameSession(audioEnabled: false, progressStore: defaults)
         game.begin()
-        for _ in 0..<game.level.cellCount { game.collectCell() }
+        game.purchaseUpgrade(.kyberCrystals)
         game.purchaseUpgrade(.speedBoost)
         XCTAssertEqual(game.speedUpgradeLevel, 1)
         XCTAssertGreaterThan(game.upgradePoints, 0)
@@ -408,6 +413,8 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(game.score, 0)
         XCTAssertEqual(game.upgradePoints, 0)
         XCTAssertEqual(game.speedUpgradeLevel, 0)
+        XCTAssertEqual(game.kyberCrystalUpgradeLevel, 0)
+        XCTAssertEqual(GameSession(audioEnabled: false, progressStore: defaults).upgradePoints, 0)
         XCTAssertFalse(game.isRunning)
         XCTAssertTrue(game.message.contains("All points and installed upgrades were lost"))
 
@@ -416,7 +423,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(game.isRunning)
     }
 
-    func testEveryFifthLevelHasAnEscalatingReinforcedBossThatDealsTenDamage() {
+    func testEveryFifthLevelHasAnEscalatingBossThatDealsThirtyContactDamage() {
         let game = GameSession(audioEnabled: false)
         XCTAssertNil(game.activeBoss)
         let expectedBossShields = [4: 60, 9: 90, 14: 120]
@@ -427,14 +434,14 @@ final class GameSessionTests: XCTestCase {
             XCTAssertTrue(boss.isBoss)
             XCTAssertEqual(boss.maxShields, expectedBossShields[levelIndex])
             XCTAssertEqual(boss.shields, boss.maxShields)
-            XCTAssertEqual(boss.contactDamage, 10)
+            XCTAssertEqual(boss.contactDamage, 30)
             XCTAssertEqual(boss.projectileDamage, 10)
         }
 
         guard let boss = game.activeBoss else { return XCTFail("Level 15 needs a boss") }
         XCTAssertTrue(game.activateShield())
         game.enemyContact(boss.displayName, damage: boss.contactDamage)
-        XCTAssertEqual(game.shields, 30)
+        XCTAssertEqual(game.shields, 10)
         XCTAssertEqual(game.health, game.maxHealth)
     }
 
@@ -721,7 +728,7 @@ final class GameSessionTests: XCTestCase {
         let miniBosses = game.enemies.filter(\.isMiniBoss)
         XCTAssertEqual(miniBosses.count, 1)
         XCTAssertEqual(miniBosses[0].shields, 6)
-        XCTAssertEqual(miniBosses[0].contactDamage, 4)
+        XCTAssertEqual(miniBosses[0].contactDamage, 12)
         XCTAssertEqual(miniBosses[0].combatScale, 1.15)
         RobotFactory.applyCombatState(to: combatLayer, session: game)
         XCTAssertNotNil(combatLayer.findEntity(named: "Training Enemy \(miniBosses[0].id)"))
@@ -757,7 +764,7 @@ final class GameSessionTests: XCTestCase {
 
         XCTAssertNil(game.hackingCameraID)
         XCTAssertTrue(game.disabledSecurityCameraIDs.contains(camera.id))
-        XCTAssertEqual(game.upgradePoints, pointsBeforeHack + GameSession.flipperHackReward)
+        XCTAssertEqual(game.upgradePoints, pointsBeforeHack, "Hacks award score, not spendable skill points")
         XCTAssertEqual(game.securityCameraHeading(camera), camera.heading, accuracy: 0.0001)
         XCTAssertTrue(game.securityCameraVisionDistances(for: camera, rayCount: 5).allSatisfy { $0 == 0 })
         let forward = SIMD2<Float>(-sin(camera.heading), -cos(camera.heading))
@@ -841,11 +848,112 @@ final class GameSessionTests: XCTestCase {
         XCTAssertFalse(room.findEntity(named: "Repair Pickup 0")?.isEnabled ?? true)
     }
 
+    func testMaxLaserPowerCannotMakeBasicSabersInstantlyDefeatEnemies() {
+        let suite = "ROBSaberSkills.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(3, forKey: "robWeaponUpgradeLevel")
+        let game = GameSession(audioEnabled: false, progressStore: defaults)
+        game.begin(); game.enemies = [game.enemies[0]]
+        XCTAssertEqual(game.weaponDamageBonus, 3)
+        game.collectCell()
+        XCTAssertEqual(game.upgradePoints, 0, "Pickups give score and energy, not skill points")
+        for strike in 1...4 {
+            game.enemies[0].position = game.robotPosition + [0, 0, -1]
+            game.saberAttack()
+            XCTAssertEqual(game.enemies[0].shields, 4 - strike)
+            XCTAssertEqual(game.enemies[0].isActive, strike < 4)
+            XCTAssertEqual(game.upgradePoints, strike < 4 ? 0 : 40)
+            game.tick(0.9)
+        }
+        game.saberAttack()
+        XCTAssertEqual(game.upgradePoints, 40, "A defeated target cannot pay out again")
+    }
+
+    func testKyberCrystalsIncreaseSaberDamageAndRequireLaterLevels() {
+        let suite = "ROBKyberRanks.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(10_000, forKey: GameSession.skillPointsStorageKey)
+        let game = GameSession(audioEnabled: false, progressStore: defaults)
+        game.begin(); game.enemies = [game.enemies[0]]
+        game.purchaseUpgrade(.kyberCrystals)
+        XCTAssertEqual(game.saberDamage, 2)
+        XCTAssertEqual(game.weaponDamageBonus, 0)
+        game.enemies[0].position = game.robotPosition + [0, 0, -1]
+        game.saberAttack()
+        XCTAssertEqual(game.enemies[0].shields, 2)
+        XCTAssertTrue(game.enemies[0].isActive)
+        let balance = game.upgradePoints
+        game.purchaseUpgrade(.kyberCrystals)
+        XCTAssertEqual(game.upgradePoints, balance)
+        XCTAssertEqual(game.kyberCrystalUpgradeLevel, 1)
+        XCTAssertTrue(game.upgradeLockReason(.kyberCrystals)?.contains("Level 5") == true)
+        for _ in 0..<5 { completeCurrentLevel(game) }
+        game.purchaseUpgrade(.kyberCrystals)
+        XCTAssertEqual(game.saberDamage, 3)
+        game.purchaseUpgrade(.kyberCrystals)
+        XCTAssertEqual(game.kyberCrystalUpgradeLevel, 2)
+        XCTAssertTrue(game.upgradeLockReason(.kyberCrystals)?.contains("Level 10") == true)
+        for _ in 0..<5 { completeCurrentLevel(game) }
+        game.purchaseUpgrade(.kyberCrystals)
+        XCTAssertEqual(game.saberDamage, 4)
+        XCTAssertFalse(game.canPurchaseUpgrade(.kyberCrystals))
+        XCTAssertNil(game.upgradeLockReason(.kyberCrystals))
+        XCTAssertEqual(GameSession(audioEnabled: false, progressStore: defaults).kyberCrystalUpgradeLevel, 3)
+    }
+
+    func testLegacySkillPointsConvertOnceAndKeepPurchasedUpgrades() {
+        let suite = "ROBSkillMigration.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(13_100, forKey: "robUpgradePoints")
+        defaults.set(3, forKey: "robWeaponUpgradeLevel")
+        defaults.set(3, forKey: "robHighestCompletedLevel")
+        let game = GameSession(audioEnabled: false, progressStore: defaults)
+        XCTAssertEqual(game.upgradePoints, 1_310)
+        XCTAssertEqual(game.weaponUpgradeLevel, 3)
+        XCTAssertEqual(game.highestCompletedLevel, 3)
+        XCTAssertTrue(game.message.contains("converted"))
+        game.purchaseUpgrade(.kyberCrystals)
+        XCTAssertEqual(game.upgradePoints, 710)
+        defaults.set(99_999, forKey: "robUpgradePoints") // An old client still writing the legacy balance.
+        let restored = GameSession(audioEnabled: false, progressStore: defaults)
+        XCTAssertEqual(restored.upgradePoints, 710)
+        XCTAssertEqual(restored.kyberCrystalUpgradeLevel, 1)
+        defaults.set(0, forKey: GameSession.skillPointsStorageKey)
+        XCTAssertEqual(GameSession(audioEnabled: false, progressStore: defaults).upgradePoints, 0)
+    }
+
+    func testEnemyContactMakesCloseCombatDangerous() {
+        for (kind, damage): (TrainingEnemyKind, Int) in [(.spider, 18), (.fax, 15)] {
+            let game = GameSession(audioEnabled: false)
+            game.begin()
+            guard let enemy = game.enemies.first(where: { $0.kind == kind }) else { return XCTFail("Missing enemy") }
+            XCTAssertEqual(enemy.contactDamage, damage)
+            game.enemyContact(enemy.displayName, damage: enemy.contactDamage)
+            XCTAssertEqual(game.health, 100 - damage)
+        }
+    }
+
+    func testFinalLevelPaysItsSkillRewardOnlyOnce() {
+        let game = GameSession(audioEnabled: false)
+        game.levelIndex = 14; game.begin()
+        game.collectedCells = game.level.cellCount; game.doorOpen = true
+        for index in game.enemies.indices { game.enemies[index].isActive = false }
+        game.nextLevel()
+        XCTAssertEqual(game.upgradePoints, 450)
+        let score = game.score
+        game.nextLevel()
+        XCTAssertEqual(game.upgradePoints, 450)
+        XCTAssertEqual(game.score, score)
+    }
+
     func testPerformanceUpgradesSpendPersistentPointsAndIncreaseCapabilities() {
         let suiteName = "ROBTrainingUpgrades.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        defaults.set(5_000, forKey: "robUpgradePoints")
+        defaults.set(5_000, forKey: GameSession.skillPointsStorageKey)
         let game = GameSession(audioEnabled: false, progressStore: defaults)
 
         game.purchaseUpgrade(.speedBoost)
@@ -1167,7 +1275,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertTrue(game.message.contains("Spin attack"))
     }
 
-    func testBattleHitsAddToThePersistentUpgradePool() {
+    func testBattleHitsAddScoreWithoutAwardingSkillPoints() {
         let game = GameSession(audioEnabled: false)
         game.begin()
         guard let targetIndex = game.enemies.indices.first else { return XCTFail("Missing training target") }
@@ -1178,7 +1286,8 @@ final class GameSessionTests: XCTestCase {
         game.fireLaser()
         for _ in 0..<90 where !game.laserProjectiles.isEmpty { game.tick(1.0 / 60.0) }
 
-        XCTAssertGreaterThanOrEqual(game.upgradePoints - pointsBeforeHit, 50)
+        XCTAssertEqual(game.upgradePoints, pointsBeforeHit)
+        XCTAssertGreaterThanOrEqual(game.score, 50)
     }
 
     func testManualShoulderLaserChargedShotSpendsEnergyAndDealsMoreDamage() {
@@ -1216,7 +1325,7 @@ final class GameSessionTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(15, forKey: "robHighestCompletedLevel")
         for weapon in ROBRangedWeapon.allCases {
-            defaults.set(1_200, forKey: "robUpgradePoints")
+            defaults.set(1_200, forKey: GameSession.skillPointsStorageKey)
             defaults.set(0, forKey: "robTargetingComputerUpgradeLevel")
             let game = GameSession(audioEnabled: false, progressStore: defaults)
             game.selectRangedWeapon(weapon); game.begin()
@@ -1322,7 +1431,11 @@ final class GameSessionTests: XCTestCase {
     }
 
     func testTargetingComputerLetsTwinBlastersDamageTwoIndependentTargets() {
-        let game = GameSession(audioEnabled: false)
+        let suite = "ROBTwinSkills.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(1_200, forKey: GameSession.skillPointsStorageKey)
+        let game = GameSession(audioEnabled: false, progressStore: defaults)
         for _ in 0..<5 { completeCurrentLevel(game) }
         game.purchaseUpgrade(.targetingComputer)
         game.selectRangedWeapon(.twinBlasters)
