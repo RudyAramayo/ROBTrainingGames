@@ -674,6 +674,7 @@ final class GameSession {
         return doorHackDescription
     }
     var laserLockDescription: String {
+        if gelBlasterEquipped { return "GEL · MANUAL AIM · PEQ \(peqMode.label.uppercased())" }
         guard hasAutoTargeting else { return "BASIC COMPUTER · MANUAL AIM · UPGRADE FOR AUTO LOCK" }
         guard let primary = lockedEnemy else { return "AUTO TARGETING · SCANNING" }
         guard rangedWeapon == .twinBlasters else { return "LOCK: \(primary.displayName.uppercased())" }
