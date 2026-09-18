@@ -1,20 +1,29 @@
 # ROB Training Submission Checklist
 
-Status: **iOS 1.0 (5) in preparation; build 4 remains Waiting for Review**
+Status: **iOS 1.0 (5) submitted — Waiting for Review**
 
 Updated: September 17, 2026
 
-Apple accepted version 1.0 build 4 for review on September 17, 2026 at 4:59 PM Pacific. Build 4 replaces the earlier build 2 submission; build 3 was uploaded but superseded before submission. Automatic release after approval remains selected. This is a review submission, not a public App Store release. Apple Vision Pro distribution remains on hold. Unchecked hardware and manual checks below remain unverified.
+Apple accepted version 1.0 build 5 for review on September 17, 2026 at 6:13 PM Pacific. Build 5 replaces the earlier build 4 submission. Automatic release after approval remains selected. This is a review submission, not a public App Store release. Apple Vision Pro distribution remains on hold. Unchecked hardware and manual checks below remain unverified.
 
-## September 17 build 5 preparation
+## September 17 build 5 release record
 
 - Adds matching browser/iOS/visionOS campaign Jammer, premium two-hand gel kit, PEQ modes and remote relay switches; ruleset `2026.09.17.3`.
 - Original shared 116-part display model checked in offline front/back renders. No physical radio or weapon controls; no URDF calibration changes.
 - Browser: 67 game tests and 46 lab tests passed; production build, 333-item gallery and 59-page subpath checks passed. All 122 iOS Simulator tests passed; six tactical tests passed again after final visual/input polish. The visionOS Simulator build passed.
-- Website source `f489e5cc3fd0c2a0f6b8b31e1595f749a13d7c9e` deployed successfully; the public simulator and bundled tactical model returned HTTP 200.
-- App Store upload and replacement review submission pending. Vision distribution remains on hold.
+- Website source `3f68c235f6aaa670940f3069f9d02d8843c9365e` deployed successfully; the public simulator and apps page returned HTTP 200, and the live game bundle matched the final local build by SHA-256.
+- Release source commit: `76aae093bc5f1ea869a22eb0dbec21a512b6758e`, committed and pushed before archiving. The final change clarifies manual gel aim in the HUD; its Release archive compiled successfully.
+- Signed archive: `/Users/rob/Downloads/ROBTraining-Releases/2026-09-17-build-5/ROBTraining-iOS-1.0-5.xcarchive`.
+- Upload succeeded September 17 at 6:06 PM Pacific. Apple processing completed, build 4's submission was cancelled, and build 5 was selected with updated promotional text, description and review notes.
+- Retained App Store export: `export/ROB Training.ipa`, 25,244,962 bytes, SHA-256 `1821ab16d5f012cef2cd9b53e4d8dfa19c8fe709115b7f9d34c0662e14dc3076`.
+- Apple Distribution signature verified with strict/deep checks. App Store provisioning team `975CAGD5EW`, no device restriction, `get-task-allow` false.
+- App Store build ID: `ed0666b9-0f8a-4316-a536-ef1af956f26d`.
+- Submission ID: `55217845-cfd5-4dde-9628-6cd07228b0e6`.
+- [Review record](https://appstoreconnect.apple.com/apps/6805294621/distribution/reviewsubmissions/details/55217845-cfd5-4dde-9628-6cd07228b0e6) visibly confirmed **iOS 1.0 (5), Waiting for Review**, submitted September 17 at 6:13 PM Pacific.
+- No separate companion binary is required; native missions work offline and Circuit Quest opens the hosted website. Vision distribution remains on hold.
+- [ ] After approval, verify the public App Store listing before reporting a public release.
 
-## September 17 build 4 release record
+## September 17 build 4 release record (superseded by build 5)
 
 - Release source commit: `417234fa917379bf4a83a46f5f360d4271d56598`, committed and pushed before archiving.
 - Added matching 24-level lean/grasp/carry/delivery objectives, including chess-pawn placement; ruleset `2026.09.17.2`.
@@ -34,7 +43,7 @@ Apple accepted version 1.0 build 4 for review on September 17, 2026 at 4:59 PM P
 
 | App | App Store ID | Bundle ID | Version | Build |
 | --- | --- | --- | --- | --- |
-| ROB Training | 6805294621 | `com.orbitusrobotics.ROBTraining` | 1.0 | 4 submitted |
+| ROB Training | 6805294621 | `com.orbitusrobotics.ROBTraining` | 1.0 | 5 submitted |
 | ROB Training Vision | 6805295387 | `com.orbitusrobotics.ROBTraining.vision` | 1.0 | 1 |
 
 ### September 17 build 3 (superseded by build 4)
@@ -152,6 +161,6 @@ Version 1.0 of the native iOS and visionOS apps stores scores locally and does n
 - [x] Account holder authorized publishing the iOS game on September 13, 2026.
 - [x] Reviewed the summary showing iOS 1.0 (2), submitted it, and verified **Waiting for Review**.
 
-The historical build 2 submission was removed on September 17 and replaced by the build 4 submission recorded above. Do not describe the app as published until approval and public listing verification are complete.
+The historical build 2 submission was removed on September 17 and replaced by build 4, then build 5 as recorded above. Do not describe the app as published until approval and public listing verification are complete.
 
 Previous build 2 archive location: `/tmp/robtraining-release-20260913/ROBTraining-iOS-1.0-2.xcarchive` (temporary artifact; no longer present on September 17). Its archive signature verification and Xcode export/upload passed on September 13, and its processing completed before selection and submission.
