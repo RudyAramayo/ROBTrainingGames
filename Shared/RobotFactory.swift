@@ -155,6 +155,7 @@ import UIKit
             jet.isEnabled = false
         }
         boosters.isEnabled = false
+        ROBTacticalVisual.install(on: root)
 
         return root
     }
@@ -250,6 +251,7 @@ import UIKit
     }
 
     static func applyCombatState(to layer: Entity, session: GameSession) {
+        ROBTacticalVisual.applyWorld(to: layer, session: session)
         for enemy in session.enemies {
             let name = "Training Enemy \(enemy.id)"
             let entity: Entity
@@ -435,6 +437,7 @@ import UIKit
             beam.position = [0, 0, -projectile.distance]
             beam.scale = [width, width, 1 + charge * 2.6]
         }
+        ROBTacticalVisual.apply(to: robot, session: session, componentMode: componentMode)
     }
 
     /// Dense rays keep the red edge tight to corners while the camera sweeps.
@@ -844,7 +847,7 @@ import UIKit
             button.scale = .init(repeating: session.isHackingDoor ? 0.85 + Float(sin(session.elapsed * 9)) * 0.18 : 1)
         }
         for camera in session.puzzle.securityCameras {
-            let isDisabled = session.disabledSecurityCameraIDs.contains(camera.id)
+            let isDisabled = session.disabledSecurityCameraIDs.contains(camera.id) || session.isSignalJammed(at: [camera.position.x, 0, camera.position.y])
             room.findEntity(named: "Security Camera \(camera.id)")?.orientation = simd_quatf(angle: session.securityCameraHeading(camera), axis: [0, 1, 0])
             if let beam = room.findEntity(named: "Security Camera Beam \(camera.id)") as? ModelEntity {
                 beam.isEnabled = !isDisabled

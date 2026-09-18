@@ -306,6 +306,8 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
     case targetingComputer
     case kyberCrystals
     case rocketBooster
+    case jammer
+    case gelBlaster
 
     var id: String { rawValue }
     var displayName: String {
@@ -316,6 +318,8 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
         case .targetingComputer: "Targeting Computer"
         case .kyberCrystals: "Kyber Crystals"
         case .rocketBooster: "Plasma Booster"
+        case .jammer: "Jammer"
+        case .gelBlaster: "StrikeForce Gel Kit + PEQ"
         }
     }
     var summary: String {
@@ -324,12 +328,14 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
         case .energyCapacity: "Adds 60 energy and dramatically improves cells and passive charging."
         case .weaponPower: "Adds one damage to laser hits."
         case .targetingComputer: "Replaces slow manual aim with fast automatic lock-on for every laser, including two independent Twin Blaster locks."
+        case .jammer: "Scrambles nearby basic robots and camera signals for 14 energy per second. Bosses resist it. Toggle J."
+        case .gelBlaster: "Premium two-handed gel blaster with a PEQ blue laser, IR view and flashlight. T draws, Q fires for 3 energy, V cycles PEQ. Shoot remote relays for a bonus."
         case .rocketBooster: "Hold to rise on blue plasma, steer in flight, then release to land. Uses 18 energy per second; recharge after landing."
         case .kyberCrystals: "Adds one saber damage per rank, from 1 to 4. Ranks 2 and 3 require clearing levels 5 and 10."
         }
     }
-    var maximumLevel: Int { (self == .targetingComputer || self == .rocketBooster) ? 1 : 3 }
-    func requiredCompletedLevel(for level: Int) -> Int { self == .rocketBooster ? 3 : self == .kyberCrystals ? level * 5 : 0 }
+    var maximumLevel: Int { (self == .targetingComputer || self == .rocketBooster || self == .jammer || self == .gelBlaster) ? 1 : 3 }
+    func requiredCompletedLevel(for level: Int) -> Int { self == .jammer ? 5 : self == .gelBlaster ? 10 : self == .rocketBooster ? 3 : self == .kyberCrystals ? level * 5 : 0 }
     func cost(for level: Int) -> Int {
         switch self {
         case .speedBoost: 700 + level * 650
@@ -338,13 +344,15 @@ enum ROBUpgrade: String, CaseIterable, Identifiable, Sendable {
         case .targetingComputer: 1_200
         case .kyberCrystals: 600 + level * 1_000
         case .rocketBooster: 900
+        case .jammer: 1_800
+        case .gelBlaster: 6_000
         }
     }
 }
 
 @MainActor @Observable
 final class GameSession {
-    static let gameplayRulesetVersion = "2026.09.17.2"
+    static let gameplayRulesetVersion = "2026.09.17.3"
     static let skillPointsStorageKey = "robSkillPoints"
     static func levelSkillReward(_ levelNumber: Int) -> Int { 50 + max(0, min(14, levelNumber - 1)) * 10 }
     static let laserRechargeDelay = 1.5
@@ -498,6 +506,30 @@ final class GameSession {
     private(set) var weaponUpgradeLevel = 0
     private(set) var targetingComputerUpgradeLevel = 0
     private(set) var rocketBoosterUpgradeLevel = 0
+    private(set) var jammerUpgradeLevel = 0
+    private(set) var gelBlasterUpgradeLevel = 0
+    private(set) var jammerActive = false
+    private(set) var gelBlasterEquipped = false
+    private(set) var peqMode: ROBPEQMode = .off
+    private(set) var gelProjectiles: [ROBGelProjectile] = []
+    private(set) var remoteRelayActivated = false
+    private var gelHeld = false
+    private var lastGelShot = -Double.infinity
+    private var nextGelID = 0
+    var hasJammer: Bool { jammerUpgradeLevel > 0 }
+    var hasGelBlaster: Bool { gelBlasterUpgradeLevel > 0 }
+    var tacticalHandsBusy: Bool { isHackingDoor || isHackingCamera || pickupActive || pickupLeanRequested || saberAnimation > 0 }
+    var remoteRelayPosition: SIMD3<Float> {
+        let point = puzzle.cells.first ?? puzzle.dock
+        return [point.x, puzzle.surfaceHeight(at: point) + 0.846 * 1.35, point.y]
+    }
+    var tacticalMuzzlePose: (position: SIMD3<Float>, direction: SIMD3<Float>) {
+        let pose = ROBBodyKinematics.torsoPose(basePitch: baseLiftPitch, leanAngle: torsoLeanAngle,
+            rearHeight: baseLiftHeight, rootHeight: robotPosition.y, scale: 1.35)
+        let yaw = simd_quatf(angle: robotHeading, axis: [0, 1, 0])
+        return (robotPosition + yaw.act(pose.position + pose.orientation.act(ROBTacticalRules.muzzle * 1.35)),
+                yaw.act(pose.orientation.act([0, 0, -1])))
+    }
     private(set) var rocketHeld = false
     private var rocketFlight = ROBRocketFlight()
     var hasRocketBooster: Bool { rocketBoosterUpgradeLevel > 0 }
@@ -533,7 +565,7 @@ final class GameSession {
     var laserCycleDuration: TimeInterval { hasAutoTargeting ? 0.25 : 0.8 }
     var laserChargeDuration: TimeInterval { hasAutoTargeting ? 1.25 : 1.8 }
     var laserCooldownRemaining: TimeInterval { max(0, laserCycleDuration - (elapsed - lastLaserShotTime)) }
-    var currentLaserEnergyCost: Double { rangedWeapon.energyCost(charge: laserCharge) }
+    var currentLaserEnergyCost: Double { gelBlasterEquipped ? ROBTacticalRules.gelCost : rangedWeapon.energyCost(charge: laserCharge) }
     var isSecurityAlerted: Bool { securityAlertRemaining > 0 }
     var isBaseFlipperActive: Bool { abs(baseFlipperAngle - baseFlipperTargetAngle) > 0.005 }
     var baseFlipperPhase: Float {
@@ -694,6 +726,8 @@ final class GameSession {
             energyUpgradeLevel = min(ROBUpgrade.energyCapacity.maximumLevel, max(0, store.integer(forKey: "robEnergyUpgradeLevel")))
             weaponUpgradeLevel = min(ROBUpgrade.weaponPower.maximumLevel, max(0, store.integer(forKey: "robWeaponUpgradeLevel")))
             targetingComputerUpgradeLevel = min(ROBUpgrade.targetingComputer.maximumLevel, max(0, store.integer(forKey: "robTargetingComputerUpgradeLevel")))
+            jammerUpgradeLevel = min(1, max(0, store.integer(forKey: "robJammerUpgradeLevel")))
+            gelBlasterUpgradeLevel = min(1, max(0, store.integer(forKey: "robGelBlasterUpgradeLevel")))
             rocketBoosterUpgradeLevel = min(1, max(0, store.integer(forKey: "robRocketBoosterUpgradeLevel")))
             kyberCrystalUpgradeLevel = min(ROBUpgrade.kyberCrystals.maximumLevel, max(0, store.integer(forKey: "robKyberCrystalUpgradeLevel")))
             if let savedCode = store.string(forKey: ROBDroidProfile.storageKey),
@@ -720,6 +754,8 @@ final class GameSession {
         case .targetingComputer: targetingComputerUpgradeLevel
         case .kyberCrystals: kyberCrystalUpgradeLevel
         case .rocketBooster: rocketBoosterUpgradeLevel
+        case .jammer: jammerUpgradeLevel
+        case .gelBlaster: gelBlasterUpgradeLevel
         }
     }
     func upgradeCost(_ upgrade: ROBUpgrade) -> Int? {
@@ -747,6 +783,12 @@ final class GameSession {
         case .targetingComputer:
             targetingComputerUpgradeLevel += 1
             progressStore?.set(targetingComputerUpgradeLevel, forKey: "robTargetingComputerUpgradeLevel")
+        case .jammer:
+            jammerUpgradeLevel = 1
+            progressStore?.set(1, forKey: "robJammerUpgradeLevel")
+        case .gelBlaster:
+            gelBlasterUpgradeLevel = 1
+            progressStore?.set(1, forKey: "robGelBlasterUpgradeLevel")
         case .rocketBooster:
             rocketBoosterUpgradeLevel = 1
             progressStore?.set(1, forKey: "robRocketBoosterUpgradeLevel")
@@ -1078,6 +1120,7 @@ final class GameSession {
     private func configureLevel() {
         isUpgradeIntermission = false
         hasAwardedLevelCompletion = false
+        resetTacticalEquipment()
         elapsed = 0; collectedCells = 0
         hasKey = false; doorOpen = !level.requiresKey; isHackingDoor = false; hackingCameraID = nil; hackingProgress = 0; securityAlertRemaining = 0; disabledSecurityCameraIDs = []
         baseFlipperAngle = Self.baseFlipperRearAngle; baseFlipperTarget = .rear; baseClimbLedgeID = nil
@@ -1123,6 +1166,7 @@ final class GameSession {
         isChargingLaser = false
         laserCharge = 0
         shieldTimeRemaining = 0
+        stopTacticalInput()
         isRunning = false
         isPaused = true
         if audioEnabled { TechnoMusicEngine.shared.stop() }
@@ -1161,6 +1205,7 @@ final class GameSession {
         guard isPickupGrounded, !isHackingDoor, !isHackingCamera, saberAnimation == 0 else {
             message = "Finish the current action and settle on level ground before leaning to grasp."; return
         }
+        stowGelBlaster()
         pickupLeanRequested.toggle()
         message = pickupLeanRequested ? "Leaning down. Align the right hand using slow tread movements, stop, then Grab."
             : "Standing for travel. Carried cargo stays in the right hand."
@@ -1327,7 +1372,7 @@ final class GameSession {
         let driveLoad = (abs(leftTread) + abs(rightTread)) * 0.5
         if !wasFlying && hasDriveEnergy && driveLoad > 0.01 {
             energy = max(0, energy - delta * (4.4 + driveLoad * 2.2))
-        } else if !wasFlying && isBaseGrounded && !isHackingDoor && !isHackingCamera && !isBaseFlipperActive && !isChargingLaser && elapsed - lastLaserShotTime >= Self.laserRechargeDelay {
+        } else if !wasFlying && isBaseGrounded && !isHackingDoor && !isHackingCamera && !isBaseFlipperActive && !isChargingLaser && !jammerActive && elapsed - lastLaserShotTime >= Self.laserRechargeDelay {
             energy = min(maxEnergy, energy + delta * passiveEnergyRecharge)
         }
         if energy <= 0.05, !wasEnergyDepleted {
@@ -1340,6 +1385,7 @@ final class GameSession {
         resolveSpatialObjectives()
         updateDoorHack(delta)
         updateCameraHack(delta)
+        updateTacticalEquipment(delta)
         updateSecurityCameras()
         if saberAnimation > 0 {
             saberAnimation = max(0, saberAnimation - delta / ROBMeleeAnimation.duration(saberStyle))
@@ -1499,7 +1545,7 @@ final class GameSession {
         guard !isInShadow else { return }
         let point = SIMD2<Float>(robotPosition.x, robotPosition.z)
         let detectingCamera = puzzle.securityCameras.first {
-            !disabledSecurityCameraIDs.contains($0.id) && securityCameraCanSee(point, camera: $0)
+            !disabledSecurityCameraIDs.contains($0.id) && !isSignalJammed(at: [$0.position.x, 0, $0.position.y]) && securityCameraCanSee(point, camera: $0)
         }
         if let detectingCamera {
             let wasAlerted = isSecurityAlerted
@@ -1890,6 +1936,10 @@ final class GameSession {
     private func updateEnemies(_ delta: TimeInterval) {
         for index in enemies.indices where enemies[index].isActive {
             var enemy = enemies[index]
+            if isEnemyJammed(enemy) {
+                enemy.lungeRemaining = 0; enemy.nextAttack = max(enemy.nextAttack, elapsed + 0.5)
+                enemies[index] = enemy; continue
+            }
             var toRobot = robotPosition - enemy.position; toRobot.y = 0
             let distance = simd_length(toRobot), phase = Float(elapsed) * (enemy.kind == .spider ? 0.62 : 0.34) + Float(index) * 2.17
             var target = enemy.origin + SIMD3<Float>(cos(phase) * (enemy.kind == .spider ? 0.65 : 0.5), 0, sin(phase) * (enemy.kind == .spider ? 0.65 : 0.5))
@@ -2025,9 +2075,11 @@ final class GameSession {
         updateLaserLock()
     }
     func fireLaser() {
+        if gelBlasterEquipped { fireGel(); return }
         fireLaser(charge: 0)
     }
     func beginLaserCharge() {
+        if gelBlasterEquipped { gelHeld = isRunning; fireGel(); return }
         guard isRunning, laserProjectiles.isEmpty, !isChargingLaser, laserCooldownRemaining == 0 else { return }
         let minimumEnergy = rangedWeapon.energyCost(charge: 0)
         guard energy >= minimumEnergy else {
@@ -2042,6 +2094,7 @@ final class GameSession {
             : "Basic computer: steer ROB to aim forward. Upgrade for faster automatic targeting."
     }
     func releaseLaserCharge() {
+        gelHeld = false
         guard isChargingLaser else { return }
         let charge = laserCharge; isChargingLaser = false; laserCharge = 0
         fireLaser(charge: charge)
@@ -2096,6 +2149,7 @@ final class GameSession {
         if audioEnabled { SoundPlayer.shared.playLaser(charge: clampedCharge) }
     }
     func saberAttack() {
+        stowGelBlaster()
         guard isRunning, saberAnimation == 0 else { return }
         guard !isCarryingCargo, pickupLeanAmount <= 0.02 else { message = "Place the cargo and stand upright before using melee weapons."; return }
         if meleeWeapon == .powerHammer {
@@ -2248,6 +2302,9 @@ final class GameSession {
         targetingComputerUpgradeLevel = 0
         kyberCrystalUpgradeLevel = 0
         rocketBoosterUpgradeLevel = 0
+        jammerUpgradeLevel = 0; gelBlasterUpgradeLevel = 0
+        progressStore?.set(0, forKey: "robJammerUpgradeLevel")
+        progressStore?.set(0, forKey: "robGelBlasterUpgradeLevel")
         progressStore?.set(0, forKey: "robRocketBoosterUpgradeLevel")
         progressStore?.set(0, forKey: Self.skillPointsStorageKey)
         progressStore?.set(0, forKey: "robSpeedUpgradeLevel")
@@ -2334,4 +2391,87 @@ final class GameSession {
         play("mission-start")
     }
     func reset() { levelIndex = 0; score = 0; lives = Self.maximumTrialLives; health = maxHealth; shields = maxShields; damageInvulnerabilityRemaining = 0; enemyAttackCount = 0; configureLevel(); isPaused = false; isRunning = false; isUpgradeIntermission = false; if audioEnabled { TechnoMusicEngine.shared.stop() }; message = "ROB systems ready with three trial lives." }
+}
+
+extension GameSession {
+    func toggleJammer() {
+        guard isRunning else { return }
+        guard hasJammer else { message = "Install the Jammer: 1,800 skill points after Level 5."; return }
+        guard jammerActive || energy >= 1 else { message = "Jammer needs energy. Let ROB recharge."; return }
+        jammerActive.toggle()
+        message = jammerActive ? "Jammer ON · 14 E/s. Basic robots and camera signals scrambled; bosses resist." : "Jammer OFF."
+    }
+    func toggleGelBlaster() {
+        guard isRunning else { return }
+        guard hasGelBlaster else { message = "StrikeForce Gel Kit costs 6,000 skill points after Level 10."; return }
+        guard gelBlasterEquipped || !tacticalHandsBusy else { message = "Stand upright and free both hands before drawing the gel blaster."; return }
+        isChargingLaser = false; laserCharge = 0; gelHeld = false
+        gelBlasterEquipped.toggle()
+        message = gelBlasterEquipped ? "Two-hand gel blaster ready. Hold Q to fire · V cycles PEQ. Shoot amber remote relays for a bonus." : "Gel blaster stowed."
+    }
+    func cyclePEQ() {
+        guard gelBlasterEquipped else { return }
+        peqMode = peqMode.next; message = "PEQ: \(peqMode.label)."
+    }
+    func stowGelBlaster() { gelBlasterEquipped = false; gelHeld = false }
+    func stopTacticalInput() { gelHeld = false; jammerActive = false }
+    private func resetTacticalEquipment() {
+        stopTacticalInput(); stowGelBlaster(); peqMode = .off
+        gelProjectiles = []; nextGelID = 0; lastGelShot = -.infinity; remoteRelayActivated = false
+    }
+    func isSignalJammed(at point: SIMD3<Float>) -> Bool {
+        ROBTacticalRules.jammed(active: jammerActive && isRunning, origin: robotPosition, target: point)
+    }
+    func isEnemyJammed(_ enemy: TrainingEnemy) -> Bool {
+        ROBTacticalRules.jammed(active: jammerActive && isRunning, origin: robotPosition, target: enemy.position, boss: enemy.isBoss, miniBoss: enemy.isMiniBoss)
+    }
+    func isInfraredTarget(_ enemy: TrainingEnemy) -> Bool {
+        guard gelBlasterEquipped, peqMode == .infrared, enemy.isActive,
+              simd_distance(robotPosition, enemy.position) < 9 else { return false }
+        return !projectileBlockers.contains { Self.segmentHitFraction(from: [robotPosition.x, robotPosition.z], to: [enemy.position.x, enemy.position.z], barrier: $0, padding: 0) != nil }
+    }
+    private func fireGel() {
+        guard isRunning, hasGelBlaster, gelBlasterEquipped, !tacticalHandsBusy,
+              elapsed - lastGelShot >= ROBTacticalRules.gelCycle - 1e-9 else { return }
+        guard energy >= ROBTacticalRules.gelCost else { gelHeld = false; message = "Gel blaster needs 3 energy. Release fire to recharge."; return }
+        energy -= ROBTacticalRules.gelCost; lastGelShot = elapsed; lastLaserShotTime = elapsed
+        let pose = tacticalMuzzlePose
+        gelProjectiles.append(ROBGelProjectile(id: nextGelID, position: pose.position, direction: pose.direction))
+        nextGelID += 1
+    }
+    private func updateTacticalEquipment(_ delta: TimeInterval) {
+        if jammerActive {
+            energy = max(0, energy - ROBTacticalRules.jammerDrain * delta)
+            if energy == 0 { jammerActive = false; message = "Jammer battery depleted — switched off." }
+        }
+        if tacticalHandsBusy { stowGelBlaster() }
+        if gelHeld { fireGel() }
+        var survivors: [ROBGelProjectile] = []
+        for var shot in gelProjectiles {
+            let start = SIMD2<Float>(shot.position.x, shot.position.z)
+            let step = min(ROBTacticalRules.gelRange - shot.distance, Float(delta) * ROBTacticalRules.gelSpeed)
+            shot.position += shot.direction * step; shot.distance += step
+            let end = SIMD2<Float>(shot.position.x, shot.position.z)
+            // Impact order is swept, so a wall always blocks enemies or switches behind it.
+            var nearest = projectileBlockers.compactMap { Self.segmentHitFraction(from: start, to: end, barrier: $0, padding: 0.04) }.min() ?? Float.infinity
+            var enemyIndex: Int?, hitRelay = false
+            for index in enemies.indices where enemies[index].isActive {
+                let enemy = enemies[index]
+                guard abs(shot.position.y - (enemy.position.y + 0.65)) < 0.85,
+                      let fraction = Self.segmentHitFraction(from: start, to: end, center: [enemy.position.x, enemy.position.z], radius: enemy.collisionRadius), fraction < nearest else { continue }
+                nearest = fraction; enemyIndex = index
+            }
+            if !remoteRelayActivated, abs(shot.position.y - remoteRelayPosition.y) < 0.3,
+               let fraction = Self.segmentHitFraction(from: start, to: end, center: [remoteRelayPosition.x, remoteRelayPosition.z], radius: 0.27), fraction < nearest {
+                nearest = fraction; enemyIndex = nil; hitRelay = true
+            }
+            if hitRelay {
+                remoteRelayActivated = true; hasKey = true; doorOpen = true; isHackingDoor = false; hackingProgress = 0
+                awardMissionPoints(ROBTacticalRules.switchScore, skillPoints: ROBTacticalRules.switchSkill)
+                message = "Remote relay activated! Security door released · +60 skill points."; play("pickup")
+            } else if let enemyIndex { damageEnemy(at: enemyIndex, weapon: "gel blaster", amount: ROBTacticalRules.gelDamage) }
+            if !nearest.isFinite && shot.distance < ROBTacticalRules.gelRange { survivors.append(shot) }
+        }
+        gelProjectiles = survivors
+    }
 }

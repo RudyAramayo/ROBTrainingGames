@@ -405,7 +405,7 @@ struct MissionCornerHUD: View {
             Text(session.cargoObjective).font(.caption.bold()).foregroundStyle(.mint).fixedSize(horizontal: false, vertical: true)
             miniMeter(icon: "shield.fill", value: Double(session.shields), maximum: Double(session.maxShields), color: .cyan, label: "ROB shields")
             miniMeter(icon: "bolt.batteryblock.fill", value: session.energy, maximum: session.maxEnergy, color: session.energyFraction < 0.2 ? .orange : .mint, label: "System energy")
-            Text("\(session.hasAutoTargeting ? "AUTO TARGETING" : "BASIC MANUAL AIM") · \(Int(ceil(session.currentLaserEnergyCost))) E / SHOT")
+            Text("\(session.gelBlasterEquipped ? "GEL · PEQ \(session.peqMode.label)" : session.jammerActive ? "JAMMER ON · 14 E/s" : session.hasAutoTargeting ? "AUTO TARGETING" : "BASIC MANUAL AIM") · \(Int(ceil(session.currentLaserEnergyCost))) E / SHOT")
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
                 .foregroundStyle(session.lockedEnemy == nil ? .orange : .red)
             if session.level.requiresKey {
@@ -504,6 +504,14 @@ struct MobileTankControls: View {
                                     accessibilityLabel: session.isCarryingCargo ? "Place cargo" : "Grab cargo with the right hand",
                                     disabled: !session.isRunning || session.isCargoDelivered,
                                     action: session.interactCargo)
+                    if session.hasJammer || session.hasGelBlaster {
+                        Menu {
+                            Button(session.jammerActive ? "Jammer OFF" : "Jammer ON · 14 E/s", action: session.toggleJammer).disabled(!session.hasJammer)
+                            Button(session.gelBlasterEquipped ? "Stow gel blaster" : "Draw gel blaster", action: session.toggleGelBlaster).disabled(!session.hasGelBlaster)
+                            Button("PEQ: \(session.peqMode.label) · Cycle", action: session.cyclePEQ).disabled(!session.gelBlasterEquipped)
+                        } label: { Image(systemName: "antenna.radiowaves.left.and.right").frame(width: actionSize, height: actionSize).background(.purple.opacity(0.7), in: Circle()) }
+                        .accessibilityLabel("Tactical equipment").disabled(!session.isRunning)
+                    }
                     RocketBoosterButton(session: session, compact: true)
                     HUDActionButton(
                         systemImage: "arrow.down.circle.fill",
@@ -1209,6 +1217,8 @@ private struct UpgradeOption: View {
         case .targetingComputer: "viewfinder.circle"
         case .kyberCrystals: "diamond.fill"
         case .rocketBooster: "flame.fill"
+        case .jammer: "antenna.radiowaves.left.and.right.slash"
+        case .gelBlaster: "scope"
         }
     }
 }

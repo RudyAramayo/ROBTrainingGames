@@ -347,6 +347,11 @@ private struct VisionControlDeck: View {
                         }
                         .buttonStyle(.borderedProminent).tint(.mint)
                         Text(session.cargoObjective).font(.callout).foregroundStyle(.mint)
+                        HStack {
+                            Button(session.jammerActive ? "JAM ON · 14 E/s" : "Jammer · J", action: session.toggleJammer).disabled(!session.isRunning || !session.hasJammer)
+                            Button(session.gelBlasterEquipped ? "Stow · T" : "Draw Gel · T", action: session.toggleGelBlaster).disabled(!session.isRunning || !session.hasGelBlaster)
+                            Button("PEQ \(session.peqMode.label) · V", action: session.cyclePEQ).disabled(!session.gelBlasterEquipped)
+                        }.buttonStyle(.bordered).tint(.purple)
                         if session.hasFlipperHackTargets {
                             Button(session.flipperHackDescription, systemImage: "dot.radiowaves.left.and.right") {
                                 session.startFlipperHack()

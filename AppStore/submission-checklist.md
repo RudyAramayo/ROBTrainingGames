@@ -1,10 +1,18 @@
 # ROB Training Submission Checklist
 
-Status: **iOS 1.0 (4) submitted — Waiting for Review**
+Status: **iOS 1.0 (5) in preparation; build 4 remains Waiting for Review**
 
 Updated: September 17, 2026
 
 Apple accepted version 1.0 build 4 for review on September 17, 2026 at 4:59 PM Pacific. Build 4 replaces the earlier build 2 submission; build 3 was uploaded but superseded before submission. Automatic release after approval remains selected. This is a review submission, not a public App Store release. Apple Vision Pro distribution remains on hold. Unchecked hardware and manual checks below remain unverified.
+
+## September 17 build 5 preparation
+
+- Adds matching browser/iOS/visionOS campaign Jammer, premium two-hand gel kit, PEQ modes and remote relay switches; ruleset `2026.09.17.3`.
+- Original shared 116-part display model checked in offline front/back renders. No physical radio or weapon controls; no URDF calibration changes.
+- Browser: 67 game tests and 46 lab tests passed; production build, 333-item gallery and 59-page subpath checks passed. All 122 iOS Simulator tests passed; six tactical tests passed again after final visual/input polish. The visionOS Simulator build passed.
+- Website source `f489e5cc3fd0c2a0f6b8b31e1595f749a13d7c9e` deployed successfully; the public simulator and bundled tactical model returned HTTP 200.
+- App Store upload and replacement review submission pending. Vision distribution remains on hold.
 
 ## September 17 build 4 release record
 

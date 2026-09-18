@@ -23,6 +23,9 @@ final class VisionGameControllerInput: NSObject {
         var rocketPressed = false
         var leanPressed = false
         var grabPressed = false
+        var jammerPressed = false
+        var gelPressed = false
+        var peqPressed = false
     }
 
     private(set) var isConnected = false
@@ -41,6 +44,7 @@ final class VisionGameControllerInput: NSObject {
     @ObservationIgnored private var laserWasPressed = false
     @ObservationIgnored private var hackWasPressed = false
     @ObservationIgnored private var menuWasPressed = false
+    @ObservationIgnored private var tacticalWasPressed = [false, false, false]
     @ObservationIgnored private var rocketWasPressed = false
     @ObservationIgnored private var leanWasPressed = false
     @ObservationIgnored private var grabWasPressed = false
@@ -84,6 +88,8 @@ final class VisionGameControllerInput: NSObject {
         if laserWasPressed { session?.releaseLaserCharge() }
         session?.stopDrive()
         session?.setRocketHeld(false)
+        session?.stopTacticalInput()
+        tacticalWasPressed = [false, false, false]
         rocketWasPressed = false
         saberWasPressed = false
         laserWasPressed = false
@@ -102,6 +108,7 @@ final class VisionGameControllerInput: NSObject {
     @objc private func controllerDidDisconnect(_ notification: Notification) {
         guard let controller = notification.object as? GCController else { return }
         let id = ObjectIdentifier(controller)
+        session?.stopTacticalInput()
         controller.extendedGamepad?.valueChangedHandler = nil
         controller.physicalInputProfile.valueDidChangeHandler = nil
         controllers.removeValue(forKey: id)
@@ -145,6 +152,9 @@ final class VisionGameControllerInput: NSObject {
         state.hackPressed = gamepad.buttonB.isPressed
         state.menuPressed = gamepad.buttonMenu.isPressed
         state.rocketPressed = gamepad.leftShoulder.isPressed
+        state.jammerPressed = gamepad.dpad.up.isPressed
+        state.gelPressed = gamepad.dpad.left.isPressed
+        state.peqPressed = gamepad.dpad.right.isPressed
         state.leanPressed = gamepad.leftThumbstickButton?.isPressed == true
         state.grabPressed = gamepad.rightThumbstickButton?.isPressed == true
         states[id] = state
@@ -192,6 +202,11 @@ final class VisionGameControllerInput: NSObject {
         let laserPressed = states.values.contains(where: \.laserPressed)
         let hackPressed = states.values.contains(where: \.hackPressed)
         let menuPressed = states.values.contains(where: \.menuPressed)
+        let tacticalPressed = [states.values.contains(where: \.jammerPressed), states.values.contains(where: \.gelPressed), states.values.contains(where: \.peqPressed)]
+        if tacticalPressed[0] && !tacticalWasPressed[0] { session?.toggleJammer() }
+        if tacticalPressed[1] && !tacticalWasPressed[1] { session?.toggleGelBlaster() }
+        if tacticalPressed[2] && !tacticalWasPressed[2] { session?.cyclePEQ() }
+        tacticalWasPressed = tacticalPressed
         let rocketPressed = states.values.contains(where: \.rocketPressed)
         let leanPressed = states.values.contains(where: \.leanPressed)
         let grabPressed = states.values.contains(where: \.grabPressed)

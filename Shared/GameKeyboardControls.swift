@@ -15,6 +15,9 @@ struct GameKeyboardControls: ViewModifier {
                     let wasHeld = heldKeys.contains(press.key)
                     heldKeys.insert(press.key)
                     if !wasHeld {
+                        if press.key == "j" { session.toggleJammer() }
+                        if press.key == "t" { session.toggleGelBlaster() }
+                        if press.key == "v" { session.cyclePEQ() }
                         if press.key == "q" { session.beginLaserCharge() }
                         if press.key == "r" { session.setRocketHeld(true) }
                         if press.key == "e" { session.activateShield() }
@@ -47,12 +50,13 @@ struct GameKeyboardControls: ViewModifier {
     private func cancelInput() {
         if heldKeys.contains("q") { session.releaseLaserCharge() }
         session.setRocketHeld(false)
+        session.stopTacticalInput()
         heldKeys = []
         session.stopDrive()
     }
 
     private static let supportedKeys: Set<KeyEquivalent> = [
-        "w", "a", "s", "d", "q", "e", "f", "b", "r", "c", "g", .upArrow, .downArrow, .leftArrow, .rightArrow, .space,
+        "w", "a", "s", "d", "q", "e", "f", "b", "r", "c", "g", "j", "t", "v", .upArrow, .downArrow, .leftArrow, .rightArrow, .space,
     ]
 }
 

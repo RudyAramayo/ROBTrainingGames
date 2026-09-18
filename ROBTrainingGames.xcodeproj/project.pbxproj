@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		01DBFA2260BE112F576CCBD9 /* ROBBattleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A037348E135227A957A0365B /* ROBBattleViews.swift */; };
 		05121A09D28DFDEB5BB51293 /* ROBBattle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C64E98B656622C765FF41748 /* ROBBattle.swift */; };
+		0628EB38FA3F7946F3299503 /* ROBTacticalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62FA25DD4F87C9CEE94688D3 /* ROBTacticalTests.swift */; };
 		0734375F540FCE947075ACE5 /* arena-wall-material.png in Resources */ = {isa = PBXBuildFile; fileRef = 4922F873A21CB27EAB947293 /* arena-wall-material.png */; };
 		0EA151C76007B45172EFCFE9 /* RobotFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8EABD4931412AA8A676C80 /* RobotFactory.swift */; };
 		124AFA151BFFCED32FC5B941 /* TechnoMusicEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F74BC0EEE41DF8682BB1619 /* TechnoMusicEngine.swift */; };
@@ -17,6 +18,7 @@
 		1D7E170D9A3B66DC4DC17F7C /* level-complete.m4a in Resources */ = {isa = PBXBuildFile; fileRef = DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */; };
 		201A3506945F144FBBE58F23 /* RobotFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8EABD4931412AA8A676C80 /* RobotFactory.swift */; };
 		22479D156C786D5582584DB6 /* ROBScanVisualModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA05B06A5408585BE01003AD /* ROBScanVisualModel.swift */; };
+		27003C2B97F57E41FC66459E /* ROBTacticalVisual.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE5784B583951614D00DE75 /* ROBTacticalVisual.swift */; };
 		29B0FE86232B80DD18211602 /* rob-training-key-art.png in Resources */ = {isa = PBXBuildFile; fileRef = 765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */; };
 		2C9151B4644B259D0962A455 /* pickup.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 14F0E4F7ED1B3521087B505C /* pickup.m4a */; };
 		374094AD795CF2CAD529E072 /* VisionDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D19BBDDC5D490212B965846 /* VisionDashboard.swift */; };
@@ -37,10 +39,12 @@
 		75A34823F815FF6431752B25 /* RobotVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDE8CFB55658390DC53F88E /* RobotVoice.swift */; };
 		77DF6D0A114D47F483C29600 /* rob-captured-colors.png in Resources */ = {isa = PBXBuildFile; fileRef = 636AB4F7184016C1F1FFE1E3 /* rob-captured-colors.png */; };
 		78CD15D09919EB828233E62E /* RobotVoicePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B4E424C9BE7958C5A4A9DA /* RobotVoicePanel.swift */; };
+		79868BE000307D0DC6B9F2EC /* ROBTacticalVisual.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE5784B583951614D00DE75 /* ROBTacticalVisual.swift */; };
 		7DA72140DFAD6235C27D1DD7 /* SoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */; };
 		801F959142CF82D4438D01F3 /* mission-start.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 43C86D54778FEDD1EDB6D00E /* mission-start.m4a */; };
 		80ACD0D4BE8A79DA1446F819 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */; };
 		81A5669F7DB12E4AC7CEC8EC /* LaserChargeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86F46D4F36051CC6C3E326B /* LaserChargeButton.swift */; };
+		8702A949E6016BFF63454E84 /* ROBTacticalRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A13BD613D15C5DE3E7089E /* ROBTacticalRules.swift */; };
 		893498983F1CFAD999DD5226 /* rob-captured.bin in Resources */ = {isa = PBXBuildFile; fileRef = AAFC4B9071418F02F986F985 /* rob-captured.bin */; };
 		8E92EDF0CC8A176364702C1A /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A494856CC93CF9C98076DE8A /* GameSession.swift */; };
 		8F5D5EA3ADB8F70CFA08BA08 /* SoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */; };
@@ -48,7 +52,9 @@
 		929BCC5700FEFAE14031A54D /* ROBPickup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93F0B9722FFB695AD07E27B7 /* ROBPickup.swift */; };
 		A7A686A5F2F3606393BB6100 /* ROBScanVisualModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA05B06A5408585BE01003AD /* ROBScanVisualModel.swift */; };
 		B0D1FEF0D8A64D0B703D8DE8 /* level-complete.m4a in Resources */ = {isa = PBXBuildFile; fileRef = DA754E7D7CE2315D5F7E1EFE /* level-complete.m4a */; };
+		B45F9C63DD9FF3BFB0B9075E /* ROBTacticalRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A13BD613D15C5DE3E7089E /* ROBTacticalRules.swift */; };
 		B479C490CB965B8F26E64DA9 /* ROBMeleeAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EA69B164FD2EF18A1B96053 /* ROBMeleeAnimation.swift */; };
+		B4E7E371B0CA551E848511A1 /* rob-tactical-model.json in Resources */ = {isa = PBXBuildFile; fileRef = 3D0E66992E13C9A8EFCCCE56 /* rob-tactical-model.json */; };
 		B53BF48805AEF932ECEA4F91 /* ROBBattleScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39FA9B438E19CFEC2BE06F5B /* ROBBattleScene.swift */; };
 		B7203185730E33816035D094 /* laser.m4a in Resources */ = {isa = PBXBuildFile; fileRef = E0A2FF07C60F58B44ADD1698 /* laser.m4a */; };
 		B7C66E4EB88560CD50A43CFD /* mission-start.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 43C86D54778FEDD1EDB6D00E /* mission-start.m4a */; };
@@ -71,6 +77,7 @@
 		F404A1811D8F61632ADCA8FC /* rob-visual.json in Resources */ = {isa = PBXBuildFile; fileRef = 1F4FFDAEF58AAB063DB13583 /* rob-visual.json */; };
 		F8CC61AB94CDC2BD86B1A149 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E77C631610B09DFC69177CB4 /* Assets.xcassets */; };
 		FA8F531FF22C63AEF3142E5D /* VisionGameControllerInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FFEAD7AC73E3EF8F36B45C6 /* VisionGameControllerInput.swift */; };
+		FC4C3D326E2FEA604E40C810 /* rob-tactical-model.json in Resources */ = {isa = PBXBuildFile; fileRef = 3D0E66992E13C9A8EFCCCE56 /* rob-tactical-model.json */; };
 		FD7F118B5CF5202E5ED50555 /* laser.m4a in Resources */ = {isa = PBXBuildFile; fileRef = E0A2FF07C60F58B44ADD1698 /* laser.m4a */; };
 /* End PBXBuildFile section */
 
@@ -85,6 +92,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		02A13BD613D15C5DE3E7089E /* ROBTacticalRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBTacticalRules.swift; sourceTree = "<group>"; };
 		077737605315118EDA10229C /* GameKeyboardControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameKeyboardControls.swift; sourceTree = "<group>"; };
 		14F0E4F7ED1B3521087B505C /* pickup.m4a */ = {isa = PBXFileReference; path = pickup.m4a; sourceTree = "<group>"; };
 		1F4FFDAEF58AAB063DB13583 /* rob-visual.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "rob-visual.json"; sourceTree = "<group>"; };
@@ -94,10 +102,13 @@
 		32D4357F2E7FC1FA9961CFD6 /* DroidWorkshopViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroidWorkshopViews.swift; sourceTree = "<group>"; };
 		359F05090B7BCCFB1DC7C669 /* ROBTrainingTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ROBTrainingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		39FA9B438E19CFEC2BE06F5B /* ROBBattleScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBBattleScene.swift; sourceTree = "<group>"; };
+		3D0E66992E13C9A8EFCCCE56 /* rob-tactical-model.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "rob-tactical-model.json"; sourceTree = "<group>"; };
 		3F74BC0EEE41DF8682BB1619 /* TechnoMusicEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TechnoMusicEngine.swift; sourceTree = "<group>"; };
 		43C86D54778FEDD1EDB6D00E /* mission-start.m4a */ = {isa = PBXFileReference; path = "mission-start.m4a"; sourceTree = "<group>"; };
 		4922F873A21CB27EAB947293 /* arena-wall-material.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "arena-wall-material.png"; sourceTree = "<group>"; };
 		4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		5DE5784B583951614D00DE75 /* ROBTacticalVisual.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBTacticalVisual.swift; sourceTree = "<group>"; };
+		62FA25DD4F87C9CEE94688D3 /* ROBTacticalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROBTacticalTests.swift; sourceTree = "<group>"; };
 		63220C95F6BF85ACADC6A078 /* ROBTrainingVision.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ROBTrainingVision.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		636AB4F7184016C1F1FFE1E3 /* rob-captured-colors.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "rob-captured-colors.png"; sourceTree = "<group>"; };
 		765A8E244554F2A5D755AFF4 /* rob-training-key-art.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "rob-training-key-art.png"; sourceTree = "<group>"; };
@@ -157,6 +168,7 @@
 				4EE6E574EB593003B19B216E /* PrivacyInfo.xcprivacy */,
 				636AB4F7184016C1F1FFE1E3 /* rob-captured-colors.png */,
 				AAFC4B9071418F02F986F985 /* rob-captured.bin */,
+				3D0E66992E13C9A8EFCCCE56 /* rob-tactical-model.json */,
 				1F4FFDAEF58AAB063DB13583 /* rob-visual.json */,
 				032F22C9CDE7E3453F3118FE /* Artwork */,
 				FD1C9C2F0921FEE5D6552908 /* Audio */,
@@ -181,6 +193,8 @@
 				93F0B9722FFB695AD07E27B7 /* ROBPickup.swift */,
 				BA05B06A5408585BE01003AD /* ROBScanVisualModel.swift */,
 				B7CEC87C449627DA35A84AF5 /* ROBSupportMotion.swift */,
+				02A13BD613D15C5DE3E7089E /* ROBTacticalRules.swift */,
+				5DE5784B583951614D00DE75 /* ROBTacticalVisual.swift */,
 				AADF2D2C39BC716ED975DC23 /* SoundPlayer.swift */,
 				3F74BC0EEE41DF8682BB1619 /* TechnoMusicEngine.swift */,
 				6C613CEBBA8D4E47E0FAE94A /* Resources */,
@@ -229,6 +243,7 @@
 			isa = PBXGroup;
 			children = (
 				DEBC1A2DCC5F0625E90BCDE7 /* GameSessionTests.swift */,
+				62FA25DD4F87C9CEE94688D3 /* ROBTacticalTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -360,6 +375,7 @@
 				2C9151B4644B259D0962A455 /* pickup.m4a in Resources */,
 				77DF6D0A114D47F483C29600 /* rob-captured-colors.png in Resources */,
 				893498983F1CFAD999DD5226 /* rob-captured.bin in Resources */,
+				B4E7E371B0CA551E848511A1 /* rob-tactical-model.json in Resources */,
 				29B0FE86232B80DD18211602 /* rob-training-key-art.png in Resources */,
 				F404A1811D8F61632ADCA8FC /* rob-visual.json in Resources */,
 			);
@@ -379,6 +395,7 @@
 				15953347EA4132F63B131F4A /* pickup.m4a in Resources */,
 				DC7292D634DC32D0DEF4E9F2 /* rob-captured-colors.png in Resources */,
 				C5FFAD658743269EB578EE8D /* rob-captured.bin in Resources */,
+				FC4C3D326E2FEA604E40C810 /* rob-tactical-model.json in Resources */,
 				55B33C4761AB7A8D346EB27C /* rob-training-key-art.png in Resources */,
 				F201505C71E8425292651D0E /* rob-visual.json in Resources */,
 			);
@@ -402,6 +419,8 @@
 				929BCC5700FEFAE14031A54D /* ROBPickup.swift in Sources */,
 				A7A686A5F2F3606393BB6100 /* ROBScanVisualModel.swift in Sources */,
 				5C9B0C7729137271D9DFF5D0 /* ROBSupportMotion.swift in Sources */,
+				8702A949E6016BFF63454E84 /* ROBTacticalRules.swift in Sources */,
+				79868BE000307D0DC6B9F2EC /* ROBTacticalVisual.swift in Sources */,
 				CB6811B4AEFB9E8FD157EA1D /* ROBTrainingVisionApp.swift in Sources */,
 				0EA151C76007B45172EFCFE9 /* RobotFactory.swift in Sources */,
 				75A34823F815FF6431752B25 /* RobotVoice.swift in Sources */,
@@ -419,6 +438,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5F24C21F936B161D686DDBFE /* GameSessionTests.swift in Sources */,
+				0628EB38FA3F7946F3299503 /* ROBTacticalTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -440,6 +460,8 @@
 				E7B1F004B1A3794FB523EEDF /* ROBPickup.swift in Sources */,
 				22479D156C786D5582584DB6 /* ROBScanVisualModel.swift in Sources */,
 				4C4608EFD0FCB8B6CEC448AD /* ROBSupportMotion.swift in Sources */,
+				B45F9C63DD9FF3BFB0B9075E /* ROBTacticalRules.swift in Sources */,
+				27003C2B97F57E41FC66459E /* ROBTacticalVisual.swift in Sources */,
 				6CFB7C4FCE1E8C49F724F115 /* ROBTrainingiOSApp.swift in Sources */,
 				201A3506945F144FBBE58F23 /* RobotFactory.swift in Sources */,
 				E1D33E988ED8F791EF94FE5F /* RobotVoice.swift in Sources */,
@@ -529,7 +551,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 975CAGD5EW;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -596,7 +618,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 975CAGD5EW;
 				ENABLE_NS_ASSERTIONS = NO;

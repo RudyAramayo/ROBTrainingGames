@@ -34,7 +34,7 @@ Run the shared campaign tests on an iOS Simulator with `xcodebuild test -scheme 
 
 ## Cross-platform gameplay sync
 
-`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. `Shared/ROBDroidProfile.swift` is the native half of the portable customization format; its field keys, allowlists, Base64URL encoding, and FNV-1a checksum must remain byte-compatible with the website's `assets/js/rob-droid-profile.mjs`. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.17.2`.
+`Shared/GameSession.swift` and `Shared/RobotFactory.swift` are the shared iOS and visionOS gameplay source. `Shared/ROBDroidProfile.swift` is the native half of the portable customization format; its field keys, allowlists, Base64URL encoding, and FNV-1a checksum must remain byte-compatible with the website's `assets/js/rob-droid-profile.mjs`. Every gameplay rules change must also be mirrored in the Orbitus Robotics website's `assets/js/rob-game-rules.mjs`, `assets/js/rob-simulator.js`, and focused rule tests. Keep `GameSession.gameplayRulesetVersion` equal to the website's `GAMEPLAY_RULESET_VERSION`; the current synchronized version is `2026.09.17.3`.
 
 App Store delivery is part of every released game update; pushing source or updating the website alone does not finish a release. Increment `CURRENT_PROJECT_VERSION` in `project.yml`, regenerate the Xcode project, run the shared campaign tests, and commit the release source before archiving. Archive `ROBTrainingiOS` in Release for `generic/platform=iOS` with `-allowProvisioningUpdates`, then use `xcodebuild -exportArchive` with `AppStore/ExportOptions-Upload.plist` to upload that signed archive. Verify Apple processing, attach the new build to the intended App Store version, synchronize `AppStore/metadata.md`, and complete submission. Record the source commit, build, validation, and actual Apple status in `AppStore/submission-checklist.md`; an upload is not a public release. ROB Training Vision has a separate App Store record and remains on hold until its release is requested. Production icons/screenshots, signing, privacy answers, age rating, support URLs, and device validation must match the submitted build. Keep lessons synchronized with `Presentation/ROB-Books/ROBOT_GAME_CURRICULUM.md` as the books evolve.
 
@@ -106,3 +106,18 @@ The shared pickup state machine rejects grabs while airborne, moving, upright,
 out of reach or blocked. The captured arms hang during the torso lean and the
 carried object follows the visible right palm. These game poses use illustrative
 geometry, not calibrated B1 commands or a measured LACT stroke-to-angle map.
+
+
+## Tactical campaign equipment (build 5)
+
+The Jammer costs 1,800 skill points after Level 5. J toggles the backpack unit; it drains 14 energy per second and pauses idle recharge. Basic robots inside its field stop moving and attacking, and nearby security-camera signals cannot raise new alarms. Bosses and security mini-bosses resist the effect. Depletion, pausing or lost input switches it off.
+
+The premium StrikeForce-inspired Gel Kit costs 6,000 skill points after Level 10. T draws or stows the two-handed tool. Hold Q (or the usual fire control) for 2-damage gel pellets, one every 0.22 seconds at 3 energy each. V cycles the ACTIONUNION PEQ-style module through blue laser, infrared target view, flashlight and off. IR markers respect walls. Leaning, carrying, hacking or swinging melee weapons stows the tool so the arms remain available. Native touch pilots use the Tactical equipment menu; Vision has buttons, and gamepads map D-pad up/left/right to Jammer/draw/PEQ.
+
+Each campaign room has an amber remote relay near its first energy cell. Gel projectiles can activate it from range, release the door's access lock and grant 400 score plus 60 skill points once per attempt. Walls and intervening robots absorb the shot. Tactical equipment is campaign-only; AutoNet peers and actual wireless hardware are unaffected.
+
+The game models are original simplified display geometry. The Jammer follows the olive JM010 housing with sixteen upward antennas on ROB's white router backpack. The blaster borrows the StrikeForce silhouette, with the right hand on the rear grip and the left arm crossing the chest to support the front. The real Umarex reference is a .177 BB product; all projectiles here are fictional gel pellets. PEQ blue/IR/flashlight modes are simulated and are not manufacturer performance specifications. These additions are not calibrated URDF components.
+
+References: [JM010 appearance](https://jammermaster.com/product/mobile-phone-signal-jammer-jm010/), [Umarex StrikeForce appearance](https://www.umarexusa.com/2252132).
+
+The shared model comes from the website repository's `scripts/build-rob-tactical-model.py --native-resources <this-repo>/Shared/Resources`; its generated JSON and browser module describe the same 116 parts. Keep the tactical rules synchronized with `assets/js/rob-tactical.mjs` (native spatial units are half the browser's arena units). Model poses use each renderer's established ROB presentation scale.

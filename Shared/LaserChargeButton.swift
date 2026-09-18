@@ -122,7 +122,7 @@ struct LaserChargeButton: View {
                     }
                     .contentShape(Circle())
             } else {
-                Label(pressing ? "Charge \(Int(session.laserCharge * 100))% · \(Int(ceil(session.currentLaserEnergyCost))) E" : "\(title) · \(Int(ceil(session.currentLaserEnergyCost))) E", systemImage: "scope")
+                Label(session.gelBlasterEquipped ? "Gel · 3 E · hold to fire" : pressing ? "Charge \(Int(session.laserCharge * 100))% · \(Int(ceil(session.currentLaserEnergyCost))) E" : "\(title) · \(Int(ceil(session.currentLaserEnergyCost))) E", systemImage: "scope")
                     .font(compact ? .caption.bold() : .body.bold())
                     .lineLimit(1)
                     .padding(.horizontal, compact ? 10 : 14)
@@ -146,7 +146,7 @@ struct LaserChargeButton: View {
                     }
             )
             .accessibilityAddTraits(.isButton)
-            .accessibilityLabel("Charge and fire virtual pan-tilt training laser")
+            .accessibilityLabel(session.gelBlasterEquipped ? "Hold to fire gel pellets" : "Charge and fire virtual pan-tilt training laser")
             .accessibilityValue("\(session.laserLockDescription). \(Int(ceil(session.currentLaserEnergyCost))) energy per shot.")
             .accessibilityAction { session.fireLaser() }
             .onDisappear { if pressing { session.releaseLaserCharge(); pressing = false } }

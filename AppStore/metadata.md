@@ -4,7 +4,7 @@
 
 - Seller-facing brand: Orbitus Robotics
 - Version: 1.0
-- iOS release build: 4 (see `submission-checklist.md` for submission status)
+- iOS release build: 5 (see `submission-checklist.md` for submission status)
 - Price: Free
 - Primary language: English (U.S.)
 - Primary category: Education
@@ -26,7 +26,7 @@
 - SKU: ROB-TRAINING-IOS-1
 - Name: ROB Training
 - Subtitle: Drive, battle, learn ROB
-- Promotional text: Pilot ROB through 24 robotics missions: climb ledges, use plasma boosters, battle training robots, and lean down to pick up and deliver cargo or chess pieces.
+- Promotional text: Master 24 ROB missions: deliver cargo, earn a Jammer, and unlock a two-handed gel blaster with blue laser, infrared view, flashlight, and remote relay targets.
 - Keywords: robotics,education,STEM,robot,spatial,training,missions,engineering,AR,simulation
 
 ### Description
@@ -37,11 +37,14 @@ Drive ROB's independent tri-wheel treads through expanded training rooms. Collec
 
 Chain wide dual-arm saber swings into a full spin attack. Aim the virtual shoulder laser manually at first, then earn the Targeting Computer upgrade for automatic locks. Upgrade Kyber Crystals to increase saber damage, and plan your spending as stronger enemies and scarcer skill points raise the challenge.
 
+Save skill points for the Jammer to scramble nearby training robots and security-camera signals, or the premium two-handed gel kit with blue laser, infrared target view and flashlight modes. Activate distant relay targets to release doors and earn a bonus. All effects stay inside the simulated campaign.
+
 ROB Training includes:
 
 • 24 progressively harder missions, including nine elevated booster stages
 • A detailed captured ROB model with balanced flipper climbs and moving shoulder laser
 • Energy-powered plasma boosters, targeting upgrades, and Kyber Crystal saber upgrades
+• Campaign Jammer and premium two-handed gel kit with PEQ modes and remote relay switches
 • Lean, grasp and deliver crates, batteries and chess pieces in every mission
 • Independent tread controls plus keyboard support
 • Active spider and sentry robots that move and fight back
@@ -79,6 +82,7 @@ ROB Training Vision includes:
 • Lean, grasp and deliver crates, batteries and chess pieces
 • A detailed captured ROB model with balanced flipper climbs and moving shoulder laser
 • Energy-powered plasma boosters, targeting upgrades, and Kyber Crystal saber upgrades
+• Campaign Jammer and premium two-handed gel kit with PEQ modes and remote relay switches
 • Full-scale ROB placement and component inspection
 • Moving enemies that pursue, lunge, circle, and return fire
 • Wide saber swings, a fully extended spin attack, and chargeable laser shots
@@ -101,3 +105,8 @@ Each level now also requires delivery of its marked cargo. Tap Lean, align the
 right hand using the treads, stop, and tap Grab. Carry the object to its pad or
 chess square, lean again and tap Place. C and G provide keyboard equivalents.
 The model motion is simulated; no robot connection or hardware command exists.
+
+
+### Build 5 review additions
+
+Adds campaign-only Jammer (1,800 earned skill points after Level 5) and StrikeForce-inspired Gel Kit (6,000 earned skill points after Level 10). No in-app purchase, radio interference, hardware control, or new data collection. J toggles Jammer, T draws/stows the gel kit, Q fires, V cycles PEQ; equivalent touch controls are available. Amber remote relays near the first cell release the access lock and pay a one-time skill bonus. Original procedural equipment models use product shapes as visual references. Robot-only fantasy combat remains within the existing content-rating answers. Previous review contact and account details are unchanged.
