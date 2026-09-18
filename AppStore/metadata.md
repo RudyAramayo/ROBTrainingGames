@@ -26,7 +26,7 @@
 - SKU: ROB-TRAINING-IOS-1
 - Name: ROB Training
 - Subtitle: Drive, battle, learn ROB
-- Promotional text: Command ROB through 24 robotics missions. Climb ledges, unlock blue-plasma boosters, and earn targeting and saber upgrades through tougher battles.
+- Promotional text: Pilot ROB through 24 robotics missions: climb ledges, use plasma boosters, battle training robots, and lean down to pick up and deliver cargo or chess pieces.
 - Keywords: robotics,education,STEM,robot,spatial,training,missions,engineering,AR,simulation
 
 ### Description
@@ -49,7 +49,7 @@ ROB Training includes:
 • Original procedural techno music and robot effects
 • A RealityKit AR lab for placing ROB in your room
 • Encrypted AutoNet deathmatch and Capture the Flag for up to four nearby pilots, with arena voting and game or AR views
-• Learning guides and access to 90 online Circuit Quest builds (internet required for web activities)
+• Learning guides and access to 102 online Circuit Quest builds (internet required for web activities)
 • A component explorer covering ROB's drive base, power, Cerebro, sensors, AMBER arms, and safety layer
 • Optional on-device ROB Voice using Apple speech recognition and Apple Intelligence when available
 
